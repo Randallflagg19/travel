@@ -15,6 +15,7 @@ type CloudinaryResource = {
 };
 
 type DeliveryType = 'upload' | 'private' | 'authenticated';
+type ResourceType = 'image' | 'video' | 'raw';
 
 function pickMediaType(
   resource: CloudinaryResource,
@@ -57,6 +58,24 @@ function deriveCountryCity(folder: string | null): {
   return { country, city };
 }
 
+function normalizePrefix(raw: string | undefined | null): string | null {
+  const p = (raw ?? '').trim();
+  if (!p) return null;
+  return p;
+}
+
+function stripTrailingSlashes(s: string): string {
+  return s.replace(/\/+$/g, '');
+}
+
+function firstFolderFromPrefix(prefix: string | null): string | null {
+  if (!prefix) return null;
+  const clean = stripTrailingSlashes(prefix);
+  if (!clean) return null;
+  const first = clean.split('/').filter(Boolean)[0];
+  return first || null;
+}
+
 @Injectable()
 export class CloudinaryService {
   private readonly isConfigured: boolean;
@@ -96,8 +115,8 @@ export class CloudinaryService {
   async importPrefix(params: { prefix: string; userId: string; max?: number }) {
     const sql = this.getSqlOrThrow();
 
-    const prefix = params.prefix.trim();
-    if (!prefix) throw new BadRequestException('prefix is required');
+    const prefixInput = params.prefix.trim();
+    if (!prefixInput) throw new BadRequestException('prefix is required');
 
     const max = Math.max(1, Math.min(10000, params.max ?? 2000));
 
@@ -112,7 +131,8 @@ export class CloudinaryService {
 
     const importBatch = async (
       deliveryType: DeliveryType,
-      resourceType: 'image' | 'video',
+      resourceType: ResourceType,
+      prefix: string,
     ) => {
       let nextCursor: string | undefined;
       while (scanned < max) {
@@ -162,14 +182,28 @@ export class CloudinaryService {
       }
     };
 
-    for (const dt of deliveryTypes) {
-      if (scanned >= max) break;
-      await importBatch(dt, 'image');
-      if (scanned >= max) break;
-      await importBatch(dt, 'video');
+    const prefixesToTry = Array.from(
+      new Set([
+        prefixInput,
+        stripTrailingSlashes(prefixInput),
+        `${stripTrailingSlashes(prefixInput)}/`,
+      ].filter(Boolean)),
+    );
+
+    const resourceTypes: ResourceType[] = ['image', 'video', 'raw'];
+
+    for (const prefix of prefixesToTry) {
+      for (const dt of deliveryTypes) {
+        for (const rt of resourceTypes) {
+          if (scanned >= max) break;
+          await importBatch(dt, rt, prefix);
+        }
+        if (scanned >= max) break;
+      }
+      if (scanned > 0 || scanned >= max) break;
     }
 
-    return { prefix, scanned, inserted };
+    return { prefix: prefixInput, scanned, inserted };
   }
 
   async probePrefix(params: { prefix: string }) {
@@ -178,8 +212,7 @@ export class CloudinaryService {
         'Cloudinary is not configured on the server',
       );
     }
-    const prefix = params.prefix.trim();
-    if (!prefix) throw new BadRequestException('prefix is required');
+    const prefix = normalizePrefix(params.prefix);
 
     const deliveryTypes: DeliveryType[] = [
       'upload',
@@ -187,65 +220,89 @@ export class CloudinaryService {
       'private',
     ];
 
-    const results: Record<
+    const resourceTypes: ResourceType[] = ['image', 'video', 'raw'];
+
+    const byType: Record<
       DeliveryType,
-      { images: CloudinaryResource[]; videos: CloudinaryResource[] }
+      Record<ResourceType, { found: number; sample: CloudinaryResource[] }>
     > = {
-      upload: { images: [], videos: [] },
-      authenticated: { images: [], videos: [] },
-      private: { images: [], videos: [] },
+      upload: { image: { found: 0, sample: [] }, video: { found: 0, sample: [] }, raw: { found: 0, sample: [] } },
+      authenticated: { image: { found: 0, sample: [] }, video: { found: 0, sample: [] }, raw: { found: 0, sample: [] } },
+      private: { image: { found: 0, sample: [] }, video: { found: 0, sample: [] }, raw: { found: 0, sample: [] } },
     };
 
     for (const dt of deliveryTypes) {
-      const imageResUnknown: unknown = await cloudinary.api.resources({
-        type: dt,
-        prefix,
-        resource_type: 'image',
-        max_results: 5,
-      });
-      const videoResUnknown: unknown = await cloudinary.api.resources({
-        type: dt,
-        prefix,
-        resource_type: 'video',
-        max_results: 5,
-      });
-      const imageRes = imageResUnknown as { resources: CloudinaryResource[] };
-      const videoRes = videoResUnknown as { resources: CloudinaryResource[] };
-      results[dt] = { images: imageRes.resources, videos: videoRes.resources };
+      for (const rt of resourceTypes) {
+        const resUnknown: unknown = await cloudinary.api.resources({
+          type: dt,
+          ...(prefix ? { prefix } : {}),
+          resource_type: rt,
+          max_results: 5,
+        });
+        const res = resUnknown as { resources: CloudinaryResource[] };
+        byType[dt][rt] = { found: res.resources.length, sample: res.resources };
+      }
     }
+
+    let ping: unknown = null;
+    try {
+      ping = (await cloudinary.api.ping()) as unknown;
+    } catch (e) {
+      ping = { error: (e as Error).message };
+    }
+
+    let rootFolders: unknown = null;
+    try {
+      rootFolders = (await cloudinary.api.root_folders()) as unknown;
+    } catch (e) {
+      rootFolders = { error: (e as Error).message };
+    }
+
+    const firstFolder = firstFolderFromPrefix(prefix);
+    let subFolders: unknown = null;
+    if (firstFolder) {
+      try {
+        subFolders = (await cloudinary.api.sub_folders(firstFolder)) as unknown;
+      } catch (e) {
+        subFolders = { error: (e as Error).message };
+      }
+    }
+
+    const allSamples = deliveryTypes.flatMap((dt) =>
+      resourceTypes.flatMap((rt) => byType[dt][rt].sample),
+    );
+
+    const sample_public_ids = allSamples.map((r) => r.public_id).slice(0, 20);
+    const sample_folders = allSamples.map((r) => r.folder ?? null).slice(0, 20);
 
     return {
       prefix,
+      diagnostics: {
+        ping,
+        root_folders: rootFolders,
+        sub_folders_for_first_prefix_folder: firstFolder
+          ? { folder: firstFolder, result: subFolders }
+          : null,
+      },
       by_type: {
         upload: {
-          images_found: results.upload.images.length,
-          videos_found: results.upload.videos.length,
+          images_found: byType.upload.image.found,
+          videos_found: byType.upload.video.found,
+          raw_found: byType.upload.raw.found,
         },
         authenticated: {
-          images_found: results.authenticated.images.length,
-          videos_found: results.authenticated.videos.length,
+          images_found: byType.authenticated.image.found,
+          videos_found: byType.authenticated.video.found,
+          raw_found: byType.authenticated.raw.found,
         },
         private: {
-          images_found: results.private.images.length,
-          videos_found: results.private.videos.length,
+          images_found: byType.private.image.found,
+          videos_found: byType.private.video.found,
+          raw_found: byType.private.raw.found,
         },
       },
-      sample_public_ids: [
-        ...results.upload.images.map((r) => r.public_id),
-        ...results.upload.videos.map((r) => r.public_id),
-        ...results.authenticated.images.map((r) => r.public_id),
-        ...results.authenticated.videos.map((r) => r.public_id),
-        ...results.private.images.map((r) => r.public_id),
-        ...results.private.videos.map((r) => r.public_id),
-      ].slice(0, 10),
-      sample_folders: [
-        ...results.upload.images.map((r) => r.folder ?? null),
-        ...results.upload.videos.map((r) => r.folder ?? null),
-        ...results.authenticated.images.map((r) => r.folder ?? null),
-        ...results.authenticated.videos.map((r) => r.folder ?? null),
-        ...results.private.images.map((r) => r.folder ?? null),
-        ...results.private.videos.map((r) => r.folder ?? null),
-      ].slice(0, 10),
+      sample_public_ids,
+      sample_folders,
     };
   }
 }

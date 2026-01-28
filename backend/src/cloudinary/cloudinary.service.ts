@@ -280,7 +280,10 @@ export class CloudinaryService {
             ${city},
             ${createdAt.toISOString()}
           )
-          ON CONFLICT (cloudinary_public_id) DO NOTHING
+          -- Our DB uses a PARTIAL unique index:
+          --   posts_cloudinary_public_id_unique ON (cloudinary_public_id) WHERE cloudinary_public_id IS NOT NULL
+          -- For Postgres to use that index for conflict resolution, the conflict target must repeat the predicate.
+          ON CONFLICT (cloudinary_public_id) WHERE cloudinary_public_id IS NOT NULL DO NOTHING
           RETURNING id
         `;
         if (rows.length > 0) inserted += 1;

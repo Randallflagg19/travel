@@ -9,7 +9,7 @@ type CloudinaryResource = {
   public_id: string;
   resource_type: string;
   format?: string;
-  secure_url: string;
+  secure_url?: string;
   created_at?: string;
   folder?: string;
   asset_folder?: string;
@@ -78,6 +78,12 @@ function firstFolderFromPrefix(prefix: string | null): string | null {
   return first || null;
 }
 
+function toResourceType(value: string): ResourceType {
+  if (value === 'image' || value === 'video' || value === 'raw') return value;
+  // Cloudinary sometimes uses "image"/"video"/"raw"; fall back to image.
+  return 'image';
+}
+
 @Injectable()
 export class CloudinaryService {
   private readonly isConfigured: boolean;
@@ -112,6 +118,22 @@ export class CloudinaryService {
       throw new BadRequestException('Database is not configured on the server');
     }
     return sql;
+  }
+
+  private buildMediaUrl(resource: CloudinaryResource): string | null {
+    const url = (resource.secure_url ?? '').trim();
+    if (url) return url;
+    // Some Admin API responses don't include secure_url.
+    // We can still build a delivery URL from config + public_id.
+    try {
+      return cloudinary.url(resource.public_id, {
+        secure: true,
+        resource_type: toResourceType(resource.resource_type),
+        type: 'upload',
+      });
+    } catch {
+      return null;
+    }
   }
 
   private async listByAssetFolder(params: {
@@ -218,6 +240,58 @@ export class CloudinaryService {
 
     let scanned = 0;
     let inserted = 0;
+    const errors: Array<{
+      stage: 'list' | 'insert';
+      folder?: string;
+      resource_type?: ResourceType;
+      source?: 'resources' | 'resources_by_asset_folder' | 'search';
+      public_id?: string;
+      message: string;
+    }> = [];
+
+    const safeInsert = async (r: CloudinaryResource) => {
+      const mediaUrl = this.buildMediaUrl(r);
+      if (!mediaUrl) {
+        errors.push({
+          stage: 'insert',
+          public_id: r.public_id,
+          message: 'Missing media URL (secure_url not provided)',
+        });
+        return;
+      }
+
+      const folder = deriveFolder(r);
+      const { country, city } = deriveCountryCity(folder);
+      const mediaType = pickMediaType(r);
+      const createdAt = r.created_at ? new Date(r.created_at) : new Date();
+
+      try {
+        const rows = await sql<{ id: string }[]>`
+          INSERT INTO posts (
+            user_id, media_type, media_url, cloudinary_public_id, folder, country, city, created_at
+          )
+          VALUES (
+            ${params.userId}::uuid,
+            ${mediaType},
+            ${mediaUrl},
+            ${r.public_id},
+            ${folder},
+            ${country},
+            ${city},
+            ${createdAt.toISOString()}
+          )
+          ON CONFLICT (cloudinary_public_id) DO NOTHING
+          RETURNING id
+        `;
+        if (rows.length > 0) inserted += 1;
+      } catch (e) {
+        errors.push({
+          stage: 'insert',
+          public_id: r.public_id,
+          message: (e as Error)?.message ?? 'DB insert failed',
+        });
+      }
+    };
 
     const deliveryTypes: DeliveryType[] = [
       'upload',
@@ -246,29 +320,7 @@ export class CloudinaryService {
 
         for (const r of res.resources) {
           scanned += 1;
-          const folder = deriveFolder(r);
-          const { country, city } = deriveCountryCity(folder);
-          const mediaType = pickMediaType(r);
-          const createdAt = r.created_at ? new Date(r.created_at) : new Date();
-
-          const rows = await sql<{ id: string }[]>`
-            INSERT INTO posts (
-              user_id, media_type, media_url, cloudinary_public_id, folder, country, city, created_at
-            )
-            VALUES (
-              ${params.userId}::uuid,
-              ${mediaType},
-              ${r.secure_url},
-              ${r.public_id},
-              ${folder},
-              ${country},
-              ${city},
-              ${createdAt.toISOString()}
-            )
-            ON CONFLICT (cloudinary_public_id) DO NOTHING
-            RETURNING id
-          `;
-          if (rows.length > 0) inserted += 1;
+          await safeInsert(r);
 
           if (scanned >= max) break;
         }
@@ -292,7 +344,16 @@ export class CloudinaryService {
       for (const dt of deliveryTypes) {
         for (const rt of resourceTypes) {
           if (scanned >= max) break;
-          await importBatch(dt, rt, prefix);
+          try {
+            await importBatch(dt, rt, prefix);
+          } catch (e) {
+            errors.push({
+              stage: 'list',
+              source: 'resources',
+              resource_type: rt,
+              message: (e as Error)?.message ?? 'cloudinary.api.resources failed',
+            });
+          }
         }
         if (scanned >= max) break;
       }
@@ -310,13 +371,6 @@ export class CloudinaryService {
         root: assetFolder,
         maxFolders: 500,
       });
-
-      const errors: Array<{
-        folder: string;
-        resource_type: ResourceType;
-        source: 'resources_by_asset_folder' | 'search';
-        message: string;
-      }> = [];
 
       const importFromFolder = async (rt: ResourceType) => {
         for (const folderPath of foldersToImport) {
@@ -345,6 +399,7 @@ export class CloudinaryService {
                 });
               } catch (e2) {
                 errors.push({
+                  stage: 'list',
                   folder: folderPath,
                   resource_type: rt,
                   source: 'resources_by_asset_folder',
@@ -353,6 +408,7 @@ export class CloudinaryService {
                     'resources_by_asset_folder failed',
                 });
                 errors.push({
+                  stage: 'list',
                   folder: folderPath,
                   resource_type: rt,
                   source: 'search',
@@ -365,29 +421,7 @@ export class CloudinaryService {
 
             for (const r of res.resources) {
               scanned += 1;
-              const folder = deriveFolder(r);
-              const { country, city } = deriveCountryCity(folder);
-              const mediaType = pickMediaType(r);
-              const createdAt = r.created_at ? new Date(r.created_at) : new Date();
-
-              const rows = await sql<{ id: string }[]>`
-                INSERT INTO posts (
-                  user_id, media_type, media_url, cloudinary_public_id, folder, country, city, created_at
-                )
-                VALUES (
-                  ${params.userId}::uuid,
-                  ${mediaType},
-                  ${r.secure_url},
-                  ${r.public_id},
-                  ${folder},
-                  ${country},
-                  ${city},
-                  ${createdAt.toISOString()}
-                )
-                ON CONFLICT (cloudinary_public_id) DO NOTHING
-                RETURNING id
-              `;
-              if (rows.length > 0) inserted += 1;
+              await safeInsert(r);
 
               if (scanned >= max) break;
             }
@@ -406,7 +440,7 @@ export class CloudinaryService {
       return { prefix: prefixInput, scanned, inserted, errors: errors.slice(0, 50) };
     }
 
-    return { prefix: prefixInput, scanned, inserted };
+    return { prefix: prefixInput, scanned, inserted, errors: errors.slice(0, 50) };
   }
 
   async probePrefix(params: { prefix: string }) {

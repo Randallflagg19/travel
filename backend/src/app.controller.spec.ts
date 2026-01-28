@@ -13,7 +13,7 @@ describe('AppController', () => {
         AppService,
         {
           provide: DbService,
-          useValue: { isConfigured: false, ping: async () => undefined },
+          useValue: { isConfigured: false, ping: () => Promise.resolve() },
         },
       ],
     }).compile();

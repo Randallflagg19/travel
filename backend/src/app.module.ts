@@ -4,6 +4,7 @@ import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DbModule } from './db/db.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -16,9 +17,18 @@ import { DbModule } from './db/db.module';
         PORT: Joi.number().port().default(3000),
         CORS_ORIGIN: Joi.string().allow('').default(''),
         DATABASE_URL: Joi.string().allow('').optional(),
+        DB_MIGRATE_ON_START: Joi.string()
+          .valid('true', 'false')
+          .default('false'),
+        JWT_SECRET: Joi.when('NODE_ENV', {
+          is: 'production',
+          then: Joi.string().min(16).required(),
+          otherwise: Joi.string().min(16).default('dev-dev-dev-dev-dev-dev'),
+        }),
       }),
     }),
     DbModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

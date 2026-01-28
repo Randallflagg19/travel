@@ -24,6 +24,10 @@ export class DbService {
     return Boolean(this.sql);
   }
 
+  get client(): Sql | null {
+    return this.sql;
+  }
+
   async ping(): Promise<void> {
     if (!this.sql) return;
     await this.sql`SELECT 1`;

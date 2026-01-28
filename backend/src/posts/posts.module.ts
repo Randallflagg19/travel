@@ -11,4 +11,3 @@ import { RolesGuard } from '../auth/roles.guard';
   providers: [PostsService, LikesService, CommentsService, RolesGuard],
 })
 export class PostsModule {}
-

@@ -1,7 +1,13 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { Auth, CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthRoles } from '../auth/auth-roles.decorator';
 import type { JwtUser } from '../auth/jwt-user.type';
 import { PostsService } from './posts.service';
 
@@ -15,14 +21,12 @@ export class PostsController {
   }
 
   @Get(':id')
-  async get(@Param('id') id: string) {
+  async get(@Param('id', new ParseUUIDPipe()) id: string) {
     return { post: await this.posts.getOrThrow(id) };
   }
 
   @Post()
-  @Auth()
-  @UseGuards(RolesGuard)
-  @Roles('ADMIN', 'SUPERADMIN')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
   async create(
     @CurrentUser() user: JwtUser,
     @Body()
@@ -53,4 +57,3 @@ export class PostsController {
     return { post };
   }
 }
-

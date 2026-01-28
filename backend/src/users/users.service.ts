@@ -22,6 +22,7 @@ export class UsersService {
       SELECT id, email, password_hash, role, name, created_at
       FROM users
       WHERE lower(email) = lower(${email})
+      ORDER BY created_at DESC
       LIMIT 1
     `;
     return rows[0] ?? null;
@@ -46,6 +47,11 @@ export class UsersService {
   }): Promise<Omit<UserRow, 'password_hash'>> {
     if (!this.db.client) {
       throw new ConflictException('Database is not configured');
+    }
+
+    const existing = await this.findByEmail(input.email);
+    if (existing) {
+      throw new ConflictException('Email already exists');
     }
 
     const role = input.role ?? 'USER';

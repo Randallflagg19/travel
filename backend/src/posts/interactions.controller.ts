@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  ParseUUIDPipe,
   Param,
   Post,
 } from '@nestjs/common';
@@ -22,7 +23,10 @@ export class InteractionsController {
 
   @Post(':id/like')
   @Auth()
-  async like(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+  async like(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: JwtUser,
+  ) {
     await this.posts.getOrThrow(id);
     await this.likes.like(id, user.sub);
     return { ok: true };
@@ -30,14 +34,17 @@ export class InteractionsController {
 
   @Delete(':id/like')
   @Auth()
-  async unlike(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+  async unlike(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: JwtUser,
+  ) {
     await this.posts.getOrThrow(id);
     await this.likes.unlike(id, user.sub);
     return { ok: true };
   }
 
   @Get(':id/comments')
-  async listComments(@Param('id') id: string) {
+  async listComments(@Param('id', new ParseUUIDPipe()) id: string) {
     await this.posts.getOrThrow(id);
     return { items: await this.comments.list(id) };
   }
@@ -45,7 +52,7 @@ export class InteractionsController {
   @Post(':id/comments')
   @Auth()
   async addComment(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
     @Body() body: { text?: string },
   ) {
@@ -54,4 +61,3 @@ export class InteractionsController {
     return { comment };
   }
 }
-

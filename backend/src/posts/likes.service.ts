@@ -6,7 +6,8 @@ export class LikesService {
   constructor(private readonly db: DbService) {}
 
   async like(postId: string, userId: string): Promise<void> {
-    if (!this.db.client) throw new BadRequestException('Database is not configured');
+    if (!this.db.client)
+      throw new BadRequestException('Database is not configured');
     await this.db.client`
       INSERT INTO likes (user_id, post_id)
       VALUES (${userId}::uuid, ${postId}::uuid)
@@ -15,11 +16,11 @@ export class LikesService {
   }
 
   async unlike(postId: string, userId: string): Promise<void> {
-    if (!this.db.client) throw new BadRequestException('Database is not configured');
+    if (!this.db.client)
+      throw new BadRequestException('Database is not configured');
     await this.db.client`
       DELETE FROM likes
       WHERE user_id = ${userId}::uuid AND post_id = ${postId}::uuid
     `;
   }
 }
-

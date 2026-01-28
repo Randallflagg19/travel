@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DbService } from '../db/db.service';
 
 export type MediaType = 'PHOTO' | 'VIDEO' | 'AUDIO';
@@ -119,4 +123,3 @@ export class PostsService {
     return post;
   }
 }
-

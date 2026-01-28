@@ -26,8 +26,13 @@ export class CommentsService {
     return rows;
   }
 
-  async create(postId: string, userId: string, text: string): Promise<CommentRow> {
-    if (!this.db.client) throw new BadRequestException('Database is not configured');
+  async create(
+    postId: string,
+    userId: string,
+    text: string,
+  ): Promise<CommentRow> {
+    if (!this.db.client)
+      throw new BadRequestException('Database is not configured');
     const trimmed = text.trim();
     if (!trimmed) throw new BadRequestException('text required');
     const rows = await this.db.client<CommentRow[]>`
@@ -38,4 +43,3 @@ export class CommentsService {
     return rows[0];
   }
 }
-

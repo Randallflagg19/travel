@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { DbModule } from './db/db.module';
 import { AuthModule } from './auth/auth.module';
 import { PostsModule } from './posts/posts.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -26,11 +27,15 @@ import { PostsModule } from './posts/posts.module';
           then: Joi.string().min(16).required(),
           otherwise: Joi.string().min(16).default('dev-dev-dev-dev-dev-dev'),
         }),
+        CLOUDINARY_CLOUD_NAME: Joi.string().allow('').optional(),
+        CLOUDINARY_API_KEY: Joi.string().allow('').optional(),
+        CLOUDINARY_API_SECRET: Joi.string().allow('').optional(),
       }),
     }),
     DbModule,
     AuthModule,
     PostsModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

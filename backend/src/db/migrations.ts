@@ -46,6 +46,13 @@ export async function runMigrations(sql: Sql) {
       )
     `;
 
+    // Avoid importing the same Cloudinary resource twice
+    await q`
+      CREATE UNIQUE INDEX IF NOT EXISTS posts_cloudinary_public_id_unique
+      ON posts (cloudinary_public_id)
+      WHERE cloudinary_public_id IS NOT NULL
+    `;
+
     // Restrict media_type values (easier than creating a Postgres enum for MVP)
     await q`
       DO $$

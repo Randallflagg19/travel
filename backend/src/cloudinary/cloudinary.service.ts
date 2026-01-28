@@ -12,6 +12,7 @@ type CloudinaryResource = {
   secure_url: string;
   created_at?: string;
   folder?: string;
+  asset_folder?: string;
 };
 
 type DeliveryType = 'upload' | 'private' | 'authenticated';
@@ -41,6 +42,7 @@ function pickMediaType(
 
 function deriveFolder(resource: CloudinaryResource): string | null {
   if (resource.folder) return resource.folder;
+  if (resource.asset_folder) return resource.asset_folder;
   const idx = resource.public_id.lastIndexOf('/');
   if (idx === -1) return null;
   return resource.public_id.slice(0, idx);
@@ -110,6 +112,54 @@ export class CloudinaryService {
       throw new BadRequestException('Database is not configured on the server');
     }
     return sql;
+  }
+
+  private async listByAssetFolder(params: {
+    assetFolder: string;
+    resourceType: ResourceType;
+    maxResults: number;
+    nextCursor?: string;
+  }): Promise<{ resources: CloudinaryResource[]; next_cursor?: string }> {
+    // Cloudinary DAM uses "asset folders", which are NOT always the same as public_id prefixes.
+    // This is why prefix-based listing returns 0 for some accounts/folder modes.
+    const resUnknown: unknown = await (cloudinary.api as unknown as {
+      resources_by_asset_folder: (
+        assetFolder: string,
+        options: Record<string, unknown>,
+      ) => Promise<unknown>;
+    }).resources_by_asset_folder(params.assetFolder, {
+      resource_type: params.resourceType,
+      max_results: params.maxResults,
+      next_cursor: params.nextCursor,
+      include_subfolders: true,
+    });
+
+    return resUnknown as {
+      resources: CloudinaryResource[];
+      next_cursor?: string;
+    };
+  }
+
+  private async listBySearchFolder(params: {
+    folder: string;
+    resourceType: ResourceType;
+    maxResults: number;
+    nextCursor?: string;
+  }): Promise<{ resources: CloudinaryResource[]; next_cursor?: string }> {
+    // Fallback if resources_by_asset_folder isn't available in this account/SDK:
+    // Search API supports folder filtering.
+    const expression = `folder=${params.folder} AND resource_type:${params.resourceType}`;
+    const search = cloudinary.search
+      .expression(expression)
+      .max_results(params.maxResults)
+      .next_cursor(params.nextCursor ?? '')
+      .sort_by('public_id', 'desc');
+
+    const resUnknown: unknown = await search.execute();
+    return resUnknown as {
+      resources: CloudinaryResource[];
+      next_cursor?: string;
+    };
   }
 
   async importPrefix(params: { prefix: string; userId: string; max?: number }) {
@@ -203,6 +253,73 @@ export class CloudinaryService {
       if (scanned > 0 || scanned >= max) break;
     }
 
+    // If prefix-based scan returned nothing, try DAM asset-folder listing.
+    // Your probe showed root_folders contains "tapir", but public_id prefix "tapir/" returns 0.
+    if (scanned === 0) {
+      const assetFolder = stripTrailingSlashes(prefixInput);
+      const importFromFolder = async (rt: ResourceType) => {
+        let nextCursor: string | undefined;
+        while (scanned < max) {
+          let res:
+            | { resources: CloudinaryResource[]; next_cursor?: string }
+            | null = null;
+          try {
+            res = await this.listByAssetFolder({
+              assetFolder,
+              resourceType: rt,
+              maxResults: 500,
+              nextCursor,
+            });
+          } catch {
+            // If Admin folder-listing isn't available, fallback to Search API.
+            res = await this.listBySearchFolder({
+              folder: assetFolder,
+              resourceType: rt,
+              maxResults: 500,
+              nextCursor,
+            });
+          }
+
+          for (const r of res.resources) {
+            scanned += 1;
+            const folder = deriveFolder(r);
+            const { country, city } = deriveCountryCity(folder);
+            const mediaType = pickMediaType(r);
+            const createdAt = r.created_at ? new Date(r.created_at) : new Date();
+
+            const rows = await sql<{ id: string }[]>`
+              INSERT INTO posts (
+                user_id, media_type, media_url, cloudinary_public_id, folder, country, city, created_at
+              )
+              VALUES (
+                ${params.userId}::uuid,
+                ${mediaType},
+                ${r.secure_url},
+                ${r.public_id},
+                ${folder},
+                ${country},
+                ${city},
+                ${createdAt.toISOString()}
+              )
+              ON CONFLICT (cloudinary_public_id) DO NOTHING
+              RETURNING id
+            `;
+            if (rows.length > 0) inserted += 1;
+
+            if (scanned >= max) break;
+          }
+
+          nextCursor = res.next_cursor;
+          if (!nextCursor) break;
+        }
+      };
+
+      for (const rt of resourceTypes) {
+        if (scanned >= max) break;
+        await importFromFolder(rt);
+      }
+    }
+
     return { prefix: prefixInput, scanned, inserted };
   }
 
@@ -275,6 +392,56 @@ export class CloudinaryService {
     const sample_public_ids = allSamples.map((r) => r.public_id).slice(0, 20);
     const sample_folders = allSamples.map((r) => r.folder ?? null).slice(0, 20);
 
+    // If a prefix is supplied, also probe as an asset folder (DAM folder) because folders != public_id prefixes.
+    const assetFolder = prefix ? stripTrailingSlashes(prefix) : null;
+    let by_asset_folder:
+      | {
+          asset_folder: string;
+          images_found: number;
+          videos_found: number;
+          raw_found: number;
+          sample_public_ids: string[];
+          sample_folders: (string | null)[];
+          source: 'resources_by_asset_folder' | 'search';
+        }
+      | null = null;
+    if (assetFolder) {
+      const samples: CloudinaryResource[] = [];
+      const counts: Record<ResourceType, number> = { image: 0, video: 0, raw: 0 };
+      let source: 'resources_by_asset_folder' | 'search' = 'resources_by_asset_folder';
+      for (const rt of resourceTypes) {
+        try {
+          const res = await this.listByAssetFolder({
+            assetFolder,
+            resourceType: rt,
+            maxResults: 5,
+          });
+          counts[rt] = res.resources.length;
+          samples.push(...res.resources);
+        } catch {
+          source = 'search';
+          const res = await this.listBySearchFolder({
+            folder: assetFolder,
+            resourceType: rt,
+            maxResults: 5,
+          });
+          counts[rt] = res.resources.length;
+          samples.push(...res.resources);
+        }
+      }
+      by_asset_folder = {
+        asset_folder: assetFolder,
+        images_found: counts.image,
+        videos_found: counts.video,
+        raw_found: counts.raw,
+        sample_public_ids: samples.map((r) => r.public_id).slice(0, 20),
+        sample_folders: samples
+          .map((r) => (r.folder ?? r.asset_folder ?? null) as string | null)
+          .slice(0, 20),
+        source,
+      };
+    }
+
     return {
       prefix,
       diagnostics: {
@@ -284,6 +451,7 @@ export class CloudinaryService {
           ? { folder: firstFolder, result: subFolders }
           : null,
       },
+      by_asset_folder,
       by_type: {
         upload: {
           images_found: byType.upload.image.found,

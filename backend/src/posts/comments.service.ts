@@ -1,0 +1,41 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { DbService } from '../db/db.service';
+
+export type CommentRow = {
+  id: string;
+  post_id: string;
+  user_id: string;
+  text: string;
+  created_at: string;
+};
+
+@Injectable()
+export class CommentsService {
+  constructor(private readonly db: DbService) {}
+
+  async list(postId: string, limit = 100): Promise<CommentRow[]> {
+    if (!this.db.client) return [];
+    const safeLimit = Math.max(1, Math.min(200, limit));
+    const rows = await this.db.client<CommentRow[]>`
+      SELECT id, post_id, user_id, text, created_at
+      FROM comments
+      WHERE post_id = ${postId}::uuid
+      ORDER BY created_at ASC
+      LIMIT ${safeLimit}
+    `;
+    return rows;
+  }
+
+  async create(postId: string, userId: string, text: string): Promise<CommentRow> {
+    if (!this.db.client) throw new BadRequestException('Database is not configured');
+    const trimmed = text.trim();
+    if (!trimmed) throw new BadRequestException('text required');
+    const rows = await this.db.client<CommentRow[]>`
+      INSERT INTO comments (post_id, user_id, text)
+      VALUES (${postId}::uuid, ${userId}::uuid, ${trimmed})
+      RETURNING id, post_id, user_id, text, created_at
+    `;
+    return rows[0];
+  }
+}
+

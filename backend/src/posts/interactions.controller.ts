@@ -1,0 +1,57 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+} from '@nestjs/common';
+import { Auth, CurrentUser } from '../auth/current-user.decorator';
+import type { JwtUser } from '../auth/jwt-user.type';
+import { PostsService } from './posts.service';
+import { LikesService } from './likes.service';
+import { CommentsService } from './comments.service';
+
+@Controller('posts')
+export class InteractionsController {
+  constructor(
+    private readonly posts: PostsService,
+    private readonly likes: LikesService,
+    private readonly comments: CommentsService,
+  ) {}
+
+  @Post(':id/like')
+  @Auth()
+  async like(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    await this.posts.getOrThrow(id);
+    await this.likes.like(id, user.sub);
+    return { ok: true };
+  }
+
+  @Delete(':id/like')
+  @Auth()
+  async unlike(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    await this.posts.getOrThrow(id);
+    await this.likes.unlike(id, user.sub);
+    return { ok: true };
+  }
+
+  @Get(':id/comments')
+  async listComments(@Param('id') id: string) {
+    await this.posts.getOrThrow(id);
+    return { items: await this.comments.list(id) };
+  }
+
+  @Post(':id/comments')
+  @Auth()
+  async addComment(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUser,
+    @Body() body: { text?: string },
+  ) {
+    await this.posts.getOrThrow(id);
+    const comment = await this.comments.create(id, user.sub, body.text ?? '');
+    return { comment };
+  }
+}
+

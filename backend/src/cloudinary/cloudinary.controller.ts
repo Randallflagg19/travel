@@ -8,6 +8,12 @@ import { CloudinaryService } from './cloudinary.service';
 export class CloudinaryController {
   constructor(private readonly cloud: CloudinaryService) {}
 
+  @Post('probe')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
+  async probe(@Body() body: { prefix?: string }) {
+    return await this.cloud.probePrefix({ prefix: body.prefix ?? 'tapir/' });
+  }
+
   @Post('import')
   @AuthRoles('ADMIN', 'SUPERADMIN')
   async import(

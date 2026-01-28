@@ -199,4 +199,44 @@ export class CloudinaryService {
 
     return { prefix, scanned, inserted };
   }
+
+  async probePrefix(params: { prefix: string }) {
+    if (!this.isConfigured) {
+      throw new BadRequestException(
+        'Cloudinary is not configured on the server',
+      );
+    }
+    const prefix = params.prefix.trim();
+    if (!prefix) throw new BadRequestException('prefix is required');
+
+    const imageResUnknown: unknown = await cloudinary.api.resources({
+      type: 'upload',
+      prefix,
+      resource_type: 'image',
+      max_results: 5,
+    });
+    const videoResUnknown: unknown = await cloudinary.api.resources({
+      type: 'upload',
+      prefix,
+      resource_type: 'video',
+      max_results: 5,
+    });
+
+    const imageRes = imageResUnknown as { resources: CloudinaryResource[] };
+    const videoRes = videoResUnknown as { resources: CloudinaryResource[] };
+
+    return {
+      prefix,
+      images_found: imageRes.resources.length,
+      videos_found: videoRes.resources.length,
+      sample_public_ids: [
+        ...imageRes.resources.slice(0, 5).map((r) => r.public_id),
+        ...videoRes.resources.slice(0, 5).map((r) => r.public_id),
+      ],
+      sample_folders: [
+        ...imageRes.resources.slice(0, 5).map((r) => r.folder ?? null),
+        ...videoRes.resources.slice(0, 5).map((r) => r.folder ?? null),
+      ],
+    };
+  }
 }

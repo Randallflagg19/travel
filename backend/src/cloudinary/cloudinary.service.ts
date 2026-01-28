@@ -149,12 +149,17 @@ export class CloudinaryService {
   }): Promise<{ resources: CloudinaryResource[]; next_cursor?: string }> {
     // Fallback if resources_by_asset_folder isn't available in this account/SDK:
     // Search API supports folder filtering.
-    const expression = `folder=${params.folder} AND resource_type:${params.resourceType}`;
-    const search = cloudinary.search
+    // Quote folder path because it can contain slashes.
+    const folder = stripTrailingSlashes(params.folder);
+    const expression = `folder:"${folder}" AND resource_type:${params.resourceType}`;
+    let search = cloudinary.search
       .expression(expression)
       .max_results(params.maxResults)
-      .next_cursor(params.nextCursor ?? '')
       .sort_by('public_id', 'desc');
+    if (params.nextCursor) {
+      // Passing empty string can trigger "Invalid next_cursor" errors.
+      search = search.next_cursor(params.nextCursor);
+    }
 
     const resUnknown: unknown = await search.execute();
     return resUnknown as {
@@ -306,6 +311,13 @@ export class CloudinaryService {
         maxFolders: 500,
       });
 
+      const errors: Array<{
+        folder: string;
+        resource_type: ResourceType;
+        source: 'resources_by_asset_folder' | 'search';
+        message: string;
+      }> = [];
+
       const importFromFolder = async (rt: ResourceType) => {
         for (const folderPath of foldersToImport) {
           if (scanned >= max) break;
@@ -322,14 +334,33 @@ export class CloudinaryService {
                 maxResults: 500,
                 nextCursor,
               });
-            } catch {
+            } catch (e1) {
               // If Admin folder-listing isn't available, fallback to Search API.
-              res = await this.listBySearchFolder({
-                folder: folderPath,
-                resourceType: rt,
-                maxResults: 500,
-                nextCursor,
-              });
+              try {
+                res = await this.listBySearchFolder({
+                  folder: folderPath,
+                  resourceType: rt,
+                  maxResults: 500,
+                  nextCursor,
+                });
+              } catch (e2) {
+                errors.push({
+                  folder: folderPath,
+                  resource_type: rt,
+                  source: 'resources_by_asset_folder',
+                  message:
+                    (e1 as Error)?.message ??
+                    'resources_by_asset_folder failed',
+                });
+                errors.push({
+                  folder: folderPath,
+                  resource_type: rt,
+                  source: 'search',
+                  message: (e2 as Error)?.message ?? 'search failed',
+                });
+                // Skip this folder/type, continue to next folder.
+                break;
+              }
             }
 
             for (const r of res.resources) {
@@ -371,6 +402,8 @@ export class CloudinaryService {
         if (scanned >= max) break;
         await importFromFolder(rt);
       }
+
+      return { prefix: prefixInput, scanned, inserted, errors: errors.slice(0, 50) };
     }
 
     return { prefix: prefixInput, scanned, inserted };

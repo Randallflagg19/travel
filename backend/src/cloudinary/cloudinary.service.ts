@@ -128,6 +128,7 @@ export class CloudinaryService {
         options: Record<string, unknown>,
       ) => Promise<unknown>;
     }).resources_by_asset_folder(params.assetFolder, {
+      type: 'upload',
       resource_type: params.resourceType,
       max_results: params.maxResults,
       next_cursor: params.nextCursor,
@@ -160,6 +161,46 @@ export class CloudinaryService {
       resources: CloudinaryResource[];
       next_cursor?: string;
     };
+  }
+
+  private async listSubFoldersBfs(params: {
+    root: string;
+    maxFolders?: number;
+  }): Promise<string[]> {
+    // Returns folder paths including the root itself.
+    const root = stripTrailingSlashes(params.root);
+    const maxFolders = Math.max(1, Math.min(2000, params.maxFolders ?? 500));
+
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const queue: string[] = [root];
+
+    while (queue.length > 0 && out.length < maxFolders) {
+      const cur = queue.shift();
+      if (!cur) break;
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      out.push(cur);
+
+      let resUnknown: unknown;
+      try {
+        resUnknown = (await cloudinary.api.sub_folders(cur)) as unknown;
+      } catch {
+        // If sub_folders isn't available for this path, just stop descending.
+        continue;
+      }
+
+      const res = resUnknown as { folders?: Array<{ path?: string }> };
+      for (const f of res.folders ?? []) {
+        const p = typeof f.path === 'string' ? f.path : null;
+        if (!p) continue;
+        const normalized = stripTrailingSlashes(p);
+        if (!seen.has(normalized)) queue.push(normalized);
+        if (out.length + queue.length >= maxFolders) break;
+      }
+    }
+
+    return out;
   }
 
   async importPrefix(params: { prefix: string; userId: string; max?: number }) {
@@ -257,60 +298,72 @@ export class CloudinaryService {
     // Your probe showed root_folders contains "tapir", but public_id prefix "tapir/" returns 0.
     if (scanned === 0) {
       const assetFolder = stripTrailingSlashes(prefixInput);
+
+      // Some Cloudinary accounts expose folders but don't return assets with include_subfolders=true.
+      // In that case, we explicitly enumerate subfolders and import each one.
+      const foldersToImport = await this.listSubFoldersBfs({
+        root: assetFolder,
+        maxFolders: 500,
+      });
+
       const importFromFolder = async (rt: ResourceType) => {
-        let nextCursor: string | undefined;
-        while (scanned < max) {
-          let res:
-            | { resources: CloudinaryResource[]; next_cursor?: string }
-            | null = null;
-          try {
-            res = await this.listByAssetFolder({
-              assetFolder,
-              resourceType: rt,
-              maxResults: 500,
-              nextCursor,
-            });
-          } catch {
-            // If Admin folder-listing isn't available, fallback to Search API.
-            res = await this.listBySearchFolder({
-              folder: assetFolder,
-              resourceType: rt,
-              maxResults: 500,
-              nextCursor,
-            });
+        for (const folderPath of foldersToImport) {
+          if (scanned >= max) break;
+          let nextCursor: string | undefined;
+          // paginate per folder
+          while (scanned < max) {
+            let res:
+              | { resources: CloudinaryResource[]; next_cursor?: string }
+              | null = null;
+            try {
+              res = await this.listByAssetFolder({
+                assetFolder: folderPath,
+                resourceType: rt,
+                maxResults: 500,
+                nextCursor,
+              });
+            } catch {
+              // If Admin folder-listing isn't available, fallback to Search API.
+              res = await this.listBySearchFolder({
+                folder: folderPath,
+                resourceType: rt,
+                maxResults: 500,
+                nextCursor,
+              });
+            }
+
+            for (const r of res.resources) {
+              scanned += 1;
+              const folder = deriveFolder(r);
+              const { country, city } = deriveCountryCity(folder);
+              const mediaType = pickMediaType(r);
+              const createdAt = r.created_at ? new Date(r.created_at) : new Date();
+
+              const rows = await sql<{ id: string }[]>`
+                INSERT INTO posts (
+                  user_id, media_type, media_url, cloudinary_public_id, folder, country, city, created_at
+                )
+                VALUES (
+                  ${params.userId}::uuid,
+                  ${mediaType},
+                  ${r.secure_url},
+                  ${r.public_id},
+                  ${folder},
+                  ${country},
+                  ${city},
+                  ${createdAt.toISOString()}
+                )
+                ON CONFLICT (cloudinary_public_id) DO NOTHING
+                RETURNING id
+              `;
+              if (rows.length > 0) inserted += 1;
+
+              if (scanned >= max) break;
+            }
+
+            nextCursor = res.next_cursor;
+            if (!nextCursor) break;
           }
-
-          for (const r of res.resources) {
-            scanned += 1;
-            const folder = deriveFolder(r);
-            const { country, city } = deriveCountryCity(folder);
-            const mediaType = pickMediaType(r);
-            const createdAt = r.created_at ? new Date(r.created_at) : new Date();
-
-            const rows = await sql<{ id: string }[]>`
-              INSERT INTO posts (
-                user_id, media_type, media_url, cloudinary_public_id, folder, country, city, created_at
-              )
-              VALUES (
-                ${params.userId}::uuid,
-                ${mediaType},
-                ${r.secure_url},
-                ${r.public_id},
-                ${folder},
-                ${country},
-                ${city},
-                ${createdAt.toISOString()}
-              )
-              ON CONFLICT (cloudinary_public_id) DO NOTHING
-              RETURNING id
-            `;
-            if (rows.length > 0) inserted += 1;
-
-            if (scanned >= max) break;
-          }
-
-          nextCursor = res.next_cursor;
-          if (!nextCursor) break;
         }
       };
 

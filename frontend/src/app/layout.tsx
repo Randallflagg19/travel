@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "My Travels",
   description: "Travel media feed",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({

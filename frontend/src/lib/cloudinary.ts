@@ -1,4 +1,7 @@
-export function cloudinaryOptimizedUrl(input: string, mediaType: "PHOTO" | "VIDEO" | "AUDIO") {
+export function cloudinaryOptimizedUrl(
+  input: string,
+  mediaType: "PHOTO" | "VIDEO" | "AUDIO",
+) {
   // If it's not a Cloudinary delivery URL - return as-is.
   if (!input.includes("res.cloudinary.com/")) return input;
 
@@ -20,3 +23,29 @@ export function cloudinaryOptimizedUrl(input: string, mediaType: "PHOTO" | "VIDE
   return `${parts[0]}/upload/${transform}/${parts[1]}`;
 }
 
+function getCloudNameFromUrl(input: string): string | null {
+  // https://res.cloudinary.com/<cloud>/...
+  const match = input.match(/res\.cloudinary\.com\/([^/]+)\//);
+  return match?.[1] ?? null;
+}
+
+export function cloudinaryVideoPosterUrl(
+  mediaUrl: string,
+  publicId: string,
+): string | null {
+  const cloud = getCloudNameFromUrl(mediaUrl);
+  if (!cloud) return null;
+  // Extract a frame from the video as a JPG poster (cheap + fast).
+  // `so_0` = start offset; `f_jpg` = JPG output.
+  return `https://res.cloudinary.com/${cloud}/video/upload/so_0,f_jpg,q_auto,w_1200/${publicId}.jpg`;
+}
+
+export function cloudinaryVideoMp4Url(
+  mediaUrl: string,
+  publicId: string,
+): string | null {
+  const cloud = getCloudNameFromUrl(mediaUrl);
+  if (!cloud) return null;
+  // MP4 is the most compatible for mobile browsers.
+  return `https://res.cloudinary.com/${cloud}/video/upload/f_mp4,q_auto/${publicId}.mp4`;
+}

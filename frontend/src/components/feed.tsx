@@ -5,7 +5,10 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { fetchPostsPage } from "@/lib/api";
-import { cloudinaryOptimizedUrl } from "@/lib/cloudinary";
+import {
+  cloudinaryOptimizedUrl,
+  cloudinaryVideoPosterUrl,
+} from "@/lib/cloudinary";
 import { useInView } from "@/hooks/use-in-view";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -128,21 +131,35 @@ export function Feed() {
               <CardContent className="space-y-3 pt-6">
                 {p.media_type === "VIDEO" ? (
                   <div className="space-y-2">
+                    {(() => {
+                      const posterUrl = p.cloudinary_public_id
+                        ? cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id)
+                        : null;
+
+                      return posterUrl ? (
+                        <Image
+                          className="aspect-video w-full rounded-lg border object-cover"
+                          alt="video preview"
+                          src={posterUrl}
+                          width={1200}
+                          height={675}
+                          sizes="(max-width: 768px) 100vw, 768px"
+                          unoptimized
+                        />
+                      ) : null;
+                    })()}
                     <video
                       className="w-full rounded-lg border"
                       controls
                       playsInline
                       preload="metadata"
                       src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
+                      poster={
+                        p.cloudinary_public_id
+                          ? cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id) ?? undefined
+                          : undefined
+                      }
                     />
-                    <a
-                      className="text-muted-foreground text-xs underline underline-offset-4"
-                      href={p.media_url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Открыть видео в новой вкладке
-                    </a>
                   </div>
                 ) : (
                   <Image

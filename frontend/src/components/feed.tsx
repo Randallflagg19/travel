@@ -86,12 +86,14 @@ export function Feed() {
       </header>
 
       {!isSelectionReady ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Выбери место слева</CardTitle>
-            <CardDescription>Страна → город. Или нажми “Все посты”.</CardDescription>
-          </CardHeader>
-        </Card>
+        <div className="hidden lg:block">
+          <Card>
+            <CardHeader>
+              <CardTitle>Выбери место слева</CardTitle>
+              <CardDescription>Страна → город. Или нажми “Все посты”.</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
       ) : null}
 
       {postsQuery.isLoading ? (

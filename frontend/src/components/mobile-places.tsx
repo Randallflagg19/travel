@@ -1,13 +1,32 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { Menu } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { PlacesSidebar } from "@/components/places-sidebar";
 
 export function MobilePlaces() {
   const [open, setOpen] = useState(false);
+  const hasAutoOpened = useRef(false);
+  const searchParams = useSearchParams();
+
+  const country = searchParams.get("country") ?? "";
+  const city = searchParams.get("city") ?? "";
+  const unknown = searchParams.get("unknown") === "true";
+  const all = searchParams.get("all") === "true";
+  const isSelectionReady = all || unknown || (country && city);
+
+  // UX: on mobile, if nothing is selected, open the sheet by default (once).
+  useEffect(() => {
+    if (hasAutoOpened.current) return;
+    if (isSelectionReady) return;
+    hasAutoOpened.current = true;
+    // Defer to next tick to avoid setState-in-effect lint rule / cascading render warning.
+    const t = window.setTimeout(() => setOpen(true), 0);
+    return () => window.clearTimeout(t);
+  }, [isSelectionReady]);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

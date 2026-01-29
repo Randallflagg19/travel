@@ -21,6 +21,17 @@ export type PostsPage = {
   hasMore: boolean;
 };
 
+export type PlacesResponse = {
+  countries: Array<{
+    country: string;
+    count: number;
+    cities: Array<{ city: string; count: number }>;
+  }>;
+  unknown: {
+    count: number;
+  };
+};
+
 function getApiBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!url) {
@@ -34,11 +45,19 @@ function getApiBaseUrl(): string {
 export async function fetchPostsPage(params: {
   limit: number;
   cursor?: string;
+  order?: "asc" | "desc";
+  country?: string;
+  city?: string;
+  unknown?: boolean;
 }): Promise<PostsPage> {
   const api = getApiBaseUrl();
   const search = new URLSearchParams();
   search.set("limit", String(params.limit));
   if (params.cursor) search.set("cursor", params.cursor);
+  if (params.order) search.set("order", params.order);
+  if (params.country) search.set("country", params.country);
+  if (params.city) search.set("city", params.city);
+  if (params.unknown) search.set("unknown", "true");
 
   const res = await fetch(`${api}/posts?${search.toString()}`, {
     // This is a client-side fetch; rely on TanStack Query caching.
@@ -51,5 +70,15 @@ export async function fetchPostsPage(params: {
   }
 
   return (await res.json()) as PostsPage;
+}
+
+export async function fetchPlaces(): Promise<PlacesResponse> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/places`, { cache: "no-store" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Failed to load places (${res.status}): ${text}`);
+  }
+  return (await res.json()) as PlacesResponse;
 }
 

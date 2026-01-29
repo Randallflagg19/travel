@@ -22,8 +22,19 @@ export class PostsController {
   async list(
     @Query('limit', new DefaultValuePipe(50), new ParseIntPipe()) limit: number,
     @Query('cursor') cursor?: string,
+    @Query('country') country?: string,
+    @Query('city') city?: string,
+    @Query('unknown') unknown?: string,
+    @Query('order') order?: 'asc' | 'desc',
   ) {
-    return await this.posts.listPage({ limit, cursor });
+    return await this.posts.listPage({
+      limit,
+      cursor,
+      country,
+      city,
+      unknown: unknown === 'true',
+      order,
+    });
   }
 
   @Get(':id')

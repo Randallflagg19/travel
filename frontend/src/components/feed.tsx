@@ -131,23 +131,6 @@ export function Feed() {
               <CardContent className="space-y-3 pt-6">
                 {p.media_type === "VIDEO" ? (
                   <div className="space-y-2">
-                    {(() => {
-                      const posterUrl = p.cloudinary_public_id
-                        ? cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id)
-                        : null;
-
-                      return posterUrl ? (
-                        <Image
-                          className="aspect-video w-full rounded-lg border object-cover"
-                          alt="video preview"
-                          src={posterUrl}
-                          width={1200}
-                          height={675}
-                          sizes="(max-width: 768px) 100vw, 768px"
-                          unoptimized
-                        />
-                      ) : null;
-                    })()}
                     <video
                       className="w-full rounded-lg border"
                       controls

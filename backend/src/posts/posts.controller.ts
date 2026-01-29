@@ -1,10 +1,13 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthRoles } from '../auth/auth-roles.decorator';
@@ -16,8 +19,11 @@ export class PostsController {
   constructor(private readonly posts: PostsService) {}
 
   @Get()
-  async list() {
-    return { items: await this.posts.list() };
+  async list(
+    @Query('limit', new DefaultValuePipe(50), new ParseIntPipe()) limit: number,
+    @Query('cursor') cursor?: string,
+  ) {
+    return await this.posts.listPage({ limit, cursor });
   }
 
   @Get(':id')

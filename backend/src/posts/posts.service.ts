@@ -24,33 +24,95 @@ export type PostRow = {
   comment_count: number;
 };
 
+type PostsCursor = {
+  created_at: string;
+  id: string;
+};
+
+function encodeCursor(cursor: PostsCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodeCursor(cursor: string): PostsCursor {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf8'),
+    ) as unknown;
+  } catch {
+    throw new BadRequestException('Invalid cursor');
+  }
+  const obj = parsed as Partial<PostsCursor> | null;
+  if (!obj || typeof obj !== 'object') throw new BadRequestException('Invalid cursor');
+  if (typeof obj.created_at !== 'string') throw new BadRequestException('Invalid cursor');
+  if (typeof obj.id !== 'string') throw new BadRequestException('Invalid cursor');
+  return { created_at: obj.created_at, id: obj.id };
+}
+
 @Injectable()
 export class PostsService {
   constructor(private readonly db: DbService) {}
 
-  async list(limit = 50): Promise<PostRow[]> {
-    if (!this.db.client) return [];
-    const safeLimit = Math.max(1, Math.min(200, limit));
-    const rows = await this.db.client<PostRow[]>`
-      SELECT
-        p.*,
-        COALESCE(l.like_count, 0)::int AS like_count,
-        COALESCE(c.comment_count, 0)::int AS comment_count
-      FROM posts p
-      LEFT JOIN (
-        SELECT post_id, COUNT(*) AS like_count
-        FROM likes
-        GROUP BY post_id
-      ) l ON l.post_id = p.id
-      LEFT JOIN (
-        SELECT post_id, COUNT(*) AS comment_count
-        FROM comments
-        GROUP BY post_id
-      ) c ON c.post_id = p.id
-      ORDER BY p.created_at DESC
-      LIMIT ${safeLimit}
-    `;
-    return rows;
+  async listPage(params?: {
+    limit?: number;
+    cursor?: string;
+  }): Promise<{ items: PostRow[]; nextCursor: string | null; hasMore: boolean }> {
+    if (!this.db.client) return { items: [], nextCursor: null, hasMore: false };
+    const safeLimit = Math.max(1, Math.min(200, params?.limit ?? 50));
+    const limitPlusOne = safeLimit + 1;
+
+    const decoded = params?.cursor ? decodeCursor(params.cursor) : null;
+
+    const rows = decoded
+      ? await this.db.client<PostRow[]>`
+          SELECT
+            p.*,
+            COALESCE(l.like_count, 0)::int AS like_count,
+            COALESCE(c.comment_count, 0)::int AS comment_count
+          FROM posts p
+          LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count
+            FROM likes
+            GROUP BY post_id
+          ) l ON l.post_id = p.id
+          LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count
+            FROM comments
+            GROUP BY post_id
+          ) c ON c.post_id = p.id
+          WHERE
+            (p.created_at < ${decoded.created_at}::timestamptz)
+            OR (p.created_at = ${decoded.created_at}::timestamptz AND p.id < ${decoded.id}::uuid)
+          ORDER BY p.created_at DESC, p.id DESC
+          LIMIT ${limitPlusOne}
+        `
+      : await this.db.client<PostRow[]>`
+          SELECT
+            p.*,
+            COALESCE(l.like_count, 0)::int AS like_count,
+            COALESCE(c.comment_count, 0)::int AS comment_count
+          FROM posts p
+          LEFT JOIN (
+            SELECT post_id, COUNT(*) AS like_count
+            FROM likes
+            GROUP BY post_id
+          ) l ON l.post_id = p.id
+          LEFT JOIN (
+            SELECT post_id, COUNT(*) AS comment_count
+            FROM comments
+            GROUP BY post_id
+          ) c ON c.post_id = p.id
+          ORDER BY p.created_at DESC, p.id DESC
+          LIMIT ${limitPlusOne}
+        `;
+
+    const hasMore = rows.length > safeLimit;
+    const items = hasMore ? rows.slice(0, safeLimit) : rows;
+    const last = items[items.length - 1];
+    const nextCursor =
+      hasMore && last ? encodeCursor({ created_at: last.created_at, id: last.id }) : null;
+
+    return { items, nextCursor, hasMore };
   }
 
   async create(input: {

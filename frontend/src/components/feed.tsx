@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { fetchPostsPage } from "@/lib/api";
 import { cloudinaryOptimizedUrl } from "@/lib/cloudinary";
 import { useInView } from "@/hooks/use-in-view";
@@ -16,12 +17,17 @@ export function Feed() {
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";
   const unknown = searchParams.get("unknown") === "true";
+  const all = searchParams.get("all") === "true";
 
   const headerTitle = unknown
     ? "Unknown"
-    : selectedCountry && selectedCity
-      ? `${selectedCountry} / ${selectedCity}`
-      : "Все посты";
+    : all
+      ? "Все посты"
+      : selectedCountry && selectedCity
+        ? `${selectedCountry} / ${selectedCity}`
+        : "Места";
+
+  const isSelectionReady = all || unknown || (selectedCountry && selectedCity);
 
   const postsQuery = useInfiniteQuery({
     queryKey: [
@@ -32,6 +38,7 @@ export function Feed() {
         country: selectedCountry,
         city: selectedCity,
         unknown,
+        all,
       },
     ],
     queryFn: ({ pageParam }) =>
@@ -41,10 +48,13 @@ export function Feed() {
         order,
         ...(unknown
           ? { unknown: true }
-          : selectedCountry && selectedCity
+          : all
+            ? {}
+            : selectedCountry && selectedCity
             ? { country: selectedCountry, city: selectedCity }
             : {}),
       }),
+    enabled: Boolean(isSelectionReady),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
@@ -55,25 +65,34 @@ export function Feed() {
     [postsQuery.data],
   );
 
-  const { ref: sentinelRef, inView } = useInView<HTMLDivElement>({
-    rootMargin: "600px",
-  });
+  const inViewOptions = useMemo(() => ({ rootMargin: "600px" }), []);
+  const { ref: sentinelRef, inView } = useInView<HTMLDivElement>(inViewOptions);
+
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = postsQuery;
 
   useEffect(() => {
     if (!inView) return;
-    if (!postsQuery.hasNextPage) return;
-    if (postsQuery.isFetchingNextPage) return;
-    void postsQuery.fetchNextPage();
-  }, [inView, postsQuery.hasNextPage, postsQuery.isFetchingNextPage, postsQuery.fetchNextPage]);
+    if (!hasNextPage) return;
+    if (isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{headerTitle}</h1>
-          <p className="text-muted-foreground text-sm">Лента медиа. Автоподгрузка включена.</p>
         </div>
       </header>
+
+      {!isSelectionReady ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Выбери место слева</CardTitle>
+            <CardDescription>Страна → город. Или нажми “Все посты”.</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
 
       {postsQuery.isLoading ? (
         <Card>
@@ -124,11 +143,15 @@ export function Feed() {
                     </a>
                   </div>
                 ) : (
-                  <img
-                    className="w-full rounded-lg border"
+                  <Image
+                    className="h-auto w-full rounded-lg border"
                     alt={p.text ?? "travel media"}
-                    loading="lazy"
                     src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
+                    width={1600}
+                    height={1200}
+                    sizes="(max-width: 768px) 100vw, 768px"
+                    // Avoid Next Image optimizer 400s for some Cloudinary formats.
+                    unoptimized
                   />
                 )}
 
@@ -142,7 +165,7 @@ export function Feed() {
                       📍 {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
                     </span>
                   ) : null}
-                  {!unknown && !(selectedCountry && selectedCity) ? (
+                  {!unknown && !all && !(selectedCountry && selectedCity) ? (
                     <span>
                       {(p.country ?? "Unknown") + (p.city ? ` / ${p.city}` : "")}
                     </span>

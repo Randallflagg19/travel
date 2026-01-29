@@ -14,13 +14,14 @@ function buildUrl(params: URLSearchParams) {
   return qs ? `/?${qs}` : "/";
 }
 
-export function PlacesSidebar() {
+export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";
   const unknown = searchParams.get("unknown") === "true";
+  const all = searchParams.get("all") === "true";
 
   const placesQuery = useQuery({
     queryKey: ["places"],
@@ -36,22 +37,32 @@ export function PlacesSidebar() {
 
   function selectCity(country: string, city: string) {
     const next = new URLSearchParams(searchParams.toString());
+    next.delete("all");
     next.delete("unknown");
     next.set("country", country);
     next.set("city", city);
     router.push(buildUrl(next));
+    onNavigate?.();
   }
 
   function selectUnknown() {
     const next = new URLSearchParams(searchParams.toString());
+    next.delete("all");
     next.delete("country");
     next.delete("city");
     next.set("unknown", "true");
     router.push(buildUrl(next));
+    onNavigate?.();
   }
 
-  function clearSelection() {
-    router.push("/");
+  function selectAll() {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("unknown");
+    next.delete("country");
+    next.delete("city");
+    next.set("all", "true");
+    router.push(buildUrl(next));
+    onNavigate?.();
   }
 
   return (
@@ -66,21 +77,25 @@ export function PlacesSidebar() {
       </div>
 
       <div className="px-4">
-        <Button variant="ghost" className="w-full justify-start" onClick={clearSelection}>
+        <Button
+          variant={all ? "secondary" : "ghost"}
+          className="w-full justify-start"
+          onClick={selectAll}
+        >
           Все посты
         </Button>
-        <Button
-          variant={unknown ? "secondary" : "ghost"}
-          className="mt-1 w-full justify-start"
-          onClick={selectUnknown}
-        >
-          Unknown
-          {placesQuery.data?.unknown.count ? (
+        {Boolean(placesQuery.data?.unknown.count) ? (
+          <Button
+            variant={unknown ? "secondary" : "ghost"}
+            className="mt-1 w-full justify-start"
+            onClick={selectUnknown}
+          >
+            Unknown
             <span className="text-muted-foreground ml-auto text-xs">
-              {placesQuery.data.unknown.count}
+              {placesQuery.data?.unknown.count}
             </span>
-          ) : null}
-        </Button>
+          </Button>
+        ) : null}
       </div>
 
       <Separator />

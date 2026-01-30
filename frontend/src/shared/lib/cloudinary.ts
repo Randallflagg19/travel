@@ -34,7 +34,8 @@ export function cloudinaryOptimizedUrl(
   // For photos (including HEIC), request an auto-format the browser can display.
   // `f_auto` converts HEIC → jpg/webp/avif depending on client.
   if (mediaType === "PHOTO") {
-    return injectUploadTransform(u, "f_auto,q_auto");
+    // Limit output size for faster initial load (Cloudinary will cache derived asset).
+    return injectUploadTransform(u, "f_auto,q_auto,w_1200,c_limit");
   }
 
   return u;
@@ -55,7 +56,8 @@ export function cloudinaryVideoPosterUrl(
     if (idx === -1) return null;
     const before = u.slice(0, idx + "/upload/".length);
     const after = u.slice(idx + "/upload/".length);
-    const base = `${before}so_0/${after}`;
+    // Make posters small + browser-friendly.
+    const base = `${before}so_0,f_jpg,q_auto,w_1200,c_limit/${after}`;
     return base.replace(/\.(mp4|mov|webm|mkv)$/i, ".jpg");
   } catch {
     return null;

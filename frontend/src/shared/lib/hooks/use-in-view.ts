@@ -1,20 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export function useInView<T extends Element>(options?: IntersectionObserverInit) {
-  const ref = useRef<T | null>(null);
+  const [node, setNode] = useState<T | null>(null);
   const [inView, setInView] = useState(false);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver((entries) => {
-      setInView(Boolean(entries[0]?.isIntersecting));
-    }, options);
-    obs.observe(el);
+    if (!node) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        setInView(Boolean(entry?.isIntersecting));
+      },
+      { root: options?.root ?? null, rootMargin: options?.rootMargin, threshold: options?.threshold },
+    );
+    obs.observe(node);
     return () => obs.disconnect();
-  }, [options]);
+  }, [node, options?.root, options?.rootMargin, options?.threshold]);
+
+  const ref = useCallback((el: T | null) => {
+    setNode(el);
+  }, []);
 
   return { ref, inView };
 }

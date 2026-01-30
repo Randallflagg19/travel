@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -8,11 +8,13 @@ import { fetchPostsPage } from "@/shared/api/api";
 import { cloudinaryOptimizedUrl, cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Button } from "@/shared/ui/button";
 
 export function Feed() {
   const limit = 30;
   const order: "asc" | "desc" = "asc";
   const searchParams = useSearchParams();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";
@@ -65,6 +67,11 @@ export function Feed() {
     [postsQuery.data],
   );
 
+  const expandedPost = useMemo(() => {
+    if (!expandedId) return null;
+    return items.find((p) => p.id === expandedId) ?? null;
+  }, [expandedId, items]);
+
   const inViewOptions = useMemo(() => ({ rootMargin: "600px" }), []);
   const { ref: sentinelRef, inView } = useInView<HTMLDivElement>(inViewOptions);
 
@@ -77,8 +84,18 @@ export function Feed() {
     void fetchNextPage();
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  // Close expanded view with ESC.
+  useEffect(() => {
+    if (!expandedId) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setExpandedId(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [expandedId]);
+
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
+    <main className="mx-auto flex max-w-screen-2xl flex-col gap-6 px-4 py-10">
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{headerTitle}</h1>
@@ -121,15 +138,79 @@ export function Feed() {
             <CardDescription>Для этого места постов нет.</CardDescription>
           </CardHeader>
         </Card>
+      ) : expandedPost ? (
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="truncate">Просмотр</CardTitle>
+              <CardDescription className="truncate">
+                Нажми ESC или “Закрыть”, чтобы вернуться к ленте.
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setExpandedId(null)}>
+              Закрыть
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {expandedPost.media_type === "VIDEO" ? (
+              <video
+                className="w-full rounded-lg border"
+                controls
+                playsInline
+                preload="auto"
+                src={cloudinaryOptimizedUrl(expandedPost.media_url, expandedPost.media_type)}
+                poster={
+                  expandedPost.cloudinary_public_id
+                    ? cloudinaryVideoPosterUrl(
+                        expandedPost.media_url,
+                        expandedPost.cloudinary_public_id,
+                      ) ?? undefined
+                    : undefined
+                }
+              />
+            ) : (
+              <button
+                type="button"
+                className="block w-full cursor-zoom-out"
+                onClick={() => setExpandedId(null)}
+                aria-label="Закрыть просмотр"
+              >
+                <Image
+                  className="h-auto w-full rounded-lg border"
+                  alt={expandedPost.text ?? "travel media"}
+                  src={cloudinaryOptimizedUrl(expandedPost.media_url, expandedPost.media_type)}
+                  width={2000}
+                  height={1500}
+                  sizes="(max-width: 1024px) 100vw, 1200px"
+                  unoptimized
+                />
+              </button>
+            )}
+
+            {expandedPost.text ? (
+              <p className="text-sm leading-relaxed">{expandedPost.text}</p>
+            ) : null}
+
+            <div className="text-muted-foreground flex flex-wrap gap-4 text-xs">
+              <span>♥ {expandedPost.like_count}</span>
+              <span>💬 {expandedPost.comment_count}</span>
+              {expandedPost.lat != null && expandedPost.lng != null ? (
+                <span>
+                  📍 {expandedPost.lat.toFixed(4)}, {expandedPost.lng.toFixed(4)}
+                </span>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {items.map((p) => (
             <Card key={p.id} className="overflow-hidden">
               <CardContent className="space-y-3 pt-6">
                 {p.media_type === "VIDEO" ? (
                   <div className="space-y-2">
                     <video
-                      className="w-full rounded-lg border"
+                      className="w-full cursor-zoom-in rounded-lg border"
                       controls
                       playsInline
                       preload="metadata"
@@ -140,19 +221,26 @@ export function Feed() {
                             undefined
                           : undefined
                       }
+                      onClick={() => setExpandedId(p.id)}
                     />
                   </div>
                 ) : (
-                  <Image
-                    className="h-auto w-full rounded-lg border"
-                    alt={p.text ?? "travel media"}
-                    src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
-                    width={1600}
-                    height={1200}
-                    sizes="(max-width: 768px) 100vw, 768px"
-                    // Avoid Next Image optimizer 400s for some Cloudinary formats.
-                    unoptimized
-                  />
+                  <button
+                    type="button"
+                    className="block w-full cursor-zoom-in"
+                    onClick={() => setExpandedId((prev) => (prev === p.id ? null : p.id))}
+                  >
+                    <Image
+                      className="h-auto w-full rounded-lg border"
+                      alt={p.text ?? "travel media"}
+                      src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
+                      width={1600}
+                      height={1200}
+                      sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 33vw"
+                      // Avoid Next Image optimizer 400s for some Cloudinary formats.
+                      unoptimized
+                    />
+                  </button>
                 )}
 
                 {p.text ? <p className="text-sm leading-relaxed">{p.text}</p> : null}
@@ -175,16 +263,16 @@ export function Feed() {
             </Card>
           ))}
 
-          <div ref={sentinelRef} className="h-10" />
+          <div ref={sentinelRef} className="col-span-full h-10" />
 
           {postsQuery.isFetchingNextPage ? (
-            <p className="text-muted-foreground text-center text-sm">Загружаю ещё…</p>
+            <p className="text-muted-foreground col-span-full text-center text-sm">Загружаю ещё…</p>
           ) : postsQuery.hasNextPage ? (
-            <p className="text-muted-foreground text-center text-sm">
+            <p className="text-muted-foreground col-span-full text-center text-sm">
               Прокрути ниже — подгружу ещё.
             </p>
           ) : (
-            <p className="text-muted-foreground text-center text-sm">Конец ленты.</p>
+            <p className="text-muted-foreground col-span-full text-center text-sm">Конец ленты.</p>
           )}
         </div>
       )}

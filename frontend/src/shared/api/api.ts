@@ -170,3 +170,63 @@ export async function authMe(accessToken: string): Promise<{ user: AuthUser }> {
   return (await res.json()) as { user: AuthUser };
 }
 
+export async function adminCloudinaryConfig(accessToken: string): Promise<{
+  cloudName: string;
+  apiKey: string;
+}> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/admin/cloudinary/config`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Cloudinary config failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { cloudName: string; apiKey: string };
+}
+
+export async function adminCloudinarySignUpload(
+  accessToken: string,
+  paramsToSign: Record<string, unknown>,
+): Promise<{ signature: string; timestamp: number }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/admin/cloudinary/sign-upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ paramsToSign }),
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Cloudinary sign failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { signature: string; timestamp: number };
+}
+
+export async function createPost(
+  accessToken: string,
+  body: {
+    mediaType: "PHOTO" | "VIDEO" | "AUDIO";
+    mediaUrl: string;
+    cloudinaryPublicId?: string;
+    folder?: string;
+    text?: string;
+    country?: string;
+    city?: string;
+    lat?: number;
+    lng?: number;
+  },
+): Promise<{ post: ApiPost }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/posts`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Create post failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { post: ApiPost };
+}
+

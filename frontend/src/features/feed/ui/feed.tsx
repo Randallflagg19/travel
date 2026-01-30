@@ -243,22 +243,13 @@ export function Feed() {
           aria-label="Просмотр медиа"
           onClick={() => setExpandedId(null)}
         >
-          <div
-            className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 text-sm text-white/90">
-                <div className="truncate">Просмотр</div>
-                <div className="truncate text-white/60">Нажми ESC или “Закрыть”.</div>
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => setExpandedId(null)}>
-                Закрыть
-              </Button>
-            </div>
-
-            <div className="relative flex-1 overflow-hidden rounded-lg">
-              {expandedPost.media_type === "VIDEO" ? (
+          <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center">
+            {expandedPost.media_type === "VIDEO" ? (
+              // For video, keep backdrop click-to-close, but don't close when interacting with controls.
+              <div
+                className="relative h-full w-full overflow-hidden rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <video
                   className="h-full w-full bg-black object-contain"
                   controls
@@ -274,7 +265,15 @@ export function Feed() {
                       : undefined
                   }
                 />
-              ) : (
+              </div>
+            ) : (
+              // For photo: tap again anywhere on the photo to close (no header/buttons).
+              <button
+                type="button"
+                className="relative h-full w-full cursor-zoom-out overflow-hidden rounded-lg"
+                onClick={() => setExpandedId(null)}
+                aria-label="Закрыть"
+              >
                 <Image
                   alt={expandedPost.text ?? "travel media"}
                   src={cloudinaryOptimizedUrl(expandedPost.media_url, expandedPost.media_type)}
@@ -284,22 +283,8 @@ export function Feed() {
                   unoptimized
                   priority
                 />
-              )}
-            </div>
-
-            {expandedPost.text ? (
-              <p className="line-clamp-3 text-sm leading-relaxed text-white/90">{expandedPost.text}</p>
-            ) : null}
-
-            <div className="flex flex-wrap gap-4 text-xs text-white/70">
-              <span>♥ {expandedPost.like_count}</span>
-              <span>💬 {expandedPost.comment_count}</span>
-              {expandedPost.lat != null && expandedPost.lng != null ? (
-                <span>
-                  📍 {expandedPost.lat.toFixed(4)}, {expandedPost.lng.toFixed(4)}
-                </span>
-              ) : null}
-            </div>
+              </button>
+            )}
           </div>
         </div>
       ) : null}

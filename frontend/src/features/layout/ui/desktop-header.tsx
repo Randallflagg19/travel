@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
+import { CloudinaryUploadButton } from "@/features/upload/ui/cloudinary-upload-button";
 
 function useHeaderText() {
   const searchParams = useSearchParams();
@@ -22,7 +23,9 @@ function useHeaderText() {
 export function DesktopHeader() {
   const { title, subtitle } = useHeaderText();
   const auth = useAuth();
-  const displayName = auth.user?.name?.trim() ? auth.user.name.trim() : auth.user?.email ?? "";
+  const displayName = auth.user?.name?.trim()
+    ? auth.user.name.trim()
+    : auth.user?.username ?? auth.user?.email ?? "";
 
   return (
     <div className="supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 hidden items-center gap-3 border-b bg-background/90 px-4 py-3 backdrop-blur lg:flex">
@@ -37,6 +40,7 @@ export function DesktopHeader() {
             <div className="text-muted-foreground max-w-[260px] truncate text-xs">
               {auth.user.role} · {displayName}
             </div>
+            <CloudinaryUploadButton />
             <Button variant="ghost" size="sm" onClick={auth.logout}>
               Выйти
             </Button>

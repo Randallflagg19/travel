@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Feed } from "@/components/feed";
+import { Feed } from "@/features/feed/ui/feed";
 
 export default function Home() {
   return (

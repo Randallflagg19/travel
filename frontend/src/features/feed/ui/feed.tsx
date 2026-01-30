@@ -4,13 +4,10 @@ import { useEffect, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { fetchPostsPage } from "@/lib/api";
-import {
-  cloudinaryOptimizedUrl,
-  cloudinaryVideoPosterUrl,
-} from "@/lib/cloudinary";
-import { useInView } from "@/hooks/use-in-view";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchPostsPage } from "@/shared/api/api";
+import { cloudinaryOptimizedUrl, cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
+import { useInView } from "@/shared/lib/hooks/use-in-view";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 
 export function Feed() {
   const limit = 30;
@@ -54,8 +51,8 @@ export function Feed() {
           : all
             ? {}
             : selectedCountry && selectedCity
-            ? { country: selectedCountry, city: selectedCity }
-            : {}),
+              ? { country: selectedCountry, city: selectedCity }
+              : {}),
       }),
     enabled: Boolean(isSelectionReady),
     initialPageParam: undefined as string | undefined,
@@ -139,7 +136,8 @@ export function Feed() {
                       src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
                       poster={
                         p.cloudinary_public_id
-                          ? cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id) ?? undefined
+                          ? cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id) ??
+                            undefined
                           : undefined
                       }
                     />

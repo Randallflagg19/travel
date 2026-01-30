@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Providers } from "./providers";
-import { PlacesSidebar } from "@/components/places-sidebar";
+import { PlacesSidebar } from "@/features/places/ui/places-sidebar";
 import { Suspense } from "react";
-import { MobileHeader } from "@/components/mobile-header";
+import { MobileHeader } from "@/features/layout/ui/mobile-header";
+import { Providers } from "./providers";
+import { DesktopHeader } from "@/features/layout/ui/desktop-header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,8 +38,21 @@ export default function RootLayout({
         <Providers>
           <div className="min-h-dvh">
             {/* Mobile header (dynamic) */}
-            <Suspense fallback={<div className="sticky top-0 z-50 border-b bg-background/90 px-3 py-2 lg:hidden" />}>
+            <Suspense
+              fallback={
+                <div className="sticky top-0 z-50 border-b bg-background/90 px-3 py-2 lg:hidden" />
+              }
+            >
               <MobileHeader />
+            </Suspense>
+
+            {/* Desktop header */}
+            <Suspense
+              fallback={
+                <div className="sticky top-0 z-40 hidden border-b bg-background/90 px-4 py-3 lg:block" />
+              }
+            >
+              <DesktopHeader />
             </Suspense>
 
             <div className="grid min-h-dvh lg:grid-cols-[280px_1fr]">

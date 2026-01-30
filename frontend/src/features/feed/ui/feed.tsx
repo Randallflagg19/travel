@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -15,6 +15,7 @@ export function Feed() {
   const order: "asc" | "desc" = "asc";
   const searchParams = useSearchParams();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const scrollYRef = useRef(0);
 
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";
@@ -94,6 +95,27 @@ export function Feed() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [expandedId]);
 
+  // Prevent scroll jumps: lock scroll while expanded and restore on close.
+  useEffect(() => {
+    if (!expandedId) return;
+    scrollYRef.current = window.scrollY;
+    const body = document.body;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+    };
+    body.style.position = "fixed";
+    body.style.top = `-${scrollYRef.current}px`;
+    body.style.width = "100%";
+    return () => {
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.width = prev.width;
+      window.scrollTo(0, scrollYRef.current);
+    };
+  }, [expandedId]);
+
   return (
     <main className="mx-auto flex max-w-screen-2xl flex-col gap-6 px-4 py-10">
       <header className="flex items-center justify-between">
@@ -138,70 +160,6 @@ export function Feed() {
             <CardDescription>Для этого места постов нет.</CardDescription>
           </CardHeader>
         </Card>
-      ) : expandedPost ? (
-        <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="truncate">Просмотр</CardTitle>
-              <CardDescription className="truncate">
-                Нажми ESC или “Закрыть”, чтобы вернуться к ленте.
-              </CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setExpandedId(null)}>
-              Закрыть
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            {expandedPost.media_type === "VIDEO" ? (
-              <video
-                className="w-full rounded-lg border"
-                controls
-                playsInline
-                preload="auto"
-                src={cloudinaryOptimizedUrl(expandedPost.media_url, expandedPost.media_type)}
-                poster={
-                  expandedPost.cloudinary_public_id
-                    ? cloudinaryVideoPosterUrl(
-                        expandedPost.media_url,
-                        expandedPost.cloudinary_public_id,
-                      ) ?? undefined
-                    : undefined
-                }
-              />
-            ) : (
-              <button
-                type="button"
-                className="block w-full cursor-zoom-out"
-                onClick={() => setExpandedId(null)}
-                aria-label="Закрыть просмотр"
-              >
-                <Image
-                  className="h-auto w-full rounded-lg border"
-                  alt={expandedPost.text ?? "travel media"}
-                  src={cloudinaryOptimizedUrl(expandedPost.media_url, expandedPost.media_type)}
-                  width={2000}
-                  height={1500}
-                  sizes="(max-width: 1024px) 100vw, 1200px"
-                  unoptimized
-                />
-              </button>
-            )}
-
-            {expandedPost.text ? (
-              <p className="text-sm leading-relaxed">{expandedPost.text}</p>
-            ) : null}
-
-            <div className="text-muted-foreground flex flex-wrap gap-4 text-xs">
-              <span>♥ {expandedPost.like_count}</span>
-              <span>💬 {expandedPost.comment_count}</span>
-              {expandedPost.lat != null && expandedPost.lng != null ? (
-                <span>
-                  📍 {expandedPost.lat.toFixed(4)}, {expandedPost.lng.toFixed(4)}
-                </span>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {items.map((p) => (
@@ -228,7 +186,7 @@ export function Feed() {
                   <button
                     type="button"
                     className="block w-full cursor-zoom-in"
-                    onClick={() => setExpandedId((prev) => (prev === p.id ? null : p.id))}
+                    onClick={() => setExpandedId(p.id)}
                   >
                     <Image
                       className="h-auto w-full rounded-lg border"
@@ -276,6 +234,75 @@ export function Feed() {
           )}
         </div>
       )}
+
+      {expandedPost ? (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 p-3"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Просмотр медиа"
+          onClick={() => setExpandedId(null)}
+        >
+          <div
+            className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 text-sm text-white/90">
+                <div className="truncate">Просмотр</div>
+                <div className="truncate text-white/60">Нажми ESC или “Закрыть”.</div>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => setExpandedId(null)}>
+                Закрыть
+              </Button>
+            </div>
+
+            <div className="relative flex-1 overflow-hidden rounded-lg">
+              {expandedPost.media_type === "VIDEO" ? (
+                <video
+                  className="h-full w-full bg-black object-contain"
+                  controls
+                  playsInline
+                  preload="auto"
+                  src={cloudinaryOptimizedUrl(expandedPost.media_url, expandedPost.media_type)}
+                  poster={
+                    expandedPost.cloudinary_public_id
+                      ? cloudinaryVideoPosterUrl(
+                          expandedPost.media_url,
+                          expandedPost.cloudinary_public_id,
+                        ) ?? undefined
+                      : undefined
+                  }
+                />
+              ) : (
+                <Image
+                  alt={expandedPost.text ?? "travel media"}
+                  src={cloudinaryOptimizedUrl(expandedPost.media_url, expandedPost.media_type)}
+                  fill
+                  sizes="100vw"
+                  className="object-contain"
+                  unoptimized
+                  priority
+                />
+              )}
+            </div>
+
+            {expandedPost.text ? (
+              <p className="line-clamp-3 text-sm leading-relaxed text-white/90">{expandedPost.text}</p>
+            ) : null}
+
+            <div className="flex flex-wrap gap-4 text-xs text-white/70">
+              <span>♥ {expandedPost.like_count}</span>
+              <span>💬 {expandedPost.comment_count}</span>
+              {expandedPost.lat != null && expandedPost.lng != null ? (
+                <span>
+                  📍 {expandedPost.lat.toFixed(4)}, {expandedPost.lng.toFixed(4)}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

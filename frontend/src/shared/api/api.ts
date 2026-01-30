@@ -32,7 +32,8 @@ export type PlacesResponse = {
 
 export type AuthUser = {
   id: string;
-  email: string;
+  username: string;
+  email: string | null;
   role: "USER" | "ADMIN" | "SUPERADMIN";
   name: string | null;
   created_at: string;
@@ -107,8 +108,9 @@ export async function fetchPlaces(): Promise<PlacesResponse> {
 }
 
 export async function authRegister(params: {
-  email: string;
+  username: string;
   password: string;
+  email?: string;
   name?: string;
 }): Promise<AuthResponse> {
   const api = getApiBaseUrl();
@@ -116,6 +118,7 @@ export async function authRegister(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      username: params.username,
       email: params.email,
       password: params.password,
       name: params.name,
@@ -131,7 +134,7 @@ export async function authRegister(params: {
 }
 
 export async function authLogin(params: {
-  email: string;
+  login: string;
   password: string;
 }): Promise<AuthResponse> {
   const api = getApiBaseUrl();
@@ -139,7 +142,7 @@ export async function authLogin(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      email: params.email,
+      login: params.login,
       password: params.password,
     }),
   });

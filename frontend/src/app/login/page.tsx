@@ -9,7 +9,7 @@ import { useAuth } from "@/entities/session/model/auth";
 import { z } from "zod";
 
 const LoginSchema = z.object({
-  email: z.string().trim().email("Неверный email"),
+  login: z.string().trim().min(3, "Введите email или username"),
   password: z.string().min(3, "Пароль: минимум 3 символа"),
 });
 
@@ -17,7 +17,7 @@ export default function LoginPage() {
   const router = useRouter();
   const auth = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,12 +27,12 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const parsed = LoginSchema.safeParse({ email, password });
+      const parsed = LoginSchema.safeParse({ login, password });
       if (!parsed.success) {
         setError(parsed.error.issues[0]?.message ?? "Проверь данные");
         return;
       }
-      await auth.login({ email: parsed.data.email, password: parsed.data.password });
+      await auth.login({ login: parsed.data.login, password: parsed.data.password });
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось войти");
@@ -50,14 +50,13 @@ export default function LoginPage() {
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-1">
-              <div className="text-sm font-medium">Email</div>
+              <div className="text-sm font-medium">Email или username</div>
               <input
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                autoComplete="email"
-                inputMode="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                autoComplete="username"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                placeholder="you@example.com или tapir"
                 required
               />
             </div>

@@ -10,7 +10,15 @@ import { z } from "zod";
 
 const RegisterSchema = z.object({
   name: z.string().optional(),
-  email: z.string().trim().email("Неверный email"),
+  username: z
+    .string()
+    .trim()
+    .regex(/^[a-zA-Z0-9._-]{3,32}$/, "Username: 3–32, латиница/цифры и . _ -"),
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Неверный email"),
   password: z.string().min(3, "Пароль: минимум 3 символа"),
 });
 
@@ -19,6 +27,7 @@ export default function RegisterPage() {
   const auth = useAuth();
 
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -29,15 +38,16 @@ export default function RegisterPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const parsed = RegisterSchema.safeParse({ name, email, password });
+      const parsed = RegisterSchema.safeParse({ name, username, email, password });
       if (!parsed.success) {
         setError(parsed.error.issues[0]?.message ?? "Проверь данные");
         return;
       }
 
       await auth.register({
-        email: parsed.data.email,
+        username: parsed.data.username,
         password: parsed.data.password,
+        email: parsed.data.email?.trim() ? parsed.data.email.trim() : undefined,
         name: parsed.data.name?.trim() ? parsed.data.name.trim() : undefined,
       });
       router.push("/");
@@ -57,6 +67,19 @@ export default function RegisterPage() {
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-1">
+              <div className="text-sm font-medium">Username</div>
+              <input
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="tapir"
+                required
+              />
+              <div className="text-muted-foreground text-xs">3–32, латиница/цифры и . _ -</div>
+            </div>
+
+            <div className="space-y-1">
               <div className="text-sm font-medium">Имя (опционально)</div>
               <input
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -68,7 +91,7 @@ export default function RegisterPage() {
             </div>
 
             <div className="space-y-1">
-              <div className="text-sm font-medium">Email</div>
+              <div className="text-sm font-medium">Email (опционально)</div>
               <input
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                 autoComplete="email"
@@ -76,7 +99,6 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                required
               />
             </div>
 

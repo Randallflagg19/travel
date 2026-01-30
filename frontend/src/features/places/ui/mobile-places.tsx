@@ -31,12 +31,8 @@ export function MobilePlaces() {
     return () => window.clearTimeout(t);
   }, [isSelectionReady, isAuthRoute]);
 
-  // Never block auth pages with the places sheet.
-  useEffect(() => {
-    if (!isAuthRoute) return;
-    if (!open) return;
-    setOpen(false);
-  }, [isAuthRoute, open]);
+  // Never show the places sheet on auth pages.
+  if (isAuthRoute) return null;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

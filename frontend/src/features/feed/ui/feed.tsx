@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { Play } from "lucide-react";
 import { fetchPostsPage } from "@/shared/api/api";
 import { cloudinaryOptimizedUrl, cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
@@ -168,7 +169,7 @@ export function Feed() {
                 {p.media_type === "VIDEO" ? (
                   <button
                     type="button"
-                    className="block w-full cursor-zoom-in"
+                    className="relative block w-full cursor-zoom-in"
                     onClick={() => setExpandedId(p.id)}
                     aria-label="Открыть видео"
                   >
@@ -196,6 +197,16 @@ export function Feed() {
                         src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
                       />
                     )}
+
+                    {/* Video indicator */}
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/30">
+                        <Play className="ml-0.5 size-6 fill-white" />
+                      </div>
+                    </div>
+                    <div className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white ring-1 ring-white/20">
+                      VIDEO
+                    </div>
                   </button>
                 ) : (
                   <button

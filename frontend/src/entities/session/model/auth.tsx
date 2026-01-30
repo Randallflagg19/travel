@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authLogin, authMe, authRegister, type AuthUser } from "@/shared/api/api";
 import { clearAccessToken, getAccessToken, setAccessToken } from "./token";
@@ -28,15 +28,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return await authMe(accessToken as string);
     },
     retry: false,
-    onError: (err) => {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("(401)")) {
-        clearAccessToken();
-        setTokenState(null);
-        queryClient.removeQueries({ queryKey: ["auth", "me"] });
-      }
-    },
   });
+
+  // If token invalid, clear it to avoid "stuck" state.
+  useEffect(() => {
+    if (!meQuery.isError) return;
+    const msg = meQuery.error instanceof Error ? meQuery.error.message : "";
+    if (!msg.includes("(401)")) return;
+
+    clearAccessToken();
+    // Defer to next tick to avoid setState-in-effect lint rule / cascading render warning.
+    const t = window.setTimeout(() => {
+      setTokenState(null);
+      queryClient.removeQueries({ queryKey: ["auth", "me"] });
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [meQuery.isError, meQuery.error, queryClient]);
 
   const user = meQuery.data?.user ?? null;
 

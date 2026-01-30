@@ -8,7 +8,6 @@ import { fetchPostsPage } from "@/shared/api/api";
 import { cloudinaryOptimizedUrl, cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Button } from "@/shared/ui/button";
 
 export function Feed() {
   const limit = 30;
@@ -16,6 +15,7 @@ export function Feed() {
   const searchParams = useSearchParams();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const scrollYRef = useRef(0);
+  const lastVideoTapRef = useRef(0);
 
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";
@@ -166,22 +166,37 @@ export function Feed() {
             <Card key={p.id} className="overflow-hidden">
               <CardContent className="space-y-3 pt-6">
                 {p.media_type === "VIDEO" ? (
-                  <div className="space-y-2">
-                    <video
-                      className="w-full cursor-zoom-in rounded-lg border"
-                      controls
-                      playsInline
-                      preload="metadata"
-                      src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
-                      poster={
-                        p.cloudinary_public_id
-                          ? cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id) ??
-                            undefined
-                          : undefined
-                      }
-                      onClick={() => setExpandedId(p.id)}
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    className="block w-full cursor-zoom-in"
+                    onClick={() => setExpandedId(p.id)}
+                    aria-label="Открыть видео"
+                  >
+                    {p.cloudinary_public_id ? (
+                      <Image
+                        className="h-auto w-full rounded-lg border"
+                        alt={p.text ?? "travel video"}
+                        src={
+                          cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id) ??
+                          cloudinaryOptimizedUrl(p.media_url, p.media_type)
+                        }
+                        width={1600}
+                        height={1200}
+                        sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 33vw"
+                        unoptimized
+                      />
+                    ) : (
+                      // Fallback if we don't have Cloudinary public_id for a poster.
+                      // Keep the <video> non-interactive so tapping opens fullscreen without starting playback underneath.
+                      <video
+                        className="pointer-events-none w-full rounded-lg border"
+                        playsInline
+                        muted
+                        preload="metadata"
+                        src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
+                      />
+                    )}
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -248,7 +263,17 @@ export function Feed() {
               // For video, keep backdrop click-to-close, but don't close when interacting with controls.
               <div
                 className="relative h-full w-full overflow-hidden rounded-lg"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  // Single taps should work for controls (play/pause/seek),
+                  // but a "repeat tap" should close. We treat it as a double-tap.
+                  const now = Date.now();
+                  if (now - lastVideoTapRef.current < 300) {
+                    setExpandedId(null);
+                    return;
+                  }
+                  lastVideoTapRef.current = now;
+                  e.stopPropagation();
+                }}
               >
                 <video
                   className="h-full w-full bg-black object-contain"

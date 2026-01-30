@@ -14,7 +14,8 @@ export async function runMigrations(sql: Sql) {
     await q`
       CREATE TABLE IF NOT EXISTS users (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        email text NOT NULL,
+        username text,
+        email text,
         password_hash text NOT NULL,
         role text NOT NULL DEFAULT 'USER',
         name text,
@@ -22,10 +23,86 @@ export async function runMigrations(sql: Sql) {
       )
     `;
 
+    // Add username column for older DBs (idempotent)
+    await q`ALTER TABLE users ADD COLUMN IF NOT EXISTS username text`;
+
+    // Make email optional (nullable) for username-based auth (idempotent)
+    await q`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_name = 'users'
+            AND column_name = 'email'
+            AND is_nullable = 'NO'
+        ) THEN
+          ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+        END IF;
+      END $$;
+    `;
+
+    // Backfill username for existing rows (idempotent & collision-safe)
+    await q`
+      WITH candidates AS (
+        SELECT
+          id,
+          lower(
+            coalesce(
+              nullif(btrim(username), ''),
+              nullif(btrim(name), ''),
+              nullif(btrim(split_part(email, '@', 1)), ''),
+              'user'
+            )
+          ) AS base
+        FROM users
+      ),
+      ranked AS (
+        SELECT
+          id,
+          base,
+          row_number() OVER (PARTITION BY base ORDER BY id) AS rn
+        FROM candidates
+      ),
+      final AS (
+        SELECT
+          id,
+          CASE WHEN rn = 1 THEN base ELSE base || '_' || rn::text END AS uname
+        FROM ranked
+      )
+      UPDATE users u
+      SET username = f.uname
+      FROM final f
+      WHERE u.id = f.id
+        AND (u.username IS NULL OR btrim(u.username) = '')
+    `;
+
+    // Case-insensitive uniqueness for username
+    await q`
+      CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_unique
+      ON users ((lower(username)))
+    `;
+
     // Case-insensitive uniqueness for email
     await q`
       CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_unique
       ON users ((lower(email)))
+    `;
+
+    // Ensure username is NOT NULL (after backfill)
+    await q`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_name = 'users'
+            AND column_name = 'username'
+            AND is_nullable = 'YES'
+        ) THEN
+          ALTER TABLE users ALTER COLUMN username SET NOT NULL;
+        END IF;
+      END $$;
     `;
 
     // Posts: 1 media = 1 post

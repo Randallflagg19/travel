@@ -20,7 +20,11 @@ export class CloudinaryController {
     @CurrentUser() user: JwtUser,
     @Body() body: { prefix?: string; max?: number },
   ) {
-    const prefix = body.prefix ?? `${user.email.split('@')[0]}/`;
+    const fallbackPrefix =
+      user.username ??
+      (user.email ? user.email.split('@')[0] : null) ??
+      `user_${user.sub}`;
+    const prefix = body.prefix ?? `${fallbackPrefix}/`;
     return await this.cloud.importPrefix({
       prefix,
       userId: user.sub,

@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AuthRoles } from '../auth/auth-roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtUser } from '../auth/jwt-user.type';
@@ -7,6 +7,18 @@ import { CloudinaryService } from './cloudinary.service';
 @Controller('admin/cloudinary')
 export class CloudinaryController {
   constructor(private readonly cloud: CloudinaryService) {}
+
+  @Get('config')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
+  async config() {
+    return this.cloud.getClientConfig();
+  }
+
+  @Post('sign-upload')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
+  async signUpload(@Body() body: { paramsToSign?: Record<string, unknown> }) {
+    return this.cloud.signUpload(body.paramsToSign);
+  }
 
   @Post('probe')
   @AuthRoles('ADMIN', 'SUPERADMIN')

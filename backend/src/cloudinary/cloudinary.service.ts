@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
+import { createHash } from 'crypto';
 import type { Sql } from 'postgres';
 import { DbService } from '../db/db.service';
 
@@ -72,17 +73,24 @@ function toResourceType(value: string): ResourceType {
 @Injectable()
 export class CloudinaryService {
   private readonly isConfigured: boolean;
+  private readonly cloudName: string | null;
+  private readonly apiKey: string | null;
+  private readonly apiSecret: string | null;
 
   constructor(
     private readonly config: ConfigService,
     private readonly db: DbService,
   ) {
-    const cloudName = this.config.get<string>('CLOUDINARY_CLOUD_NAME');
-    const apiKey = this.config.get<string>('CLOUDINARY_API_KEY');
-    const apiSecret = this.config.get<string>('CLOUDINARY_API_SECRET');
+    const cloudName = this.config.get<string>('CLOUDINARY_CLOUD_NAME') ?? null;
+    const apiKey = this.config.get<string>('CLOUDINARY_API_KEY') ?? null;
+    const apiSecret = this.config.get<string>('CLOUDINARY_API_SECRET') ?? null;
+
+    this.cloudName = cloudName;
+    this.apiKey = apiKey;
+    this.apiSecret = apiSecret;
 
     this.isConfigured = Boolean(cloudName && apiKey && apiSecret);
-    if (this.isConfigured) {
+    if (cloudName && apiKey && apiSecret) {
       cloudinary.config({
         cloud_name: cloudName,
         api_key: apiKey,
@@ -90,6 +98,42 @@ export class CloudinaryService {
         secure: true,
       });
     }
+  }
+
+  getClientConfig() {
+    if (!this.isConfigured || !this.cloudName || !this.apiKey) {
+      throw new BadRequestException('Cloudinary is not configured on the server');
+    }
+    return { cloudName: this.cloudName, apiKey: this.apiKey };
+  }
+
+  signUpload(paramsToSign: Record<string, unknown> | null | undefined) {
+    if (!this.isConfigured || !this.apiSecret) {
+      throw new BadRequestException('Cloudinary is not configured on the server');
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    const input = paramsToSign ?? {};
+    // Cloudinary signature: sort params, join "k=v" with "&", append api_secret, sha1.
+    const entries: Array<[string, string]> = [];
+    for (const [k, v] of Object.entries(input)) {
+      if (v === null || v === undefined) continue;
+      if (k === 'file' || k === 'signature' || k === 'api_key') continue;
+      if (k === 'timestamp') continue; // server will set
+      const s = String(v);
+      if (!s.trim()) continue;
+      entries.push([k, s]);
+    }
+    entries.push(['timestamp', String(timestamp)]);
+    entries.sort((a, b) => a[0].localeCompare(b[0]));
+
+    const toSign = entries.map(([k, v]) => `${k}=${v}`).join('&');
+    const signature = createHash('sha1')
+      .update(`${toSign}${this.apiSecret}`, 'utf8')
+      .digest('hex');
+
+    return { signature, timestamp };
   }
 
   private getSqlOrThrow(): Sql {

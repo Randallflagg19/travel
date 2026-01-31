@@ -310,6 +310,7 @@ export function Feed() {
                 canLike={canLike}
                 canComment={canComment}
                 isCommentsOpen={commentsPostId === p.id}
+                currentUserId={auth.user?.id ?? null}
                 accessToken={auth.accessToken}
                 onLikeToggled={updatePostLike}
                 onLikeSuccess={() =>

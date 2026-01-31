@@ -331,3 +331,20 @@ export async function addComment(
   return (await res.json()) as { comment: ApiComment };
 }
 
+export async function deleteComment(
+  accessToken: string,
+  postId: string,
+  commentId: string,
+): Promise<{ ok: boolean }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/posts/${postId}/comments/${commentId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Delete comment failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { ok: boolean };
+}
+

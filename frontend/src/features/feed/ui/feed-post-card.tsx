@@ -22,6 +22,7 @@ type FeedPostCardProps = {
   canLike: boolean;
   canComment: boolean;
   isCommentsOpen: boolean;
+  currentUserId: string | null;
   accessToken: string | null;
   onLikeToggled: (postId: string, liked: boolean, deltaCount: number) => void;
   onLikeSuccess?: () => void;
@@ -39,6 +40,7 @@ export function FeedPostCard({
   canLike,
   canComment,
   isCommentsOpen,
+  currentUserId,
   accessToken,
   onLikeToggled,
   onLikeSuccess,
@@ -192,6 +194,7 @@ export function FeedPostCard({
           <PostCommentsBlock
             postId={p.id}
             canComment={canComment}
+            currentUserId={currentUserId}
             accessToken={accessToken}
             onCommentAdded={onCommentAdded}
           />

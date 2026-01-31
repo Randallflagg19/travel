@@ -2,12 +2,19 @@
 
 import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchComments, addComment, type ApiComment } from "@/shared/api/api";
+import { X } from "lucide-react";
+import {
+  fetchComments,
+  addComment,
+  deleteComment,
+  type ApiComment,
+} from "@/shared/api/api";
 import { Button } from "@/shared/ui/button";
 
 type PostCommentsBlockProps = {
   postId: string;
   canComment: boolean;
+  currentUserId: string | null;
   accessToken: string | null;
   onCommentAdded?: () => void;
 };
@@ -41,11 +48,15 @@ function formatCommentDate(iso: string): string {
 export function PostCommentsBlock({
   postId,
   canComment,
+  currentUserId,
   accessToken,
   onCommentAdded,
 }: PostCommentsBlockProps) {
   const queryClient = useQueryClient();
   const [newText, setNewText] = useState("");
+  const [deleteConfirmCommentId, setDeleteConfirmCommentId] = useState<
+    string | null
+  >(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const commentsQuery = useQuery({
@@ -72,9 +83,28 @@ export function PostCommentsBlock({
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (commentId: string) =>
+      deleteComment(accessToken!, postId, commentId),
+    onSuccess: (_, commentId) => {
+      setDeleteConfirmCommentId(null);
+      queryClient.setQueryData(
+        ["comments", postId],
+        (old: { items: ApiComment[] } | undefined) =>
+          old
+            ? {
+                items: old.items.filter((c) => c.id !== commentId),
+              }
+            : old,
+      );
+      onCommentAdded?.();
+    },
+  });
+
   const items: ApiComment[] = commentsQuery.data?.items ?? [];
   const isLoading = commentsQuery.isLoading;
   const isSubmitting = addMutation.isPending;
+  const canDeleteOwn = Boolean(accessToken && currentUserId);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,12 +134,30 @@ export function PostCommentsBlock({
                 key={c.id}
                 className="rounded-lg bg-muted/50 px-3 py-2 text-sm"
               >
-                <p className="whitespace-pre-wrap break-words leading-snug">
-                  {c.text}
-                </p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {formatCommentDate(c.created_at)}
-                </p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="whitespace-pre-wrap break-words leading-snug">
+                      {c.text}
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {formatCommentDate(c.created_at)}
+                    </p>
+                  </div>
+                  {canDeleteOwn && c.user_id === currentUserId ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        !deleteMutation.isPending &&
+                        setDeleteConfirmCommentId(c.id)
+                      }
+                      disabled={deleteMutation.isPending}
+                      className="text-muted-foreground hover:text-destructive flex size-9 shrink-0 items-center justify-center rounded p-1 transition-colors disabled:opacity-50"
+                      aria-label="Удалить комментарий"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
@@ -135,6 +183,46 @@ export function PostCommentsBlock({
             {isSubmitting ? "…" : "Отправить"}
           </Button>
         </form>
+      ) : null}
+
+      {deleteConfirmCommentId ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Подтверждение удаления"
+          onClick={() => setDeleteConfirmCommentId(null)}
+        >
+          <div
+            className="bg-background border-border w-full max-w-xs rounded-xl border p-4 shadow-lg sm:rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm">Удалить комментарий?</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="min-h-10 min-w-16 sm:min-h-9 sm:min-w-0"
+                onClick={() => setDeleteConfirmCommentId(null)}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="min-h-10 min-w-20 sm:min-h-9 sm:min-w-0"
+                disabled={deleteMutation.isPending}
+                onClick={() => {
+                  deleteMutation.mutate(deleteConfirmCommentId);
+                }}
+              >
+                {deleteMutation.isPending ? "…" : "Удалить"}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

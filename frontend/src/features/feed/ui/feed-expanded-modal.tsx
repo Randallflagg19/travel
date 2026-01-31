@@ -77,6 +77,12 @@ export function FeedExpandedModal({
               <button
                 type="button"
                 className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 transition hover:bg-black/50"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onSetExpandedVideoSrc(expandedPost.media_url);
+                  shouldAutoPlayRef.current = true;
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSetExpandedVideoSrc(expandedPost.media_url);

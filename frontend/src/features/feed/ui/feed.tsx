@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { fetchPostsPage, deletePost } from "@/shared/api/api";
+import {
+  fetchPostsPage,
+  deletePost,
+  type ApiPost,
+} from "@/shared/api/api";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { useAuth } from "@/entities/session/model/auth";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
@@ -58,22 +62,26 @@ export function Feed() {
         city: selectedCity,
         unknown,
         all,
+        accessToken: auth.accessToken ?? null,
       },
     ],
     queryFn: ({ pageParam }) =>
-      fetchPostsPage({
-        limit,
-        cursor: typeof pageParam === "string" ? pageParam : undefined,
-        order,
-        ...(unknown
-          ? { unknown: true }
-          : all
-            ? {}
-            : selectedCountry && selectedCity
-              ? { country: selectedCountry, city: selectedCity }
-              : {}),
-      }),
-    enabled: Boolean(isSelectionReady),
+      fetchPostsPage(
+        {
+          limit,
+          cursor: typeof pageParam === "string" ? pageParam : undefined,
+          order,
+          ...(unknown
+            ? { unknown: true }
+            : all
+              ? {}
+              : selectedCountry && selectedCity
+                ? { country: selectedCountry, city: selectedCity }
+                : {}),
+        },
+        auth.accessToken ?? undefined,
+      ),
+    enabled: Boolean(isSelectionReady && auth.hydrated),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
@@ -163,6 +171,60 @@ export function Feed() {
     }
   }
 
+  const canLike = Boolean(
+    auth.user &&
+      (auth.user.role === "USER" ||
+        auth.user.role === "ADMIN" ||
+        auth.user.role === "SUPERADMIN"),
+  );
+
+  const updatePostLike = useCallback(
+    (postId: string, liked: boolean, deltaCount: number) => {
+      queryClient.setQueryData(
+        [
+          "posts",
+          {
+            limit,
+            order,
+            country: selectedCountry,
+            city: selectedCity,
+            unknown,
+            all,
+            accessToken: auth.accessToken ?? null,
+          },
+        ],
+        (old: { pages: { items: ApiPost[]; nextCursor: string | null; hasMore: boolean }[]; pageParams: unknown[] } | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((p) =>
+                p.id === postId
+                  ? {
+                      ...p,
+                      liked_by_me: liked,
+                      like_count: Math.max(0, p.like_count + deltaCount),
+                    }
+                  : p,
+              ),
+            })),
+          };
+        },
+      );
+    },
+    [
+      queryClient,
+      limit,
+      order,
+      selectedCountry,
+      selectedCity,
+      unknown,
+      all,
+      auth.accessToken,
+    ],
+  );
+
   const showPlaceInCard = Boolean(
     !unknown && !all && !(selectedCountry && selectedCity),
   );
@@ -214,6 +276,12 @@ export function Feed() {
               onDelete={handleDeletePost}
               onOpen={openExpanded}
               showPlaceInCard={showPlaceInCard}
+              canLike={canLike}
+              accessToken={auth.accessToken}
+              onLikeToggled={updatePostLike}
+              onLikeSuccess={() =>
+                queryClient.invalidateQueries({ queryKey: ["posts"] })
+              }
             />
           ))}
 

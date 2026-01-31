@@ -13,6 +13,7 @@ export type ApiPost = {
   created_at: string;
   like_count: number;
   comment_count: number;
+  liked_by_me?: boolean;
 };
 
 export type PostsPage = {
@@ -72,14 +73,17 @@ async function readApiError(res: Response): Promise<string> {
   return await res.text().catch(() => "");
 }
 
-export async function fetchPostsPage(params: {
-  limit: number;
-  cursor?: string;
-  order?: "asc" | "desc";
-  country?: string;
-  city?: string;
-  unknown?: boolean;
-}): Promise<PostsPage> {
+export async function fetchPostsPage(
+  params: {
+    limit: number;
+    cursor?: string;
+    order?: "asc" | "desc";
+    country?: string;
+    city?: string;
+    unknown?: boolean;
+  },
+  accessToken?: string | null,
+): Promise<PostsPage> {
   const api = getApiBaseUrl();
   const search = new URLSearchParams();
   search.set("limit", String(params.limit));
@@ -89,12 +93,50 @@ export async function fetchPostsPage(params: {
   if (params.city) search.set("city", params.city);
   if (params.unknown) search.set("unknown", "true");
 
-  const res = await fetch(`${api}/posts?${search.toString()}`, { cache: "no-store" });
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+  const res = await fetch(`${api}/posts?${search.toString()}`, {
+    cache: "no-store",
+    headers,
+  });
   if (!res.ok) {
     const text = await readApiError(res);
     throw new Error(`Failed to load posts (${res.status}): ${text}`);
   }
   return (await res.json()) as PostsPage;
+}
+
+export async function likePost(
+  accessToken: string,
+  postId: string,
+): Promise<{ ok: boolean }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/posts/${postId}/like`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Like failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { ok: boolean };
+}
+
+export async function unlikePost(
+  accessToken: string,
+  postId: string,
+): Promise<{ ok: boolean }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/posts/${postId}/like`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Unlike failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { ok: boolean };
 }
 
 export async function fetchPlaces(): Promise<PlacesResponse> {

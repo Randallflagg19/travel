@@ -1,12 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authLogin, authMe, authRegister, type AuthUser } from "@/shared/api/api";
-import { clearAccessToken, getAccessToken, setAccessToken } from "./token";
+import { clearAccessToken, getAccessToken, setAccessToken, subscribeToken } from "./token";
 
 type AuthContextValue = {
   accessToken: string | null;
+  /** False on server, true on client. Use to avoid first fetch without token (SSR). */
+  hydrated: boolean;
   user: AuthUser | null;
   isLoading: boolean;
   error: Error | null;
@@ -17,9 +19,22 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function getServerSnapshot(): null {
+  return null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
-  const [accessToken, setTokenState] = useState<string | null>(() => getAccessToken());
+  const accessToken = useSyncExternalStore(
+    subscribeToken,
+    getAccessToken,
+    getServerSnapshot,
+  );
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const meQuery = useQuery({
     queryKey: ["auth", "me", accessToken],
@@ -37,12 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!msg.includes("(401)")) return;
 
     clearAccessToken();
-    // Defer to next tick to avoid setState-in-effect lint rule / cascading render warning.
-    const t = window.setTimeout(() => {
-      setTokenState(null);
-      queryClient.removeQueries({ queryKey: ["auth", "me"] });
-    }, 0);
-    return () => window.clearTimeout(t);
+    queryClient.removeQueries({ queryKey: ["auth", "me"] });
   }, [meQuery.isError, meQuery.error, queryClient]);
 
   const user = meQuery.data?.user ?? null;
@@ -50,28 +60,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(() => {
     return {
       accessToken,
+      hydrated,
       user,
       isLoading: Boolean(accessToken) && meQuery.isLoading,
       error: (meQuery.error instanceof Error ? meQuery.error : null) ?? null,
       async login(params) {
         const res = await authLogin(params);
         setAccessToken(res.accessToken);
-        setTokenState(res.accessToken);
         queryClient.setQueryData(["auth", "me", res.accessToken], { user: res.user });
       },
       async register(params) {
         const res = await authRegister(params);
         setAccessToken(res.accessToken);
-        setTokenState(res.accessToken);
         queryClient.setQueryData(["auth", "me", res.accessToken], { user: res.user });
       },
       logout() {
         clearAccessToken();
-        setTokenState(null);
         queryClient.removeQueries({ queryKey: ["auth", "me"] });
       },
     };
-  }, [accessToken, user, meQuery.isLoading, meQuery.error, queryClient]);
+  }, [accessToken, hydrated, user, meQuery.isLoading, meQuery.error, queryClient]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

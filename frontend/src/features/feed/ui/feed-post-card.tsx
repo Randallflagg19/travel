@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
-import { Play, Trash2 } from "lucide-react";
+import { Heart, Play, Trash2 } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
+import { likePost, unlikePost } from "@/shared/api/api";
 import {
   cloudinaryThumbUrl,
   cloudinaryVideoPosterUrl,
@@ -16,6 +18,10 @@ type FeedPostCardProps = {
   onDelete: (postId: string) => void;
   onOpen: (postId: string) => void;
   showPlaceInCard: boolean;
+  canLike: boolean;
+  accessToken: string | null;
+  onLikeToggled: (postId: string, liked: boolean, deltaCount: number) => void;
+  onLikeSuccess?: () => void;
 };
 
 export function FeedPostCard({
@@ -25,7 +31,33 @@ export function FeedPostCard({
   onDelete,
   onOpen,
   showPlaceInCard,
+  canLike,
+  accessToken,
+  onLikeToggled,
+  onLikeSuccess,
 }: FeedPostCardProps) {
+  const [likePending, setLikePending] = useState(false);
+  const liked = Boolean(p.liked_by_me);
+
+  async function handleLikeClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!canLike || !accessToken || likePending) return;
+    const nextLiked = !liked;
+    const delta = nextLiked ? 1 : -1;
+    onLikeToggled(p.id, nextLiked, delta);
+    setLikePending(true);
+    try {
+      if (nextLiked) await likePost(accessToken, p.id);
+      else await unlikePost(accessToken, p.id);
+      onLikeSuccess?.();
+    } catch {
+      onLikeToggled(p.id, liked, -delta);
+    } finally {
+      setLikePending(false);
+    }
+  }
+
   return (
     <Card className="relative overflow-hidden">
       {deleteMode && canDelete ? (
@@ -102,8 +134,26 @@ export function FeedPostCard({
 
         {p.text ? <p className="text-sm leading-relaxed">{p.text}</p> : null}
 
-        <div className="text-muted-foreground flex flex-wrap gap-4 text-xs">
-          <span>♥ {p.like_count}</span>
+        <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-xs">
+          {canLike ? (
+            <button
+              type="button"
+              onClick={handleLikeClick}
+              disabled={likePending}
+              className="flex items-center gap-1 rounded p-0.5 transition hover:opacity-80 disabled:opacity-50"
+              aria-label={liked ? "Снять лайк" : "Лайкнуть"}
+            >
+              <Heart
+                className={`size-4 ${liked ? "fill-red-500 text-red-500" : ""}`}
+              />
+              <span>{p.like_count}</span>
+            </button>
+          ) : (
+            <span className="flex items-center gap-1">
+              <Heart className="size-4" />
+              {p.like_count}
+            </span>
+          )}
           <span>💬 {p.comment_count}</span>
           {p.lat != null && p.lng != null ? (
             <span>

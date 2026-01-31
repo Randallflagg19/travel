@@ -97,15 +97,18 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
             },
           },
           async (_error: unknown, result: unknown) => {
-            const r = result as { event?: string; info?: any };
-            if (r.event !== "success") return;
-            const info = r.info as {
-              secure_url?: string;
-              public_id?: string;
-              resource_type?: string;
-              format?: string;
-              folder?: string;
+            const r = result as {
+              event?: string;
+              info?: {
+                secure_url?: string;
+                public_id?: string;
+                resource_type?: string;
+                format?: string;
+                folder?: string;
+              };
             };
+            if (r.event !== "success" || !r.info) return;
+            const info = r.info;
             const mediaUrl = (info.secure_url ?? "").trim();
             const publicId = (info.public_id ?? "").trim();
             if (!mediaUrl) return;
@@ -120,7 +123,6 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
                 city: ctx.country && ctx.city ? ctx.city : undefined,
               });
             } catch (e) {
-              // eslint-disable-next-line no-console
               console.error("createPost failed", e);
             }
           },

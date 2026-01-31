@@ -1,19 +1,33 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Play } from "lucide-react";
-import { fetchPostsPage } from "@/shared/api/api";
-import { cloudinaryOptimizedUrl, cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
+import { Play, ArrowDownAZ, ArrowUpAZ, Trash2 } from "lucide-react";
+import { fetchPostsPage, deletePost } from "@/shared/api/api";
+import {
+  cloudinaryThumbUrl,
+  cloudinaryFullUrl,
+  cloudinaryOptimizedUrl,
+  cloudinaryVideoPosterUrl,
+} from "@/shared/lib/cloudinary";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
+import { useAuth } from "@/entities/session/model/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Button } from "@/shared/ui/button";
 
 export function Feed() {
   const limit = 30;
-  const order: "asc" | "desc" = "asc";
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const auth = useAuth();
+  const order: "asc" | "desc" = searchParams.get("order") === "desc" ? "desc" : "asc";
+  const deleteMode = searchParams.get("delete") === "1";
+  const canDelete = Boolean(
+    auth.user && (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
+  );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const scrollYRef = useRef(0);
   const lastVideoTapRef = useRef(0);
@@ -117,12 +131,51 @@ export function Feed() {
     };
   }, [expandedId]);
 
+  function setOrder(next: "asc" | "desc") {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("order", next);
+    router.push(`/?${nextParams.toString()}`);
+  }
+
+  async function handleDeletePost(postId: string) {
+    if (!auth.accessToken || !canDelete) return;
+    if (!confirm("Удалить пост? Файл будет удалён из Cloudinary и из ленты.")) return;
+    try {
+      await deletePost(auth.accessToken, postId);
+      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+      await queryClient.invalidateQueries({ queryKey: ["places"] });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Не удалось удалить");
+    }
+  }
+
   return (
     <main className="mx-auto flex max-w-screen-2xl flex-col gap-6 px-4 py-10">
-      <header className="flex items-center justify-between">
-        <div className="space-y-1">
+      <header className="flex items-center justify-between gap-3">
+        <div className="min-w-0 space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{headerTitle}</h1>
         </div>
+        {isSelectionReady ? (
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-xs">Порядок:</span>
+            <Button
+              variant={order === "desc" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setOrder("desc")}
+              aria-label="Сначала новые"
+            >
+              <ArrowDownAZ className="size-4" />
+            </Button>
+            <Button
+              variant={order === "asc" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setOrder("asc")}
+              aria-label="Сначала старые"
+            >
+              <ArrowUpAZ className="size-4" />
+            </Button>
+          </div>
+        ) : null}
       </header>
 
       {!isSelectionReady ? (
@@ -164,7 +217,21 @@ export function Feed() {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {items.map((p) => (
-            <Card key={p.id} className="overflow-hidden">
+            <Card key={p.id} className="relative overflow-hidden">
+              {deleteMode && canDelete ? (
+                <button
+                  type="button"
+                  className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-red-600/90 text-white shadow hover:bg-red-600"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDeletePost(p.id);
+                  }}
+                  aria-label="Удалить пост"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              ) : null}
               <CardContent className="space-y-3 pt-6">
                 {p.media_type === "VIDEO" ? (
                   <button
@@ -178,17 +245,16 @@ export function Feed() {
                         className="h-auto w-full rounded-lg border"
                         alt={p.text ?? "travel video"}
                         src={
-                          cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id) ??
-                          cloudinaryOptimizedUrl(p.media_url, p.media_type)
+                          cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id, {
+                            width: 600,
+                          }) ?? cloudinaryThumbUrl(p.media_url, p.media_type)
                         }
-                        width={1600}
-                        height={1200}
-                        sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 33vw"
+                        width={720}
+                        height={540}
+                        sizes="(max-width: 768px) 100vw, 720px"
                         unoptimized
                       />
                     ) : (
-                      // Fallback if we don't have Cloudinary public_id for a poster.
-                      // Keep the <video> non-interactive so tapping opens fullscreen without starting playback underneath.
                       <video
                         className="pointer-events-none w-full rounded-lg border"
                         playsInline
@@ -217,11 +283,10 @@ export function Feed() {
                     <Image
                       className="h-auto w-full rounded-lg border"
                       alt={p.text ?? "travel media"}
-                      src={cloudinaryOptimizedUrl(p.media_url, p.media_type)}
-                      width={1600}
-                      height={1200}
-                      sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 33vw"
-                      // Avoid Next Image optimizer 400s for some Cloudinary formats.
+                      src={cloudinaryThumbUrl(p.media_url, p.media_type)}
+                      width={720}
+                      height={540}
+                      sizes="(max-width: 768px) 100vw, 720px"
                       unoptimized
                     />
                   </button>
@@ -297,6 +362,7 @@ export function Feed() {
                       ? cloudinaryVideoPosterUrl(
                           expandedPost.media_url,
                           expandedPost.cloudinary_public_id,
+                          { width: 1200 },
                         ) ?? undefined
                       : undefined
                   }
@@ -312,7 +378,7 @@ export function Feed() {
               >
                 <Image
                   alt={expandedPost.text ?? "travel media"}
-                  src={cloudinaryOptimizedUrl(expandedPost.media_url, expandedPost.media_type)}
+                  src={cloudinaryFullUrl(expandedPost.media_url, expandedPost.media_type)}
                   fill
                   sizes="100vw"
                   className="object-contain"

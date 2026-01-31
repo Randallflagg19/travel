@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { fetchPlaces } from "@/shared/api/api";
+import { useAuth } from "@/entities/session/model/auth";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { Separator } from "@/shared/ui/separator";
 import { Skeleton } from "@/shared/ui/skeleton";
@@ -17,6 +19,11 @@ function buildUrl(params: URLSearchParams) {
 export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const auth = useAuth();
+  const deleteMode = searchParams.get("delete") === "1";
+  const canDelete = Boolean(
+    auth.user && (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
+  );
 
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";
@@ -65,6 +72,14 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
     onNavigate?.();
   }
 
+  function toggleDeleteMode() {
+    const next = new URLSearchParams(searchParams.toString());
+    if (deleteMode) next.delete("delete");
+    else next.set("delete", "1");
+    router.push(buildUrl(next));
+    onNavigate?.();
+  }
+
   return (
     <aside className="flex h-dvh flex-col gap-4 border-r bg-background">
       <div className="px-4 pt-6">
@@ -76,7 +91,17 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
-      <div className="px-4">
+      <div className="px-4 space-y-1">
+        {canDelete ? (
+          <Button
+            variant={deleteMode ? "destructive" : "ghost"}
+            className="w-full justify-start"
+            onClick={toggleDeleteMode}
+          >
+            <Trash2 className="mr-2 size-4" />
+            {deleteMode ? "Выключить удаление" : "Удаление"}
+          </Button>
+        ) : null}
         <Button
           variant={all ? "secondary" : "ghost"}
           className="w-full justify-start"

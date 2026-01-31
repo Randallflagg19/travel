@@ -104,11 +104,20 @@ export function Feed() {
 
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = postsQuery;
 
-  const openExpanded = useCallback((id: string) => {
-    setExpandedId(id);
-    setExpandedVideoSrc(null);
-    shouldAutoPlayRef.current = false;
-  }, []);
+  const openExpanded = useCallback(
+    (id: string) => {
+      const post = items.find((p) => p.id === id);
+      setExpandedId(id);
+      if (post?.media_type === "VIDEO") {
+        setExpandedVideoSrc(post.media_url);
+        shouldAutoPlayRef.current = true;
+      } else {
+        setExpandedVideoSrc(null);
+        shouldAutoPlayRef.current = false;
+      }
+    },
+    [items],
+  );
 
   const closeExpanded = useCallback(() => {
     setExpandedId(null);
@@ -337,7 +346,6 @@ export function Feed() {
           post={expandedPost}
           onClose={closeExpanded}
           expandedVideoSrc={expandedVideoSrc}
-          onSetExpandedVideoSrc={setExpandedVideoSrc}
           videoRef={videoRef}
           shouldAutoPlayRef={shouldAutoPlayRef}
           lastVideoTapRef={lastVideoTapRef}

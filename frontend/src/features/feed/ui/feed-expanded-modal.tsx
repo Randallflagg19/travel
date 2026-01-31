@@ -2,7 +2,6 @@
 
 import { type MutableRefObject, type RefObject } from "react";
 import Image from "next/image";
-import { Play } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
 import {
   cloudinaryFullUrl,
@@ -13,7 +12,6 @@ type FeedExpandedModalProps = {
   post: ApiPost;
   onClose: () => void;
   expandedVideoSrc: string | null;
-  onSetExpandedVideoSrc: (src: string) => void;
   videoRef: RefObject<HTMLVideoElement | null>;
   shouldAutoPlayRef: MutableRefObject<boolean>;
   lastVideoTapRef: MutableRefObject<number>;
@@ -23,7 +21,6 @@ export function FeedExpandedModal({
   post: expandedPost,
   onClose,
   expandedVideoSrc,
-  onSetExpandedVideoSrc,
   videoRef,
   shouldAutoPlayRef,
   lastVideoTapRef,
@@ -55,7 +52,7 @@ export function FeedExpandedModal({
               className="h-full w-full bg-black object-contain"
               controls
               playsInline
-              preload="metadata"
+              preload="auto"
               src={expandedVideoSrc || undefined}
               poster={
                 expandedPost.cloudinary_public_id
@@ -69,35 +66,10 @@ export function FeedExpandedModal({
               onCanPlay={() => {
                 if (shouldAutoPlayRef.current) {
                   shouldAutoPlayRef.current = false;
-                  videoRef.current?.play();
+                  videoRef.current?.play().catch(() => {});
                 }
               }}
             />
-            {!expandedVideoSrc ? (
-              <button
-                type="button"
-                className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 transition hover:bg-black/50"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const url = expandedPost.media_url;
-                  onSetExpandedVideoSrc(url);
-                  shouldAutoPlayRef.current = true;
-                  const v = videoRef.current;
-                  if (v) {
-                    v.src = url;
-                    v.load();
-                    v.play().catch(() => {});
-                  }
-                }}
-                onClick={(e) => e.stopPropagation()}
-                aria-label="Воспроизвести"
-              >
-                <div className="flex size-20 items-center justify-center rounded-full bg-white/90 text-black shadow-lg">
-                  <Play className="ml-1 size-10" fill="currentColor" />
-                </div>
-              </button>
-            ) : null}
           </div>
         ) : (
           <button

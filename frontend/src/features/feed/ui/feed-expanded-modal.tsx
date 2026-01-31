@@ -80,14 +80,17 @@ export function FeedExpandedModal({
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  onSetExpandedVideoSrc(expandedPost.media_url);
+                  const url = expandedPost.media_url;
+                  onSetExpandedVideoSrc(url);
                   shouldAutoPlayRef.current = true;
+                  const v = videoRef.current;
+                  if (v) {
+                    v.src = url;
+                    v.load();
+                    v.play().catch(() => {});
+                  }
                 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSetExpandedVideoSrc(expandedPost.media_url);
-                  shouldAutoPlayRef.current = true;
-                }}
+                onClick={(e) => e.stopPropagation()}
                 aria-label="Воспроизвести"
               >
                 <div className="flex size-20 items-center justify-center rounded-full bg-white/90 text-black shadow-lg">

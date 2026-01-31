@@ -23,6 +23,7 @@ export type PostRow = {
   created_at: string;
   like_count: number;
   comment_count: number;
+  liked_by_me?: boolean;
 };
 
 type PostsCursor = {
@@ -75,6 +76,7 @@ export class PostsService {
     city?: string;
     unknown?: boolean;
     order?: 'asc' | 'desc';
+    userId?: string;
   }): Promise<{
     items: PostRow[];
     nextCursor: string | null;
@@ -404,6 +406,21 @@ export class PostsService {
       hasMore && last
         ? encodeCursor({ created_at: last.created_at, id: last.id })
         : null;
+
+    if (params?.userId?.trim() && items.length > 0 && this.db.client) {
+      const likedRows = await this.db.client<{ post_id: string }[]>`
+        SELECT post_id FROM likes
+        WHERE user_id = ${params.userId.trim()}::uuid
+      `;
+      const likedSet = new Set(likedRows.map((r) => r.post_id));
+      for (const p of items) {
+        p.liked_by_me = likedSet.has(p.id);
+      }
+    } else {
+      for (const p of items) {
+        p.liked_by_me = false;
+      }
+    }
 
     return { items, nextCursor, hasMore };
   }

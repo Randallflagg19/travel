@@ -9,9 +9,11 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthRoles } from '../auth/auth-roles.decorator';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import type { JwtUser } from '../auth/jwt-user.type';
 import { PostsService } from './posts.service';
 
@@ -20,7 +22,9 @@ export class PostsController {
   constructor(private readonly posts: PostsService) {}
 
   @Get()
+  @UseGuards(OptionalJwtAuthGuard)
   async list(
+    @CurrentUser() user: JwtUser | null,
     @Query('limit', new DefaultValuePipe(50), new ParseIntPipe()) limit: number,
     @Query('cursor') cursor?: string,
     @Query('country') country?: string,
@@ -35,6 +39,7 @@ export class PostsController {
       city,
       unknown: unknown === 'true',
       order,
+      userId: user?.sub,
     });
   }
 

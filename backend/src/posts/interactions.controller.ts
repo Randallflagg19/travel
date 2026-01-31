@@ -7,7 +7,8 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
-import { Auth, CurrentUser } from '../auth/current-user.decorator';
+import { AuthRoles } from '../auth/auth-roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtUser } from '../auth/jwt-user.type';
 import { PostsService } from './posts.service';
 import { LikesService } from './likes.service';
@@ -22,7 +23,7 @@ export class InteractionsController {
   ) {}
 
   @Post(':id/like')
-  @Auth()
+  @AuthRoles('USER', 'ADMIN', 'SUPERADMIN')
   async like(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
@@ -33,7 +34,7 @@ export class InteractionsController {
   }
 
   @Delete(':id/like')
-  @Auth()
+  @AuthRoles('USER', 'ADMIN', 'SUPERADMIN')
   async unlike(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
@@ -50,7 +51,7 @@ export class InteractionsController {
   }
 
   @Post(':id/comments')
-  @Auth()
+  @AuthRoles('USER', 'ADMIN', 'SUPERADMIN')
   async addComment(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,

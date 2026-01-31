@@ -61,7 +61,7 @@ export default function RootLayout({
                   <PlacesSidebar />
                 </Suspense>
               </aside>
-              <main className="min-w-0">{children}</main>
+              <main className="min-w-0 overflow-x-hidden">{children}</main>
             </div>
           </div>
         </Providers>

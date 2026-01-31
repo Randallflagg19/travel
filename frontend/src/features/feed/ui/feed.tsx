@@ -247,7 +247,7 @@ export function Feed() {
   }, [commentsPostId]);
 
   return (
-    <main className="mx-auto flex max-w-screen-2xl flex-col gap-6 px-4 py-10">
+    <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 overflow-x-hidden px-4 py-10">
       <FeedHeader
         headerTitle={headerTitle}
         isSelectionReady={Boolean(isSelectionReady)}

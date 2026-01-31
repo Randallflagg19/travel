@@ -27,7 +27,7 @@ function useHeaderText() {
     return { title: `${country} / ${city}`, subtitle: "Лента" };
   }
 
-  return { title: "Места", subtitle: "Выбери страну и город" };
+  return { title: "Места", subtitle: "Выбери место" };
 }
 
 export function MobileHeader() {

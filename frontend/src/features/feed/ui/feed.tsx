@@ -14,6 +14,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 import { FeedHeader, FeedEmptyState } from "./feed-header";
 import { FeedPostCard } from "./feed-post-card";
 import { FeedExpandedModal } from "./feed-expanded-modal";
+import { PostCommentsSheet } from "./post-comments-sheet";
 
 export function Feed() {
   const limit = 30;
@@ -30,6 +31,7 @@ export function Feed() {
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedVideoSrc, setExpandedVideoSrc] = useState<string | null>(null);
+  const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
   const scrollYRef = useRef(0);
   const lastVideoTapRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -178,6 +180,11 @@ export function Feed() {
         auth.user.role === "SUPERADMIN"),
   );
 
+  const canComment = Boolean(
+    auth.user &&
+      (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
+  );
+
   const updatePostLike = useCallback(
     (postId: string, liked: boolean, deltaCount: number) => {
       queryClient.setQueryData(
@@ -282,6 +289,7 @@ export function Feed() {
               onLikeSuccess={() =>
                 queryClient.invalidateQueries({ queryKey: ["posts"] })
               }
+              onOpenComments={setCommentsPostId}
             />
           ))}
 
@@ -314,6 +322,20 @@ export function Feed() {
           lastVideoTapRef={lastVideoTapRef}
         />
       ) : null}
+
+      <PostCommentsSheet
+        postId={commentsPostId}
+        postCommentCount={
+          items.find((p) => p.id === commentsPostId)?.comment_count ?? 0
+        }
+        open={Boolean(commentsPostId)}
+        onOpenChange={(open) => !open && setCommentsPostId(null)}
+        canComment={canComment}
+        accessToken={auth.accessToken}
+        onCommentAdded={() =>
+          queryClient.invalidateQueries({ queryKey: ["posts"] })
+        }
+      />
     </main>
   );
 }

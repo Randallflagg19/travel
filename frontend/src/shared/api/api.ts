@@ -31,6 +31,14 @@ export type PlacesResponse = {
   unknown: { count: number };
 };
 
+export type ApiComment = {
+  id: string;
+  post_id: string;
+  user_id: string;
+  text: string;
+  created_at: string;
+};
+
 export type AuthUser = {
   id: string;
   username: string;
@@ -286,5 +294,40 @@ export async function deletePost(
     throw new Error(`Delete post failed (${res.status}): ${text}`);
   }
   return (await res.json()) as { ok: boolean };
+}
+
+export async function fetchComments(postId: string): Promise<{
+  items: ApiComment[];
+}> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/posts/${postId}/comments`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Comments failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { items: ApiComment[] };
+}
+
+export async function addComment(
+  accessToken: string,
+  postId: string,
+  text: string,
+): Promise<{ comment: ApiComment }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/posts/${postId}/comments`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Add comment failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { comment: ApiComment };
 }
 

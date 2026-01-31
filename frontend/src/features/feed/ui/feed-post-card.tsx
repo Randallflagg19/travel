@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Heart, Play, Trash2 } from "lucide-react";
+import { Heart, MessageSquare, Play, Trash2 } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
 import { likePost, unlikePost } from "@/shared/api/api";
 import {
@@ -22,6 +22,7 @@ type FeedPostCardProps = {
   accessToken: string | null;
   onLikeToggled: (postId: string, liked: boolean, deltaCount: number) => void;
   onLikeSuccess?: () => void;
+  onOpenComments: (postId: string) => void;
 };
 
 export function FeedPostCard({
@@ -35,6 +36,7 @@ export function FeedPostCard({
   accessToken,
   onLikeToggled,
   onLikeSuccess,
+  onOpenComments,
 }: FeedPostCardProps) {
   const [likePending, setLikePending] = useState(false);
   const liked = Boolean(p.liked_by_me);
@@ -154,7 +156,19 @@ export function FeedPostCard({
               {p.like_count}
             </span>
           )}
-          <span>💬 {p.comment_count}</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onOpenComments(p.id);
+            }}
+            className="text-muted-foreground flex items-center gap-1 rounded p-0.5 transition hover:opacity-80"
+            aria-label="Комментарии"
+          >
+            <MessageSquare className="size-4" />
+            <span>{p.comment_count}</span>
+          </button>
           {p.lat != null && p.lng != null ? (
             <span>
               📍 {p.lat.toFixed(4)}, {p.lng.toFixed(4)}

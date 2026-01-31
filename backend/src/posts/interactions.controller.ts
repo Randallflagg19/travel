@@ -51,7 +51,7 @@ export class InteractionsController {
   }
 
   @Post(':id/comments')
-  @AuthRoles('USER', 'ADMIN', 'SUPERADMIN')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
   async addComment(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,

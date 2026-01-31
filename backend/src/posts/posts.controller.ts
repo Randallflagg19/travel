@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   DefaultValuePipe,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -40,6 +41,13 @@ export class PostsController {
   @Get(':id')
   async get(@Param('id', new ParseUUIDPipe()) id: string) {
     return { post: await this.posts.getOrThrow(id) };
+  }
+
+  @Delete(':id')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
+  async delete(@Param('id', new ParseUUIDPipe()) id: string) {
+    await this.posts.delete(id);
+    return { ok: true };
   }
 
   @Post()

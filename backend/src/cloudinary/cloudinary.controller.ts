@@ -10,13 +10,13 @@ export class CloudinaryController {
 
   @Get('config')
   @AuthRoles('ADMIN', 'SUPERADMIN')
-  async config() {
+  config() {
     return this.cloud.getClientConfig();
   }
 
   @Post('sign-upload')
   @AuthRoles('ADMIN', 'SUPERADMIN')
-  async signUpload(@Body() body: { paramsToSign?: Record<string, unknown> }) {
+  signUpload(@Body() body: { paramsToSign?: Record<string, unknown> }) {
     return this.cloud.signUpload(body.paramsToSign);
   }
 

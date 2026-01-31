@@ -70,6 +70,63 @@ function toResourceType(value: string): ResourceType {
   return 'image';
 }
 
+/** Парсит GPS из формата Cloudinary EXIF: "13 deg 45' 10.78\" N" → десятичные градусы. */
+function parseGpsCoord(value: string | undefined): number | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const m = value.trim().match(/(\d+)\s*deg\s*(\d+)'\s*([\d.]+)"\s*([NSEW])/i);
+  if (!m) return null;
+  const [, d, min, sec, dir] = m;
+  const deg = parseInt(d ?? '0', 10);
+  const minVal = parseInt(min ?? '0', 10) / 60;
+  const secVal = parseFloat(sec ?? '0') / 3600;
+  let dec = deg + minVal + secVal;
+  if ((dir ?? '').toUpperCase() === 'S' || (dir ?? '').toUpperCase() === 'W')
+    dec = -dec;
+  return Math.round(dec * 1e7) / 1e7;
+}
+
+/** Парсит дату съёмки: "2026:01:19 13:18:00" (локаль + offset) или "UTC 2026-01-23 03:09:16". */
+function parseShotDate(
+  dateStr: string | undefined,
+  offsetStr?: string | null,
+): Date | null {
+  if (typeof dateStr !== 'string' || !dateStr.trim()) return null;
+  const normalized = dateStr.replace(/-/g, ':').trim();
+  const m = normalized.match(
+    /(?:UTC\s+)?(\d{4}):(\d{2}):(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})/,
+  );
+  if (!m) return null;
+  const [, y, mo, d, h, min, sec] = m;
+  let offsetMinutes = 0;
+  if (typeof offsetStr === 'string' && offsetStr.trim()) {
+    const om = offsetStr.trim().match(/^([+-])(\d{2}):(\d{2})$/);
+    if (om) {
+      const sign = om[1] === '+' ? 1 : -1;
+      offsetMinutes = sign * (parseInt(om[2], 10) * 60 + parseInt(om[3], 10));
+    }
+  }
+  const date = new Date(
+    Date.UTC(
+      parseInt(y ?? '0', 10),
+      parseInt(mo ?? '0', 10) - 1,
+      parseInt(d ?? '0', 10),
+      parseInt(h ?? '0', 10),
+      parseInt(min ?? '0', 10),
+      parseInt(sec ?? '0', 10),
+    ),
+  );
+  if (offsetMinutes !== 0) {
+    date.setTime(date.getTime() - offsetMinutes * 60 * 1000);
+  }
+  return date;
+}
+
+export type ResourceMetadata = {
+  lat: number | null;
+  lng: number | null;
+  shotAt: Date | null;
+};
+
 @Injectable()
 export class CloudinaryService {
   private readonly isConfigured: boolean;
@@ -102,14 +159,18 @@ export class CloudinaryService {
 
   getClientConfig() {
     if (!this.isConfigured || !this.cloudName || !this.apiKey) {
-      throw new BadRequestException('Cloudinary is not configured on the server');
+      throw new BadRequestException(
+        'Cloudinary is not configured on the server',
+      );
     }
     return { cloudName: this.cloudName, apiKey: this.apiKey };
   }
 
   signUpload(paramsToSign: Record<string, unknown> | null | undefined) {
     if (!this.isConfigured || !this.apiSecret) {
-      throw new BadRequestException('Cloudinary is not configured on the server');
+      throw new BadRequestException(
+        'Cloudinary is not configured on the server',
+      );
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
@@ -121,7 +182,12 @@ export class CloudinaryService {
       if (v === null || v === undefined) continue;
       if (k === 'file' || k === 'signature' || k === 'api_key') continue;
       if (k === 'timestamp') continue; // server will set
-      const s = String(v);
+      const s =
+        typeof v === 'string'
+          ? v
+          : typeof v === 'number' || typeof v === 'boolean'
+            ? String(v)
+            : '';
       if (!s.trim()) continue;
       entries.push([k, s]);
     }
@@ -134,6 +200,21 @@ export class CloudinaryService {
       .digest('hex');
 
     return { signature, timestamp };
+  }
+
+  /** Delete asset from Cloudinary by public_id. resourceType: 'image' | 'video' | 'raw'. */
+  async destroy(
+    publicId: string,
+    resourceType: 'image' | 'video' | 'raw',
+  ): Promise<void> {
+    if (!this.isConfigured) {
+      throw new BadRequestException(
+        'Cloudinary is not configured on the server',
+      );
+    }
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
   }
 
   private getSqlOrThrow(): Sql {
@@ -172,12 +253,14 @@ export class CloudinaryService {
     nextCursor?: string;
   }): Promise<{ resources: CloudinaryResource[]; next_cursor?: string }> {
     // Cloudinary DAM uses "asset folders" (Media Library folders).
-    const resUnknown: unknown = await (cloudinary.api as unknown as {
-      resources_by_asset_folder: (
-        assetFolder: string,
-        options: Record<string, unknown>,
-      ) => Promise<unknown>;
-    }).resources_by_asset_folder(params.assetFolder, {
+    const resUnknown: unknown = await (
+      cloudinary.api as unknown as {
+        resources_by_asset_folder: (
+          assetFolder: string,
+          options: Record<string, unknown>,
+        ) => Promise<unknown>;
+      }
+    ).resources_by_asset_folder(params.assetFolder, {
       type: 'upload',
       resource_type: params.resourceType,
       max_results: params.maxResults,
@@ -230,6 +313,65 @@ export class CloudinaryService {
     return out;
   }
 
+  /**
+   * Запрашивает у Cloudinary метаданные ресурса (EXIF/видео) и возвращает
+   * координаты и дату съёмки, если они есть.
+   */
+  async getResourceMetadata(
+    publicId: string,
+    resourceType: ResourceType,
+  ): Promise<ResourceMetadata> {
+    const out: ResourceMetadata = { lat: null, lng: null, shotAt: null };
+    if (!this.isConfigured) return out;
+    let raw: unknown;
+    try {
+      raw = await cloudinary.api.resource(publicId, {
+        resource_type: resourceType,
+        media_metadata: true,
+      });
+    } catch {
+      return out;
+    }
+    const res = raw as Record<string, unknown>;
+    if (resourceType === 'image') {
+      const meta = res.media_metadata as Record<string, unknown> | undefined;
+      if (meta) {
+        const lat = parseGpsCoord(meta.GPSLatitude as string | undefined);
+        const lng = parseGpsCoord(meta.GPSLongitude as string | undefined);
+        if (lat != null) out.lat = lat;
+        if (lng != null) out.lng = lng;
+        const dateStr =
+          (meta.DateTimeOriginal as string) ??
+          (meta.CreateDate as string) ??
+          (meta.ModifyDate as string);
+        const offset =
+          (meta.OffsetTimeOriginal as string) ??
+          (meta.OffsetTimeDigitized as string) ??
+          (meta.OffsetTime as string);
+        const shot = parseShotDate(
+          dateStr as string | undefined,
+          offset as string | undefined,
+        );
+        if (shot) out.shotAt = shot;
+      }
+    } else if (resourceType === 'video') {
+      const dateStr =
+        (res.encoded_date as string) ?? (res.tagged_date as string);
+      const shot = parseShotDate(dateStr);
+      if (shot) out.shotAt = shot;
+      const videoMeta = res.video_metadata as
+        | Record<string, unknown>
+        | undefined;
+      const video = videoMeta?.video as Record<string, unknown> | undefined;
+      const vMeta = video?.metadata as Record<string, unknown> | undefined;
+      if (vMeta?.encoded_date) {
+        const s = parseShotDate(vMeta.encoded_date as string);
+        if (s) out.shotAt = s;
+      }
+    }
+    return out;
+  }
+
   async importPrefix(params: { prefix: string; userId: string; max?: number }) {
     const sql = this.getSqlOrThrow();
 
@@ -263,12 +405,24 @@ export class CloudinaryService {
       const folder = deriveFolder(r);
       const { country, city } = deriveCountryCity(folder);
       const mediaType = pickMediaType(r);
-      const createdAt = r.created_at ? new Date(r.created_at) : new Date();
+      const rt: ResourceType = toResourceType(r.resource_type);
+
+      let createdAt = r.created_at ? new Date(r.created_at) : new Date();
+      let lat: number | null = null;
+      let lng: number | null = null;
+      try {
+        const meta = await this.getResourceMetadata(r.public_id, rt);
+        if (meta.shotAt) createdAt = meta.shotAt;
+        if (meta.lat != null) lat = meta.lat;
+        if (meta.lng != null) lng = meta.lng;
+      } catch {
+        // Оставляем created_at из Cloudinary, lat/lng null
+      }
 
       try {
         const rows = await sql<{ id: string }[]>`
           INSERT INTO posts (
-            user_id, media_type, media_url, cloudinary_public_id, folder, country, city, created_at
+            user_id, media_type, media_url, cloudinary_public_id, folder, country, city, lat, lng, created_at
           )
           VALUES (
             ${params.userId}::uuid,
@@ -278,6 +432,8 @@ export class CloudinaryService {
             ${folder},
             ${country},
             ${city},
+            ${lat},
+            ${lng},
             ${createdAt.toISOString()}
           )
           -- Our DB uses a PARTIAL unique index:
@@ -345,7 +501,12 @@ export class CloudinaryService {
       }
     }
 
-    return { prefix: prefixInput, scanned, inserted, errors: errors.slice(0, 50) };
+    return {
+      prefix: prefixInput,
+      scanned,
+      inserted,
+      errors: errors.slice(0, 50),
+    };
   }
 
   async probePrefix(params: { prefix: string }) {

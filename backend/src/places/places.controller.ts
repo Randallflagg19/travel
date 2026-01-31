@@ -14,4 +14,3 @@ export class PlacesController {
     return await this.places.listPlaces();
   }
 }
-

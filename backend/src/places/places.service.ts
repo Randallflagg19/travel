@@ -37,7 +37,11 @@ export class PlacesService {
 
     const countriesMap = new Map<
       string,
-      { country: string; cities: Array<{ city: string; count: number }>; count: number }
+      {
+        country: string;
+        cities: Array<{ city: string; count: number }>;
+        count: number;
+      }
     >();
 
     let unknownCount = 0;
@@ -79,4 +83,3 @@ export class PlacesService {
     };
   }
 }
-

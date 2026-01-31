@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DbService } from '../db/db.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 export type MediaType = 'PHOTO' | 'VIDEO' | 'AUDIO';
 
@@ -43,15 +44,29 @@ function decodeCursor(cursor: string): PostsCursor {
     throw new BadRequestException('Invalid cursor');
   }
   const obj = parsed as Partial<PostsCursor> | null;
-  if (!obj || typeof obj !== 'object') throw new BadRequestException('Invalid cursor');
-  if (typeof obj.created_at !== 'string') throw new BadRequestException('Invalid cursor');
-  if (typeof obj.id !== 'string') throw new BadRequestException('Invalid cursor');
+  if (!obj || typeof obj !== 'object')
+    throw new BadRequestException('Invalid cursor');
+  if (typeof obj.created_at !== 'string')
+    throw new BadRequestException('Invalid cursor');
+  if (typeof obj.id !== 'string')
+    throw new BadRequestException('Invalid cursor');
   return { created_at: obj.created_at, id: obj.id };
+}
+
+function mediaTypeToCloudinaryResource(
+  mediaType: MediaType,
+): 'image' | 'video' | 'raw' {
+  if (mediaType === 'PHOTO') return 'image';
+  if (mediaType === 'VIDEO' || mediaType === 'AUDIO') return 'video';
+  return 'image';
 }
 
 @Injectable()
 export class PostsService {
-  constructor(private readonly db: DbService) {}
+  constructor(
+    private readonly db: DbService,
+    private readonly cloud: CloudinaryService,
+  ) {}
 
   async listPage(params?: {
     limit?: number;
@@ -60,7 +75,11 @@ export class PostsService {
     city?: string;
     unknown?: boolean;
     order?: 'asc' | 'desc';
-  }): Promise<{ items: PostRow[]; nextCursor: string | null; hasMore: boolean }> {
+  }): Promise<{
+    items: PostRow[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }> {
     if (!this.db.client) return { items: [], nextCursor: null, hasMore: false };
     const safeLimit = Math.max(1, Math.min(200, params?.limit ?? 50));
     const limitPlusOne = safeLimit + 1;
@@ -382,7 +401,9 @@ export class PostsService {
     const items = hasMore ? rows.slice(0, safeLimit) : rows;
     const last = items[items.length - 1];
     const nextCursor =
-      hasMore && last ? encodeCursor({ created_at: last.created_at, id: last.id }) : null;
+      hasMore && last
+        ? encodeCursor({ created_at: last.created_at, id: last.id })
+        : null;
 
     return { items, nextCursor, hasMore };
   }
@@ -428,7 +449,29 @@ export class PostsService {
         0::int as like_count,
         0::int as comment_count
     `;
-    return rows[0];
+    const post = rows[0];
+    if (post && input.cloudinaryPublicId?.trim()) {
+      try {
+        const meta = await this.cloud.getResourceMetadata(
+          input.cloudinaryPublicId.trim(),
+          mediaTypeToCloudinaryResource(input.mediaType),
+        );
+        const lat = meta.lat ?? post.lat;
+        const lng = meta.lng ?? post.lng;
+        const created_at = meta.shotAt
+          ? meta.shotAt.toISOString()
+          : post.created_at;
+        await this.db.client`
+          UPDATE posts
+          SET lat = ${lat}, lng = ${lng}, created_at = ${created_at}::timestamptz
+          WHERE id = ${post.id}::uuid
+        `;
+        return await this.getOrThrow(post.id);
+      } catch {
+        // Метаданные не получили — возвращаем пост как есть
+      }
+    }
+    return post;
   }
 
   async getOrThrow(id: string) {
@@ -455,5 +498,24 @@ export class PostsService {
     const post = rows[0];
     if (!post) throw new NotFoundException('Post not found');
     return post;
+  }
+
+  async delete(id: string): Promise<void> {
+    if (!this.db.client) throw new NotFoundException();
+    const post = await this.getOrThrow(id);
+    if (post.cloudinary_public_id?.trim()) {
+      try {
+        await this.cloud.destroy(
+          post.cloudinary_public_id.trim(),
+          mediaTypeToCloudinaryResource(post.media_type),
+        );
+      } catch {
+        // Proceed to delete from DB even if Cloudinary fails (e.g. already deleted).
+      }
+    }
+    const deleted = await this.db.client`
+      DELETE FROM posts WHERE id = ${id}::uuid
+    `;
+    if (deleted.count === 0) throw new NotFoundException('Post not found');
   }
 }

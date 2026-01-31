@@ -61,4 +61,16 @@ export class InteractionsController {
     const comment = await this.comments.create(id, user.sub, body.text ?? '');
     return { comment };
   }
+
+  @Delete(':id/comments/:commentId')
+  @AuthRoles('USER', 'ADMIN', 'SUPERADMIN')
+  async deleteComment(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('commentId', new ParseUUIDPipe()) commentId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    await this.posts.getOrThrow(id);
+    await this.comments.delete(commentId, user.sub);
+    return { ok: true };
+  }
 }

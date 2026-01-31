@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { DbService } from '../db/db.service';
 
 export type CommentRow = {
@@ -41,5 +45,21 @@ export class CommentsService {
       RETURNING id, post_id, user_id, text, created_at
     `;
     return rows[0];
+  }
+
+  async delete(commentId: string, userId: string): Promise<void> {
+    if (!this.db.client)
+      throw new BadRequestException('Database is not configured');
+    const rows = await this.db.client<CommentRow[]>`
+      SELECT user_id FROM comments WHERE id = ${commentId}::uuid
+    `;
+    const comment = rows[0];
+    if (!comment)
+      throw new BadRequestException('Comment not found');
+    if (comment.user_id !== userId)
+      throw new ForbiddenException('You can only delete your own comment');
+    await this.db.client`
+      DELETE FROM comments WHERE id = ${commentId}::uuid
+    `;
   }
 }

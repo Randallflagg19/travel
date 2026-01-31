@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchComments, addComment, type ApiComment } from "@/shared/api/api";
 import { Button } from "@/shared/ui/button";
@@ -46,6 +46,7 @@ export function PostCommentsBlock({
 }: PostCommentsBlockProps) {
   const queryClient = useQueryClient();
   const [newText, setNewText] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
 
   const commentsQuery = useQuery({
     queryKey: ["comments", postId],
@@ -55,10 +56,19 @@ export function PostCommentsBlock({
 
   const addMutation = useMutation({
     mutationFn: (text: string) => addComment(accessToken!, postId, text),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setNewText("");
-      void queryClient.invalidateQueries({ queryKey: ["comments", postId] });
+      queryClient.setQueryData(
+        ["comments", postId],
+        (old: { items: ApiComment[] } | undefined) => ({
+          items: [...(old?.items ?? []), data.comment],
+        }),
+      );
       onCommentAdded?.();
+      requestAnimationFrame(() => {
+        const el = listRef.current;
+        if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      });
     },
   });
 
@@ -75,7 +85,10 @@ export function PostCommentsBlock({
 
   return (
     <div className="border-t pt-3">
-      <div className="max-h-[280px] overflow-y-auto overscroll-contain rounded-lg bg-muted/30 py-1">
+      <div
+        ref={listRef}
+        className="max-h-[280px] overflow-y-auto overscroll-contain rounded-lg bg-muted/30 py-1"
+      >
         {isLoading ? (
           <p className="text-muted-foreground px-2 py-4 text-center text-sm">
             Загрузка…

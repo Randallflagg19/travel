@@ -10,6 +10,7 @@ import {
   cloudinaryVideoPosterUrl,
 } from "@/shared/lib/cloudinary";
 import { Card, CardContent } from "@/shared/ui/card";
+import { PostCommentsBlock } from "./post-comments-block";
 
 type FeedPostCardProps = {
   post: ApiPost;
@@ -19,10 +20,13 @@ type FeedPostCardProps = {
   onOpen: (postId: string) => void;
   showPlaceInCard: boolean;
   canLike: boolean;
+  canComment: boolean;
+  isCommentsOpen: boolean;
   accessToken: string | null;
   onLikeToggled: (postId: string, liked: boolean, deltaCount: number) => void;
   onLikeSuccess?: () => void;
   onOpenComments: (postId: string) => void;
+  onCommentAdded?: () => void;
 };
 
 export function FeedPostCard({
@@ -33,10 +37,13 @@ export function FeedPostCard({
   onOpen,
   showPlaceInCard,
   canLike,
+  canComment,
+  isCommentsOpen,
   accessToken,
   onLikeToggled,
   onLikeSuccess,
   onOpenComments,
+  onCommentAdded,
 }: FeedPostCardProps) {
   const [likePending, setLikePending] = useState(false);
   const liked = Boolean(p.liked_by_me);
@@ -180,6 +187,15 @@ export function FeedPostCard({
             </span>
           ) : null}
         </div>
+
+        {isCommentsOpen ? (
+          <PostCommentsBlock
+            postId={p.id}
+            canComment={canComment}
+            accessToken={accessToken}
+            onCommentAdded={onCommentAdded}
+          />
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -14,7 +14,6 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 import { FeedHeader, FeedEmptyState } from "./feed-header";
 import { FeedPostCard } from "./feed-post-card";
 import { FeedExpandedModal } from "./feed-expanded-modal";
-import { PostCommentsSheet } from "./post-comments-sheet";
 
 export function Feed() {
   const limit = 30;
@@ -32,6 +31,7 @@ export function Feed() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedVideoSrc, setExpandedVideoSrc] = useState<string | null>(null);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
+  const postCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrollYRef = useRef(0);
   const lastVideoTapRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -236,6 +236,16 @@ export function Feed() {
     !unknown && !all && !(selectedCountry && selectedCity),
   );
 
+  const openComments = useCallback((postId: string) => {
+    if (commentsPostId === postId) {
+      setCommentsPostId(null);
+      return;
+    }
+    const el = postCardRefs.current[postId];
+    if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+    setTimeout(() => setCommentsPostId(postId), 380);
+  }, [commentsPostId]);
+
   return (
     <main className="mx-auto flex max-w-screen-2xl flex-col gap-6 px-4 py-10">
       <FeedHeader
@@ -275,22 +285,33 @@ export function Feed() {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {items.map((p) => (
-            <FeedPostCard
+            <div
               key={p.id}
-              post={p}
-              deleteMode={deleteMode}
-              canDelete={canDelete}
-              onDelete={handleDeletePost}
-              onOpen={openExpanded}
-              showPlaceInCard={showPlaceInCard}
-              canLike={canLike}
-              accessToken={auth.accessToken}
-              onLikeToggled={updatePostLike}
-              onLikeSuccess={() =>
-                queryClient.invalidateQueries({ queryKey: ["posts"] })
-              }
-              onOpenComments={setCommentsPostId}
-            />
+              ref={(el) => {
+                postCardRefs.current[p.id] = el;
+              }}
+            >
+              <FeedPostCard
+                post={p}
+                deleteMode={deleteMode}
+                canDelete={canDelete}
+                onDelete={handleDeletePost}
+                onOpen={openExpanded}
+                showPlaceInCard={showPlaceInCard}
+                canLike={canLike}
+                canComment={canComment}
+                isCommentsOpen={commentsPostId === p.id}
+                accessToken={auth.accessToken}
+                onLikeToggled={updatePostLike}
+                onLikeSuccess={() =>
+                  queryClient.invalidateQueries({ queryKey: ["posts"] })
+                }
+                onOpenComments={openComments}
+                onCommentAdded={() =>
+                  queryClient.invalidateQueries({ queryKey: ["posts"] })
+                }
+              />
+            </div>
           ))}
 
           <div ref={sentinelRef} className="col-span-full h-10" />
@@ -322,20 +343,6 @@ export function Feed() {
           lastVideoTapRef={lastVideoTapRef}
         />
       ) : null}
-
-      <PostCommentsSheet
-        postId={commentsPostId}
-        postCommentCount={
-          items.find((p) => p.id === commentsPostId)?.comment_count ?? 0
-        }
-        open={Boolean(commentsPostId)}
-        onOpenChange={(open) => !open && setCommentsPostId(null)}
-        canComment={canComment}
-        accessToken={auth.accessToken}
-        onCommentAdded={() =>
-          queryClient.invalidateQueries({ queryKey: ["posts"] })
-        }
-      />
     </main>
   );
 }

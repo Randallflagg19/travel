@@ -451,27 +451,41 @@ export class PostsService {
     `;
     const post = rows[0];
     if (post && input.cloudinaryPublicId?.trim()) {
-      try {
-        const meta = await this.cloud.getResourceMetadata(
-          input.cloudinaryPublicId.trim(),
-          mediaTypeToCloudinaryResource(input.mediaType),
-        );
-        const lat = meta.lat ?? post.lat;
-        const lng = meta.lng ?? post.lng;
-        const created_at = meta.shotAt
-          ? meta.shotAt.toISOString()
-          : post.created_at;
-        await this.db.client`
-          UPDATE posts
-          SET lat = ${lat}, lng = ${lng}, created_at = ${created_at}::timestamptz
-          WHERE id = ${post.id}::uuid
-        `;
-        return await this.getOrThrow(post.id);
-      } catch {
-        // Метаданные не получили — возвращаем пост как есть
-      }
+      this.updatePostMetadataFromCloudinary(
+        post.id,
+        input.cloudinaryPublicId.trim(),
+        mediaTypeToCloudinaryResource(input.mediaType),
+      ).catch(() => {
+        // Best effort: не блокируем UI, метаданные подтянутся при следующем запросе или никогда
+      });
     }
     return post;
+  }
+
+  /** Фоновая подтяжка метаданных (EXIF) из Cloudinary; не блокирует create(). */
+  private async updatePostMetadataFromCloudinary(
+    postId: string,
+    cloudinaryPublicId: string,
+    resourceType: 'image' | 'video' | 'raw',
+  ): Promise<void> {
+    if (!this.db.client) return;
+    const meta = await this.cloud.getResourceMetadata(
+      cloudinaryPublicId,
+      resourceType,
+    );
+    const lat = meta.lat ?? null;
+    const lng = meta.lng ?? null;
+    const created_at = meta.shotAt?.toISOString() ?? null;
+    if (lat != null || lng != null || created_at != null) {
+      await this.db.client`
+        UPDATE posts
+        SET
+          lat = COALESCE(${lat}, lat),
+          lng = COALESCE(${lng}, lng),
+          created_at = COALESCE(${created_at}::timestamptz, created_at)
+        WHERE id = ${postId}::uuid
+      `;
+    }
   }
 
   async getOrThrow(id: string) {

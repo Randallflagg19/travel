@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
 import {
   fetchPostsPage,
   deletePost,
@@ -14,48 +13,41 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 import { FeedHeader, FeedEmptyState } from "./feed-header";
 import { FeedPostCard } from "./feed-post-card";
 import { FeedExpandedModal } from "./feed-expanded-modal";
+import { useFeedParams } from "../model/use-feed-params";
+import { useFeedPermissions } from "../model/use-feed-permissions";
+import { useExpandedModalBehavior } from "../model/use-expanded-modal-behavior";
 
 export function Feed() {
   const limit = 30;
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const auth = useAuth();
-  const order: "asc" | "desc" =
-    searchParams.get("order") === "desc" ? "desc" : "asc";
-  const deleteMode = searchParams.get("delete") === "1";
-  const canDelete = Boolean(
-    auth.user &&
-    (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
-  );
+  const feedParams = useFeedParams();
+  const permissions = useFeedPermissions(auth.user);
+
+  const {
+    order,
+    setOrder,
+    deleteMode,
+    selectedCountry,
+    selectedCity,
+    unknown,
+    all,
+    headerTitle,
+    isSelectionReady,
+  } = feedParams;
+
+  const { canDelete, canLike, canComment } = permissions;
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedVideoSrc, setExpandedVideoSrc] = useState<string | null>(null);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
   const postCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const scrollYRef = useRef(0);
   const lastVideoTapRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const shouldAutoPlayRef = useRef(false);
 
-  const selectedCountry = searchParams.get("country") ?? "";
-  const selectedCity = searchParams.get("city") ?? "";
-  const unknown = searchParams.get("unknown") === "true";
-  const all = searchParams.get("all") === "true";
-
-  const headerTitle = unknown
-    ? "Unknown"
-    : all
-      ? "Все посты"
-      : selectedCountry && selectedCity
-        ? `${selectedCountry} / ${selectedCity}`
-        : "Места";
-
-  const isSelectionReady = Boolean(
-    all || unknown || (selectedCountry && selectedCity),
-  );
-
-  const postsQuery = useInfiniteQuery({
-    queryKey: [
+  const postsQueryKey = useMemo(
+    () => [
       "posts",
       {
         limit,
@@ -67,6 +59,19 @@ export function Feed() {
         accessToken: auth.accessToken ?? null,
       },
     ],
+    [
+      limit,
+      order,
+      selectedCountry,
+      selectedCity,
+      unknown,
+      all,
+      auth.accessToken,
+    ],
+  );
+
+  const postsQuery = useInfiniteQuery({
+    queryKey: postsQueryKey,
     queryFn: ({ pageParam }) =>
       fetchPostsPage(
         {
@@ -101,7 +106,6 @@ export function Feed() {
 
   const inViewOptions = useMemo(() => ({ rootMargin: "600px" }), []);
   const { ref: sentinelRef, inView } = useInView<HTMLDivElement>(inViewOptions);
-
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = postsQuery;
 
   const openExpanded = useCallback(
@@ -125,49 +129,14 @@ export function Feed() {
     shouldAutoPlayRef.current = false;
   }, []);
 
+  useExpandedModalBehavior(Boolean(expandedId), closeExpanded);
+
   useEffect(() => {
     if (!inView) return;
     if (!hasNextPage) return;
     if (isFetchingNextPage) return;
     void fetchNextPage();
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  // Close expanded view with ESC.
-  useEffect(() => {
-    if (!expandedId) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") closeExpanded();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [expandedId, closeExpanded]);
-
-  // Prevent scroll jumps: lock scroll while expanded and restore on close.
-  useEffect(() => {
-    if (!expandedId) return;
-    scrollYRef.current = window.scrollY;
-    const body = document.body;
-    const prev = {
-      position: body.style.position,
-      top: body.style.top,
-      width: body.style.width,
-    };
-    body.style.position = "fixed";
-    body.style.top = `-${scrollYRef.current}px`;
-    body.style.width = "100%";
-    return () => {
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.width = prev.width;
-      window.scrollTo(0, scrollYRef.current);
-    };
-  }, [expandedId]);
-
-  function setOrder(next: "asc" | "desc") {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("order", next);
-    router.push(`/?${nextParams.toString()}`);
-  }
 
   async function handleDeletePost(postId: string) {
     if (!auth.accessToken || !canDelete) return;
@@ -182,33 +151,10 @@ export function Feed() {
     }
   }
 
-  const canLike = Boolean(
-    auth.user &&
-      (auth.user.role === "USER" ||
-        auth.user.role === "ADMIN" ||
-        auth.user.role === "SUPERADMIN"),
-  );
-
-  const canComment = Boolean(
-    auth.user &&
-      (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
-  );
-
   const updatePostLike = useCallback(
     (postId: string, liked: boolean, deltaCount: number) => {
       queryClient.setQueryData(
-        [
-          "posts",
-          {
-            limit,
-            order,
-            country: selectedCountry,
-            city: selectedCity,
-            unknown,
-            all,
-            accessToken: auth.accessToken ?? null,
-          },
-        ],
+        postsQueryKey,
         (old: { pages: { items: ApiPost[]; nextCursor: string | null; hasMore: boolean }[]; pageParams: unknown[] } | undefined) => {
           if (!old) return old;
           return {
@@ -229,16 +175,7 @@ export function Feed() {
         },
       );
     },
-    [
-      queryClient,
-      limit,
-      order,
-      selectedCountry,
-      selectedCity,
-      unknown,
-      all,
-      auth.accessToken,
-    ],
+    [queryClient, postsQueryKey],
   );
 
   const showPlaceInCard = Boolean(

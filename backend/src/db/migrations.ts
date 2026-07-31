@@ -146,6 +146,8 @@ export async function runMigrations(sql: Sql) {
     `;
 
     await q`CREATE INDEX IF NOT EXISTS posts_created_at_idx ON posts (created_at DESC)`;
+    await q`CREATE INDEX IF NOT EXISTS posts_created_at_id_idx ON posts (created_at, id)`;
+    await q`CREATE INDEX IF NOT EXISTS posts_country_city_created_at_id_idx ON posts (country, city, created_at, id)`;
     await q`CREATE INDEX IF NOT EXISTS posts_user_id_idx ON posts (user_id)`;
 
     // Comments

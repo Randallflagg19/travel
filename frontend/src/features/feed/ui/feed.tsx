@@ -18,7 +18,7 @@ import { useFeedPermissions } from "../model/use-feed-permissions";
 import { useExpandedModalBehavior } from "../model/use-expanded-modal-behavior";
 
 export function Feed() {
-  const limit = 30;
+  const limit = 9;
   const queryClient = useQueryClient();
   const auth = useAuth();
   const feedParams = useFeedParams();
@@ -104,7 +104,7 @@ export function Feed() {
     return items.find((p) => p.id === expandedId) ?? null;
   }, [expandedId, items]);
 
-  const inViewOptions = useMemo(() => ({ rootMargin: "600px" }), []);
+  const inViewOptions = useMemo(() => ({ rootMargin: "300px" }), []);
   const { ref: sentinelRef, inView } = useInView<HTMLDivElement>(inViewOptions);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = postsQuery;
 

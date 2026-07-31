@@ -83,7 +83,7 @@ export class PostsService {
     hasMore: boolean;
   }> {
     if (!this.db.client) return { items: [], nextCursor: null, hasMore: false };
-    const safeLimit = Math.max(1, Math.min(200, params?.limit ?? 50));
+    const safeLimit = Math.max(1, Math.min(50, params?.limit ?? 12));
     const limitPlusOne = safeLimit + 1;
 
     const decoded = params?.cursor ? decodeCursor(params.cursor) : null;
@@ -92,312 +92,105 @@ export class PostsService {
     const wantUnknown = Boolean(params?.unknown);
     const country = params?.country?.trim() ? params.country.trim() : undefined;
     const city = params?.city?.trim() ? params.city.trim() : undefined;
+    const cursorCreatedAt = decoded?.created_at ?? null;
+    const cursorId = decoded?.id ?? null;
 
-    // We intentionally keep the SQL explicit (few branches) to avoid unsafe string building.
     const rows =
       order === 'asc'
-        ? decoded
-          ? wantUnknown
-            ? await this.db.client<PostRow[]>`
-                SELECT
-                  p.*,
-                  COALESCE(l.like_count, 0)::int AS like_count,
-                  COALESCE(c.comment_count, 0)::int AS comment_count
-                FROM posts p
-                LEFT JOIN (
-                  SELECT post_id, COUNT(*) AS like_count
-                  FROM likes
-                  GROUP BY post_id
-                ) l ON l.post_id = p.id
-                LEFT JOIN (
-                  SELECT post_id, COUNT(*) AS comment_count
-                  FROM comments
-                  GROUP BY post_id
-                ) c ON c.post_id = p.id
-                WHERE
-                  (p.country IS NULL OR TRIM(p.country) = '' OR p.city IS NULL OR TRIM(p.city) = '')
-                  AND (
-                    (p.created_at > ${decoded.created_at}::timestamptz)
-                    OR (
-                      p.created_at = ${decoded.created_at}::timestamptz
-                      AND p.id > ${decoded.id}::uuid
-                    )
+        ? await this.db.client<PostRow[]>`
+            WITH page AS (
+              SELECT p.*
+              FROM posts p
+              WHERE
+                (
+                  ${wantUnknown}::boolean = false
+                  OR p.country IS NULL
+                  OR TRIM(p.country) = ''
+                  OR p.city IS NULL
+                  OR TRIM(p.city) = ''
+                )
+                AND (
+                  ${wantUnknown}::boolean = true
+                  OR ${country ?? null}::text IS NULL
+                  OR ${city ?? null}::text IS NULL
+                  OR (p.country = ${country ?? null} AND p.city = ${city ?? null})
+                )
+                AND (
+                  ${cursorCreatedAt}::timestamptz IS NULL
+                  OR ${cursorId}::uuid IS NULL
+                  OR p.created_at > ${cursorCreatedAt}::timestamptz
+                  OR (
+                    p.created_at = ${cursorCreatedAt}::timestamptz
+                    AND p.id > ${cursorId}::uuid
                   )
-                ORDER BY p.created_at ASC, p.id ASC
-                LIMIT ${limitPlusOne}
-              `
-            : country && city
-              ? await this.db.client<PostRow[]>`
-                  SELECT
-                    p.*,
-                    COALESCE(l.like_count, 0)::int AS like_count,
-                    COALESCE(c.comment_count, 0)::int AS comment_count
-                  FROM posts p
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM likes
-                    GROUP BY post_id
-                  ) l ON l.post_id = p.id
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                  ) c ON c.post_id = p.id
-                  WHERE
-                    p.country = ${country}
-                    AND p.city = ${city}
-                    AND (
-                      (p.created_at > ${decoded.created_at}::timestamptz)
-                      OR (
-                        p.created_at = ${decoded.created_at}::timestamptz
-                        AND p.id > ${decoded.id}::uuid
-                      )
-                    )
-                  ORDER BY p.created_at ASC, p.id ASC
-                  LIMIT ${limitPlusOne}
-                `
-              : await this.db.client<PostRow[]>`
-                  SELECT
-                    p.*,
-                    COALESCE(l.like_count, 0)::int AS like_count,
-                    COALESCE(c.comment_count, 0)::int AS comment_count
-                  FROM posts p
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM likes
-                    GROUP BY post_id
-                  ) l ON l.post_id = p.id
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                  ) c ON c.post_id = p.id
-                  WHERE
-                    (
-                      (p.created_at > ${decoded.created_at}::timestamptz)
-                      OR (
-                        p.created_at = ${decoded.created_at}::timestamptz
-                        AND p.id > ${decoded.id}::uuid
-                      )
-                    )
-                  ORDER BY p.created_at ASC, p.id ASC
-                  LIMIT ${limitPlusOne}
-                `
-          : wantUnknown
-            ? await this.db.client<PostRow[]>`
-                SELECT
-                  p.*,
-                  COALESCE(l.like_count, 0)::int AS like_count,
-                  COALESCE(c.comment_count, 0)::int AS comment_count
-                FROM posts p
-                LEFT JOIN (
-                  SELECT post_id, COUNT(*) AS like_count
-                  FROM likes
-                  GROUP BY post_id
-                ) l ON l.post_id = p.id
-                LEFT JOIN (
-                  SELECT post_id, COUNT(*) AS comment_count
-                  FROM comments
-                  GROUP BY post_id
-                ) c ON c.post_id = p.id
-                WHERE
-                  (p.country IS NULL OR TRIM(p.country) = '' OR p.city IS NULL OR TRIM(p.city) = '')
-                ORDER BY p.created_at ASC, p.id ASC
-                LIMIT ${limitPlusOne}
-              `
-            : country && city
-              ? await this.db.client<PostRow[]>`
-                  SELECT
-                    p.*,
-                    COALESCE(l.like_count, 0)::int AS like_count,
-                    COALESCE(c.comment_count, 0)::int AS comment_count
-                  FROM posts p
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM likes
-                    GROUP BY post_id
-                  ) l ON l.post_id = p.id
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                  ) c ON c.post_id = p.id
-                  WHERE
-                    p.country = ${country}
-                    AND p.city = ${city}
-                  ORDER BY p.created_at ASC, p.id ASC
-                  LIMIT ${limitPlusOne}
-                `
-              : await this.db.client<PostRow[]>`
-                  SELECT
-                    p.*,
-                    COALESCE(l.like_count, 0)::int AS like_count,
-                    COALESCE(c.comment_count, 0)::int AS comment_count
-                  FROM posts p
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM likes
-                    GROUP BY post_id
-                  ) l ON l.post_id = p.id
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                  ) c ON c.post_id = p.id
-                  ORDER BY p.created_at ASC, p.id ASC
-                  LIMIT ${limitPlusOne}
-                `
-        : decoded
-          ? wantUnknown
-            ? await this.db.client<PostRow[]>`
-                SELECT
-                  p.*,
-                  COALESCE(l.like_count, 0)::int AS like_count,
-                  COALESCE(c.comment_count, 0)::int AS comment_count
-                FROM posts p
-                LEFT JOIN (
-                  SELECT post_id, COUNT(*) AS like_count
-                  FROM likes
-                  GROUP BY post_id
-                ) l ON l.post_id = p.id
-                LEFT JOIN (
-                  SELECT post_id, COUNT(*) AS comment_count
-                  FROM comments
-                  GROUP BY post_id
-                ) c ON c.post_id = p.id
-                WHERE
-                  (p.country IS NULL OR TRIM(p.country) = '' OR p.city IS NULL OR TRIM(p.city) = '')
-                  AND (
-                    (p.created_at < ${decoded.created_at}::timestamptz)
-                    OR (
-                      p.created_at = ${decoded.created_at}::timestamptz
-                      AND p.id < ${decoded.id}::uuid
-                    )
+                )
+              ORDER BY p.created_at ASC, p.id ASC
+              LIMIT ${limitPlusOne}
+            )
+            SELECT
+              page.*,
+              COALESCE(l.like_count, 0)::int AS like_count,
+              COALESCE(c.comment_count, 0)::int AS comment_count
+            FROM page
+            LEFT JOIN LATERAL (
+              SELECT COUNT(*) AS like_count
+              FROM likes
+              WHERE likes.post_id = page.id
+            ) l ON true
+            LEFT JOIN LATERAL (
+              SELECT COUNT(*) AS comment_count
+              FROM comments
+              WHERE comments.post_id = page.id
+            ) c ON true
+            ORDER BY page.created_at ASC, page.id ASC
+          `
+        : await this.db.client<PostRow[]>`
+            WITH page AS (
+              SELECT p.*
+              FROM posts p
+              WHERE
+                (
+                  ${wantUnknown}::boolean = false
+                  OR p.country IS NULL
+                  OR TRIM(p.country) = ''
+                  OR p.city IS NULL
+                  OR TRIM(p.city) = ''
+                )
+                AND (
+                  ${wantUnknown}::boolean = true
+                  OR ${country ?? null}::text IS NULL
+                  OR ${city ?? null}::text IS NULL
+                  OR (p.country = ${country ?? null} AND p.city = ${city ?? null})
+                )
+                AND (
+                  ${cursorCreatedAt}::timestamptz IS NULL
+                  OR ${cursorId}::uuid IS NULL
+                  OR p.created_at < ${cursorCreatedAt}::timestamptz
+                  OR (
+                    p.created_at = ${cursorCreatedAt}::timestamptz
+                    AND p.id < ${cursorId}::uuid
                   )
-                ORDER BY p.created_at DESC, p.id DESC
-                LIMIT ${limitPlusOne}
-              `
-            : country && city
-              ? await this.db.client<PostRow[]>`
-                  SELECT
-                    p.*,
-                    COALESCE(l.like_count, 0)::int AS like_count,
-                    COALESCE(c.comment_count, 0)::int AS comment_count
-                  FROM posts p
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM likes
-                    GROUP BY post_id
-                  ) l ON l.post_id = p.id
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                  ) c ON c.post_id = p.id
-                  WHERE
-                    p.country = ${country}
-                    AND p.city = ${city}
-                    AND (
-                      (p.created_at < ${decoded.created_at}::timestamptz)
-                      OR (
-                        p.created_at = ${decoded.created_at}::timestamptz
-                        AND p.id < ${decoded.id}::uuid
-                      )
-                    )
-                  ORDER BY p.created_at DESC, p.id DESC
-                  LIMIT ${limitPlusOne}
-                `
-              : await this.db.client<PostRow[]>`
-                  SELECT
-                    p.*,
-                    COALESCE(l.like_count, 0)::int AS like_count,
-                    COALESCE(c.comment_count, 0)::int AS comment_count
-                  FROM posts p
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM likes
-                    GROUP BY post_id
-                  ) l ON l.post_id = p.id
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                  ) c ON c.post_id = p.id
-                  WHERE
-                    (
-                      (p.created_at < ${decoded.created_at}::timestamptz)
-                      OR (
-                        p.created_at = ${decoded.created_at}::timestamptz
-                        AND p.id < ${decoded.id}::uuid
-                      )
-                    )
-                  ORDER BY p.created_at DESC, p.id DESC
-                  LIMIT ${limitPlusOne}
-                `
-          : wantUnknown
-            ? await this.db.client<PostRow[]>`
-                SELECT
-                  p.*,
-                  COALESCE(l.like_count, 0)::int AS like_count,
-                  COALESCE(c.comment_count, 0)::int AS comment_count
-                FROM posts p
-                LEFT JOIN (
-                  SELECT post_id, COUNT(*) AS like_count
-                  FROM likes
-                  GROUP BY post_id
-                ) l ON l.post_id = p.id
-                LEFT JOIN (
-                  SELECT post_id, COUNT(*) AS comment_count
-                  FROM comments
-                  GROUP BY post_id
-                ) c ON c.post_id = p.id
-                WHERE
-                  (p.country IS NULL OR TRIM(p.country) = '' OR p.city IS NULL OR TRIM(p.city) = '')
-                ORDER BY p.created_at DESC, p.id DESC
-                LIMIT ${limitPlusOne}
-              `
-            : country && city
-              ? await this.db.client<PostRow[]>`
-                  SELECT
-                    p.*,
-                    COALESCE(l.like_count, 0)::int AS like_count,
-                    COALESCE(c.comment_count, 0)::int AS comment_count
-                  FROM posts p
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM likes
-                    GROUP BY post_id
-                  ) l ON l.post_id = p.id
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                  ) c ON c.post_id = p.id
-                  WHERE
-                    p.country = ${country}
-                    AND p.city = ${city}
-                  ORDER BY p.created_at DESC, p.id DESC
-                  LIMIT ${limitPlusOne}
-                `
-              : await this.db.client<PostRow[]>`
-                  SELECT
-                    p.*,
-                    COALESCE(l.like_count, 0)::int AS like_count,
-                    COALESCE(c.comment_count, 0)::int AS comment_count
-                  FROM posts p
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM likes
-                    GROUP BY post_id
-                  ) l ON l.post_id = p.id
-                  LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                  ) c ON c.post_id = p.id
-                  ORDER BY p.created_at DESC, p.id DESC
-                  LIMIT ${limitPlusOne}
-                `;
+                )
+              ORDER BY p.created_at DESC, p.id DESC
+              LIMIT ${limitPlusOne}
+            )
+            SELECT
+              page.*,
+              COALESCE(l.like_count, 0)::int AS like_count,
+              COALESCE(c.comment_count, 0)::int AS comment_count
+            FROM page
+            LEFT JOIN LATERAL (
+              SELECT COUNT(*) AS like_count
+              FROM likes
+              WHERE likes.post_id = page.id
+            ) l ON true
+            LEFT JOIN LATERAL (
+              SELECT COUNT(*) AS comment_count
+              FROM comments
+              WHERE comments.post_id = page.id
+            ) c ON true
+            ORDER BY page.created_at DESC, page.id DESC
+          `;
 
     const hasMore = rows.length > safeLimit;
     const items = hasMore ? rows.slice(0, safeLimit) : rows;
@@ -408,9 +201,11 @@ export class PostsService {
         : null;
 
     if (params?.userId?.trim() && items.length > 0 && this.db.client) {
+      const postIds = items.map((p) => p.id);
       const likedRows = await this.db.client<{ post_id: string }[]>`
         SELECT post_id FROM likes
         WHERE user_id = ${params.userId.trim()}::uuid
+          AND post_id = ANY(${this.db.client.array(postIds)}::uuid[])
       `;
       const likedSet = new Set(likedRows.map((r) => r.post_id));
       for (const p of items) {

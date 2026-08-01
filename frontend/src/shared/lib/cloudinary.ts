@@ -67,7 +67,7 @@ export function cloudinaryFullUrl(
   if (mediaType === "VIDEO") return u;
 
   if (mediaType === "PHOTO") {
-    return injectUploadTransform(u, "f_auto,q_auto,w_2000,c_limit");
+    return injectUploadTransform(u, "f_auto,q_auto:good,w_1600,c_limit");
   }
 
   return u;
@@ -96,4 +96,3 @@ export function cloudinaryVideoPosterUrl(
     return null;
   }
 }
-

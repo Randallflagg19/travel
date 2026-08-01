@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "My Travels",
-  description: "Travel media feed",
+  title: "Tapir Travel",
+  description: "Личный журнал путешествий, фото и историй.",
   icons: {
     icon: "/icon.png",
   },
@@ -32,15 +32,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
-          <div className="min-h-dvh">
+          <div className="min-h-dvh bg-background text-foreground">
             {/* Mobile header (dynamic) */}
             <Suspense
               fallback={
-                <div className="sticky top-0 z-50 border-b bg-background/90 px-3 py-2 lg:hidden" />
+                <div className="sticky top-0 z-50 border-b border-white/10 bg-background/90 px-3 py-2 lg:hidden" />
               }
             >
               <MobileHeader />
@@ -49,15 +47,15 @@ export default function RootLayout({
             {/* Desktop header */}
             <Suspense
               fallback={
-                <div className="sticky top-0 z-40 hidden border-b bg-background/90 px-4 py-3 lg:block" />
+                <div className="sticky top-0 z-40 hidden border-b border-white/10 bg-background/90 px-4 py-3 lg:block" />
               }
             >
               <DesktopHeader />
             </Suspense>
 
-            <div className="grid min-h-dvh lg:grid-cols-[280px_1fr]">
+            <div className="grid min-h-dvh lg:grid-cols-[300px_1fr]">
               <aside className="hidden lg:block">
-                <Suspense fallback={<div className="h-dvh border-r" />}>
+                <Suspense fallback={<div className="h-dvh border-r border-white/10" />}>
                   <PlacesSidebar />
                 </Suspense>
               </aside>

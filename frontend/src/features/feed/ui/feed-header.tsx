@@ -18,26 +18,30 @@ export function FeedHeader({
   onOrderChange,
 }: FeedHeaderProps) {
   return (
-    <header className="flex items-center justify-between gap-3">
-      <div className="min-w-0 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{headerTitle}</h1>
-      </div>
+    <header className="flex items-center justify-end gap-3">
+      <span className="sr-only">{headerTitle}</span>
       {isSelectionReady ? (
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs">Порядок:</span>
+        <div className="travel-glass flex shrink-0 items-center gap-2 rounded-3xl p-1.5">
+          <span className="hidden text-xs text-white/45 sm:inline">Порядок:</span>
           <Button
-            variant={order === "desc" ? "secondary" : "ghost"}
+            variant="ghost"
             size="sm"
             onClick={() => onOrderChange("desc")}
             aria-label="Сначала новые"
+            className={`rounded-2xl text-white/70 hover:bg-white/10 hover:text-white ${
+              order === "desc" ? "bg-amber-300/15 text-amber-100" : ""
+            }`}
           >
             <ArrowDownAZ className="size-4" />
           </Button>
           <Button
-            variant={order === "asc" ? "secondary" : "ghost"}
+            variant="ghost"
             size="sm"
             onClick={() => onOrderChange("asc")}
             aria-label="Сначала старые"
+            className={`rounded-2xl text-white/70 hover:bg-white/10 hover:text-white ${
+              order === "asc" ? "bg-amber-300/15 text-amber-100" : ""
+            }`}
           >
             <ArrowUpAZ className="size-4" />
           </Button>
@@ -55,10 +59,12 @@ export function FeedEmptyState({ isSelectionReady }: FeedEmptyStateProps) {
   if (isSelectionReady) return null;
   return (
     <div className="hidden lg:block">
-      <Card>
+      <Card className="travel-glass border-white/10 bg-white/[0.055]">
         <CardHeader>
-          <CardTitle>Выбери место слева</CardTitle>
-          <CardDescription>Страна → город. Или нажми &quot;Все посты&quot;.</CardDescription>
+          <CardTitle className="text-white">Выбери главу слева</CardTitle>
+          <CardDescription className="text-white/55">
+            Страна → город. Или нажми &quot;Все посты&quot;.
+          </CardDescription>
         </CardHeader>
       </Card>
     </div>

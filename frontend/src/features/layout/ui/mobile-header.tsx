@@ -6,6 +6,7 @@ import { MobilePlaces } from "@/features/places/ui/mobile-places";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { CloudinaryUploadButton } from "@/features/upload/ui/cloudinary-upload-button";
+import { displayPlaceTitle } from "@/features/places/model/place-labels";
 
 function useHeaderText() {
   const searchParams = useSearchParams();
@@ -24,10 +25,10 @@ function useHeaderText() {
   }
 
   if (country && city) {
-    return { title: `${country} / ${city}`, subtitle: "Лента" };
+    return { title: displayPlaceTitle(country, city), subtitle: "Журнал" };
   }
 
-  return { title: "Места", subtitle: "Выбери место" };
+  return { title: "Tapir Travel", subtitle: "Выбери главу" };
 }
 
 export function MobileHeader() {
@@ -38,16 +39,16 @@ export function MobileHeader() {
     : auth.user?.username ?? auth.user?.email ?? "";
 
   return (
-    <div className="supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 flex items-center gap-3 border-b bg-background/90 px-3 py-2 backdrop-blur lg:hidden">
+    <div className="sticky top-0 z-50 flex items-center gap-3 border-b border-white/10 bg-[#071014]/80 px-3 py-2 backdrop-blur-xl lg:hidden">
       <MobilePlaces />
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold">{title}</div>
-        <div className="text-muted-foreground truncate text-xs">{subtitle}</div>
+        <div className="truncate text-sm font-semibold text-white">{title}</div>
+        <div className="truncate text-xs text-amber-100/55">{subtitle}</div>
       </div>
       <div className="ml-auto flex items-center gap-2">
         {auth.user ? (
           <>
-            <div className="text-muted-foreground max-w-[140px] truncate text-xs">
+            <div className="max-w-[140px] truncate text-xs text-white/55">
               {displayName}
             </div>
             <CloudinaryUploadButton size="sm" variant="secondary" />
@@ -64,4 +65,3 @@ export function MobileHeader() {
     </div>
   );
 }
-

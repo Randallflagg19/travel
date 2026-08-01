@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { MapPin } from "lucide-react";
 import {
   fetchPostsPage,
   deletePost,
@@ -16,6 +18,79 @@ import { FeedExpandedModal } from "./feed-expanded-modal";
 import { useFeedParams } from "../model/use-feed-params";
 import { useFeedPermissions } from "../model/use-feed-permissions";
 import { useExpandedModalBehavior } from "../model/use-expanded-modal-behavior";
+
+function FeedHero({
+  title,
+  city,
+  postsCount,
+  isSelectionReady,
+}: {
+  title: string;
+  city: string;
+  postsCount: number;
+  isSelectionReady: boolean;
+}) {
+  return (
+    <section className="travel-card-glow relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#071014]">
+      <div className="absolute inset-y-0 right-0 hidden w-[58%] overflow-hidden lg:block">
+        <Image
+          src="/me.png"
+          alt="Tapir Travel"
+          fill
+          priority
+          className="object-cover object-center opacity-88"
+          sizes="58vw"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,16,20,0.92)_0%,rgba(7,16,20,0.2)_34%,rgba(7,16,20,0.18)_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_55%_18%,rgba(245,166,76,0.18),transparent_30%)]" />
+      </div>
+      <Image
+        src="/me.png"
+        alt="Tapir Travel"
+        fill
+        priority
+        className="object-cover object-center opacity-35 lg:hidden"
+        sizes="100vw"
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,14,0.98)_0%,rgba(5,10,14,0.9)_42%,rgba(5,10,14,0.3)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(48,196,143,0.22),transparent_34%),radial-gradient(circle_at_84%_30%,rgba(245,166,76,0.16),transparent_30%)]" />
+
+      <div className="relative min-h-[360px] px-6 py-8 sm:px-8 lg:px-10">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-sm font-medium text-emerald-200">
+            Мои путешествия
+          </span>
+          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/60">
+            Tapir Travel
+          </span>
+        </div>
+
+        <div className="mt-12 max-w-2xl">
+          <h1 className="text-5xl font-semibold tracking-tight text-white sm:text-6xl lg:text-7xl xl:text-8xl">
+            {title}
+          </h1>
+          <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/68">
+            Уличная еда, тёплые вечера, случайные дороги и кадры, которые
+            хочется сохранить. Пишу здесь, чтобы помнить.
+          </p>
+        </div>
+
+        <div className="mt-8 flex flex-wrap gap-3 text-sm text-white/72">
+          <span className="rounded-full border border-white/10 bg-black/24 px-4 py-2 backdrop-blur">
+            {postsCount ? `${postsCount} кадров на экране` : "Выбери главу"}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/24 px-4 py-2 backdrop-blur">
+            <MapPin className="size-4 text-emerald-200" />
+            {city || "Маршрут 2026"}
+          </span>
+          <span className="rounded-full border border-white/10 bg-black/24 px-4 py-2 backdrop-blur">
+            {isSelectionReady ? "живой журнал" : "скоро новые места"}
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function Feed() {
   const limit = 9;
@@ -193,7 +268,14 @@ export function Feed() {
   }, [commentsPostId]);
 
   return (
-    <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 overflow-x-hidden px-4 py-10">
+    <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-5 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">
+      <FeedHero
+        title={headerTitle}
+        city={selectedCity}
+        postsCount={items.length}
+        isSelectionReady={Boolean(isSelectionReady)}
+      />
+
       <FeedHeader
         headerTitle={headerTitle}
         isSelectionReady={Boolean(isSelectionReady)}
@@ -203,18 +285,20 @@ export function Feed() {
 
       <FeedEmptyState isSelectionReady={Boolean(isSelectionReady)} />
 
-      {postsQuery.isLoading ? (
-        <Card>
+      {!isSelectionReady ? null : postsQuery.isLoading ? (
+        <Card className="travel-glass border-white/10 bg-white/[0.055]">
           <CardHeader>
-            <CardTitle>Загрузка…</CardTitle>
-            <CardDescription>Тянем первую страницу постов.</CardDescription>
+            <CardTitle className="text-white">Загрузка…</CardTitle>
+            <CardDescription className="text-white/55">
+              Тянем первую страницу постов.
+            </CardDescription>
           </CardHeader>
         </Card>
       ) : postsQuery.isError ? (
-        <Card>
+        <Card className="travel-glass border-white/10 bg-white/[0.055]">
           <CardHeader>
-            <CardTitle>Ошибка</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">Ошибка</CardTitle>
+            <CardDescription className="text-white/55">
               {postsQuery.error instanceof Error
                 ? postsQuery.error.message
                 : "Не удалось загрузить посты"}
@@ -222,10 +306,12 @@ export function Feed() {
           </CardHeader>
         </Card>
       ) : items.length === 0 ? (
-        <Card>
+        <Card className="travel-glass border-white/10 bg-white/[0.055]">
           <CardHeader>
-            <CardTitle>Пока пусто</CardTitle>
-            <CardDescription>Для этого места постов нет.</CardDescription>
+            <CardTitle className="text-white">Пока пусто</CardTitle>
+            <CardDescription className="text-white/55">
+              Для этого места постов нет.
+            </CardDescription>
           </CardHeader>
         </Card>
       ) : (
@@ -264,15 +350,15 @@ export function Feed() {
           <div ref={sentinelRef} className="col-span-full h-10" />
 
           {postsQuery.isFetchingNextPage ? (
-            <p className="text-muted-foreground col-span-full text-center text-sm">
+            <p className="col-span-full text-center text-sm text-white/50">
               Загружаю ещё…
             </p>
           ) : postsQuery.hasNextPage ? (
-            <p className="text-muted-foreground col-span-full text-center text-sm">
+            <p className="col-span-full text-center text-sm text-white/50">
               Прокрути ниже — подгружу ещё.
             </p>
           ) : (
-            <p className="text-muted-foreground col-span-full text-center text-sm">
+            <p className="col-span-full text-center text-sm text-white/50">
               Конец ленты.
             </p>
           )}

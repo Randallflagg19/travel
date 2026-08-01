@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { MapPin } from "lucide-react";
 import {
   fetchPostsPage,
   deletePost,
@@ -55,37 +54,32 @@ function FeedHero({
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,14,0.98)_0%,rgba(5,10,14,0.9)_42%,rgba(5,10,14,0.3)_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(48,196,143,0.22),transparent_34%),radial-gradient(circle_at_84%_30%,rgba(245,166,76,0.16),transparent_30%)]" />
 
-      <div className="relative min-h-[360px] px-6 py-8 sm:px-8 lg:px-10">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-sm font-medium text-emerald-200">
-            Мои путешествия
-          </span>
-          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/60">
-            Tapir Travel
-          </span>
-        </div>
-
-        <div className="mt-12 max-w-2xl">
-          <h1 className="text-5xl font-semibold tracking-tight text-white sm:text-6xl lg:text-7xl xl:text-8xl">
+      <div className="relative flex min-h-[330px] items-center px-6 py-10 sm:px-8 lg:px-10">
+        <div className="max-w-3xl">
+          <p className="mb-4 font-serif text-2xl italic text-amber-200/90">
+            личный журнал дороги
+          </p>
+          <h1 className="font-serif text-5xl font-semibold italic tracking-tight text-amber-100 sm:text-6xl lg:text-7xl xl:text-8xl">
             {title}
           </h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/68">
-            Уличная еда, тёплые вечера, случайные дороги и кадры, которые
-            хочется сохранить. Пишу здесь, чтобы помнить.
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/70 sm:text-xl">
+            Не отчёт и не витрина. Просто места, где я был, странные детали,
+            случайные находки и фотографии, которые потом внезапно оказываются
+            важнее, чем казались.
           </p>
-        </div>
-
-        <div className="mt-8 flex flex-wrap gap-3 text-sm text-white/72">
-          <span className="rounded-full border border-white/10 bg-black/24 px-4 py-2 backdrop-blur">
-            {postsCount ? `${postsCount} кадров на экране` : "Выбери главу"}
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/24 px-4 py-2 backdrop-blur">
-            <MapPin className="size-4 text-emerald-200" />
-            {city || "Маршрут 2026"}
-          </span>
-          <span className="rounded-full border border-white/10 bg-black/24 px-4 py-2 backdrop-blur">
-            {isSelectionReady ? "живой журнал" : "скоро новые места"}
-          </span>
+          {!isSelectionReady ? (
+            <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
+              выбери главу слева или открой все посты
+            </p>
+          ) : postsCount ? (
+            <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
+              {postsCount} кадров сейчас в ленте
+            </p>
+          ) : city ? (
+            <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
+              {city}
+            </p>
+          ) : null}
         </div>
       </div>
     </section>

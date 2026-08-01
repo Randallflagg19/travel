@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Compass, Lock, MapPin, Palmtree, Trash2 } from "lucide-react";
+import { Lock, MapPin, Palmtree, Trash2 } from "lucide-react";
 import { fetchPlaces } from "@/shared/api/api";
 import { useAuth } from "@/entities/session/model/auth";
 import { ScrollArea } from "@/shared/ui/scroll-area";
@@ -115,18 +115,6 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
             <p className="text-xs text-white/45">Коллекционируй моменты.</p>
           </div>
         </button>
-      </div>
-
-      <div className="px-5">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-4">
-          <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-            <Compass className="size-4 text-emerald-300" />
-            Главы
-          </h2>
-          <p className="mt-2 text-xs leading-relaxed text-white/48">
-            Страны и города как главы маршрута.
-          </p>
-        </div>
       </div>
 
       <div className="space-y-2 px-5">
@@ -281,12 +269,6 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         )}
       </ScrollArea>
-
-      <div className="px-5 pb-5">
-        <div className="rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(5,8,12,0.55),rgba(245,166,76,0.12))] p-4 text-sm leading-relaxed text-amber-100/80">
-          Коллекционируй моменты и истории.
-        </div>
-      </div>
     </aside>
   );
 }

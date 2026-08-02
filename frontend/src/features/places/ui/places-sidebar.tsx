@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, MapPin, Palmtree, Trash2 } from "lucide-react";
+import { MapPin, Palmtree, Trash2 } from "lucide-react";
 import { fetchPlaces } from "@/shared/api/api";
 import { useAuth } from "@/entities/session/model/auth";
 import { ScrollArea } from "@/shared/ui/scroll-area";
@@ -249,23 +249,6 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 </div>
               );
             })}
-
-            <div className="rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(245,166,76,0.14),rgba(255,255,255,0.035))] p-4 text-white/75">
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-black/20 text-lg">
-                  🐪
-                </span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 font-medium text-white/86">
-                    Egypt soon
-                    <Lock className="size-3.5 text-amber-200/70" />
-                  </div>
-                  <div className="text-xs text-white/42">
-                    Скоро новая глава
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </ScrollArea>

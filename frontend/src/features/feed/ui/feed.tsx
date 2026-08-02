@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchPostsPage,
+  fetchPlaces,
   deletePost,
   type ApiPost,
+  type PlacesResponse,
 } from "@/shared/api/api";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { useAuth } from "@/entities/session/model/auth";
@@ -17,6 +20,42 @@ import { FeedExpandedModal } from "./feed-expanded-modal";
 import { useFeedParams } from "../model/use-feed-params";
 import { useFeedPermissions } from "../model/use-feed-permissions";
 import { useExpandedModalBehavior } from "../model/use-expanded-modal-behavior";
+import { displayCountryName } from "@/features/places/model/place-labels";
+
+type MobileChapter = {
+  country: string;
+  city: string;
+  label: string;
+  count: number;
+  emoji: string;
+};
+
+function chapterEmoji(label: string) {
+  if (label === "Bali") return "🌊";
+  if (label === "Thailand") return "🏯";
+  if (label === "China") return "🐉";
+  if (label === "Egypt") return "𓂀";
+  return "✈️";
+}
+
+function buildMobileChapters(data?: PlacesResponse): MobileChapter[] {
+  return (
+    data?.countries
+      .map((country) => {
+        const firstCity = country.cities[0]?.city;
+        if (!firstCity) return null;
+        const label = displayCountryName(country.country);
+        return {
+          country: country.country,
+          city: firstCity,
+          label,
+          count: country.count,
+          emoji: chapterEmoji(label),
+        };
+      })
+      .filter((chapter): chapter is MobileChapter => Boolean(chapter)) ?? []
+  );
+}
 
 function FeedHero({
   title,
@@ -30,7 +69,41 @@ function FeedHero({
   isSelectionReady: boolean;
 }) {
   return (
-    <section className="travel-card-glow relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#071014]">
+    <>
+      <section className="lg:hidden">
+        <div className="travel-card-glow relative aspect-[4/3] overflow-hidden rounded-[2rem] border border-white/10 bg-[#071014]">
+          <Image
+            src="/me.png"
+            alt="Tapir Travel"
+            fill
+            priority
+            className="object-cover object-center"
+            sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,10,14,0.04)_0%,rgba(5,10,14,0.1)_48%,rgba(5,10,14,0.36)_100%)]" />
+        </div>
+
+        <div className="travel-card-glow relative z-10 -mt-12 rounded-[1.7rem] border border-white/10 bg-[#071014]/88 p-6 backdrop-blur-xl">
+          <p className="font-serif text-xl italic text-amber-200/88">
+            личный журнал дороги
+          </p>
+          <h1 className="mt-2 font-serif text-5xl font-semibold italic leading-none tracking-tight text-amber-100">
+            {title}
+          </h1>
+          <p className="mt-5 text-[1.05rem] leading-relaxed text-white/72">
+            Не отчёт. Просто места и детали, которые хочется помнить.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium uppercase tracking-[0.22em] text-emerald-200/72">
+            <span>
+              {postsCount ? `${postsCount} кадров` : "выбери главу"}
+            </span>
+            {city ? <span>· {city}</span> : null}
+            {!city && !isSelectionReady ? <span>· маршрут 2026</span> : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="travel-card-glow relative hidden overflow-hidden rounded-[2rem] border border-white/10 bg-[#071014] lg:block">
       <div className="absolute inset-y-0 right-0 hidden w-[58%] overflow-hidden lg:block">
         <Image
           src="/me.png"
@@ -82,7 +155,64 @@ function FeedHero({
           ) : null}
         </div>
       </div>
-    </section>
+      </section>
+    </>
+  );
+}
+
+function MobileChapters({
+  selectedCountry,
+  places,
+}: {
+  selectedCountry: string;
+  places?: PlacesResponse;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const chapters = useMemo(() => buildMobileChapters(places), [places]);
+
+  if (chapters.length === 0) return null;
+
+  function selectChapter(chapter: MobileChapter) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("all");
+    next.delete("unknown");
+    next.set("country", chapter.country);
+    next.set("city", chapter.city);
+    router.push(`/?${next.toString()}`);
+  }
+
+  return (
+    <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 lg:hidden [&::-webkit-scrollbar]:hidden">
+      {chapters.map((chapter) => {
+        const active = selectedCountry === chapter.country;
+        return (
+          <button
+            key={`${chapter.country}/${chapter.city}`}
+            type="button"
+            onClick={() => selectChapter(chapter)}
+            className={`relative h-24 min-w-32 overflow-hidden rounded-3xl border p-3 text-left transition ${
+              active
+                ? "border-emerald-300/70 bg-emerald-300/14 shadow-lg shadow-emerald-950/30"
+                : "border-white/10 bg-white/[0.055]"
+            }`}
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(245,166,76,0.18),transparent_38%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]" />
+            <div className="relative flex h-full flex-col justify-between">
+              <span className="text-2xl">{chapter.emoji}</span>
+              <span>
+                <span className="block font-serif text-xl italic leading-none text-amber-100">
+                  {chapter.label}
+                </span>
+                <span className="mt-1 block text-xs text-white/45">
+                  {chapter.count} кадров
+                </span>
+              </span>
+            </div>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -161,6 +291,11 @@ export function Feed() {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
+  });
+
+  const placesQuery = useQuery({
+    queryKey: ["places"],
+    queryFn: fetchPlaces,
   });
 
   const items = useMemo(
@@ -268,6 +403,11 @@ export function Feed() {
         city={selectedCity}
         postsCount={items.length}
         isSelectionReady={Boolean(isSelectionReady)}
+      />
+
+      <MobileChapters
+        selectedCountry={selectedCountry}
+        places={placesQuery.data}
       />
 
       <FeedHeader

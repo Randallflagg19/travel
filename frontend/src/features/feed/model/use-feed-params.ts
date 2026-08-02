@@ -23,7 +23,7 @@ export function useFeedParams(): FeedParams {
   const searchParams = useSearchParams();
 
   const order: FeedOrder =
-    searchParams.get("order") === "desc" ? "desc" : "asc";
+    searchParams.get("order") === "asc" ? "asc" : "desc";
   const deleteMode = searchParams.get("delete") === "1";
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";

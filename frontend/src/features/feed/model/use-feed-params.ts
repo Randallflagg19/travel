@@ -2,7 +2,10 @@
 
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { displayPlaceTitle } from "@/features/places/model/place-labels";
+import {
+  displayCountryName,
+  displayPlaceTitle,
+} from "@/features/places/model/place-labels";
 
 export type FeedOrder = "asc" | "desc";
 
@@ -36,6 +39,8 @@ export function useFeedParams(): FeedParams {
       ? "Все посты"
       : selectedCountry && selectedCity
         ? displayPlaceTitle(selectedCountry, selectedCity)
+        : selectedCountry
+          ? displayCountryName(selectedCountry)
         : "Tapir Travel";
 
   const isSelectionReady = Boolean(

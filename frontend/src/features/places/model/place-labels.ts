@@ -9,6 +9,6 @@ export function displayPlaceTitle(country: string, city: string): string {
   return displayCountryName(country || city);
 }
 
-export function isBaliChapter(country: string, cities?: Array<{ city: string }>) {
-  return country === "Indonesia" && cities?.some((city) => city.city === "Bali");
+export function shouldOpenCountryDirectly(cities?: Array<{ city: string }>) {
+  return (cities?.length ?? 0) === 1;
 }

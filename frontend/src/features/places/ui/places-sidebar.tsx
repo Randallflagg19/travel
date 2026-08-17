@@ -13,7 +13,7 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { Button } from "@/shared/ui/button";
 import {
   displayCountryName,
-  isBaliChapter,
+  shouldOpenCountryDirectly,
 } from "@/features/places/model/place-labels";
 
 function buildUrl(params: URLSearchParams) {
@@ -54,6 +54,17 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
     next.set("country", country);
     next.set("city", city);
     router.push(buildUrl(next));
+    onNavigate?.();
+  }
+
+  function selectCountry(country: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("all");
+    next.delete("unknown");
+    next.delete("city");
+    next.set("country", country);
+    router.push(buildUrl(next));
+    setOpenCountry(country);
     onNavigate?.();
   }
 
@@ -178,24 +189,26 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
             {placesQuery.data?.countries.map((c) => {
               const isOpen = openCountry === c.country;
               const isActiveCountry = !unknown && selectedCountry === c.country;
-              const isBali = isBaliChapter(c.country, c.cities);
+              const opensDirectly = shouldOpenCountryDirectly(c.cities);
               const displayCountry = displayCountryName(c.country);
-              const baliCity = c.cities.find((city) => city.city === "Bali");
-              const isActiveBali =
-                isBali && selectedCountry === c.country && selectedCity === "Bali";
+              const directCity = c.cities[0];
+              const isActiveDirect =
+                opensDirectly &&
+                selectedCountry === c.country &&
+                selectedCity === directCity?.city;
 
               return (
                 <div key={c.country} className="rounded-2xl">
                   <Button
                     variant="ghost"
                     className={`h-auto w-full justify-start rounded-2xl border px-3 py-3 text-left ${
-                      isActiveCountry || isActiveBali
+                      isActiveCountry || isActiveDirect
                         ? "border-emerald-300/25 bg-emerald-400/15 text-white shadow-lg shadow-emerald-950/20"
                         : "border-white/10 bg-white/[0.035] text-white/78 hover:bg-white/10 hover:text-white"
                     }`}
                     onClick={() => {
-                      if (isBali && baliCity) selectCity(c.country, baliCity.city);
-                      else setOpenCountry(isOpen ? "" : c.country);
+                      if (opensDirectly && directCity) selectCity(c.country, directCity.city);
+                      else selectCountry(c.country);
                     }}
                   >
                     <span className="mr-3 flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">
@@ -211,7 +224,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       <span className="block truncate font-medium">
                         {displayCountry}
                       </span>
-                      {isBali ? (
+                      {opensDirectly && displayCountry === "Bali" ? (
                         <span className="block text-xs text-white/42">
                           Остров, море, память
                         </span>
@@ -220,7 +233,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     <span className="ml-auto text-xs text-white/45">{c.count}</span>
                   </Button>
 
-                  {isOpen && !isBali ? (
+                  {isOpen && !opensDirectly ? (
                     <div className="ml-5 mt-2 space-y-1 border-l border-white/10 pl-3">
                       {c.cities.map((cc) => {
                         const isActiveCity =

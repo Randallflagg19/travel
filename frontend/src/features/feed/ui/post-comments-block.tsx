@@ -10,6 +10,7 @@ import {
   type ApiComment,
 } from "@/shared/api/api";
 import { Button } from "@/shared/ui/button";
+import { createPortal } from "react-dom";
 
 type PostCommentsBlockProps = {
   postId: string;
@@ -185,45 +186,48 @@ export function PostCommentsBlock({
         </form>
       ) : null}
 
-      {deleteConfirmCommentId ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Подтверждение удаления"
-          onClick={() => setDeleteConfirmCommentId(null)}
-        >
-          <div
-            className="bg-background border-border w-full max-w-xs rounded-xl border p-4 shadow-lg sm:rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-sm">Удалить комментарий?</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="min-h-10 min-w-16 sm:min-h-9 sm:min-w-0"
-                onClick={() => setDeleteConfirmCommentId(null)}
+      {deleteConfirmCommentId && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Подтверждение удаления"
+              onClick={() => setDeleteConfirmCommentId(null)}
+            >
+              <div
+                className="bg-background border-border w-full max-w-xs rounded-xl border p-4 shadow-lg sm:rounded-lg"
+                onClick={(e) => e.stopPropagation()}
               >
-                Отмена
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                className="min-h-10 min-w-20 sm:min-h-9 sm:min-w-0"
-                disabled={deleteMutation.isPending}
-                onClick={() => {
-                  deleteMutation.mutate(deleteConfirmCommentId);
-                }}
-              >
-                {deleteMutation.isPending ? "…" : "Удалить"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                <p className="text-sm">Удалить комментарий?</p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-10 min-w-16 sm:min-h-9 sm:min-w-0"
+                    onClick={() => setDeleteConfirmCommentId(null)}
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="min-h-10 min-w-20 sm:min-h-9 sm:min-w-0"
+                    disabled={deleteMutation.isPending}
+                    onClick={() => {
+                      deleteMutation.mutate(deleteConfirmCommentId);
+                    }}
+                  >
+                    {deleteMutation.isPending ? "…" : "Удалить"}
+                  </Button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

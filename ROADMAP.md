@@ -18,10 +18,10 @@
 
 ## Текущий фокус
 
-Следующий практический шаг: нормализовать backend contract для places/posts.
+Последний практический шаг: нормализовать backend contract для places/posts.
 
-Статус: реализовано локально, нужно проверить поведение на данных и затем решить,
-готово ли к commit/push/deploy.
+Статус: реализовано, проверено локально, закоммичено, запушено и выложено через
+Render/Vercel.
 
 Почему backend первым:
 
@@ -38,7 +38,7 @@
 1. `backend/src/places/places.service.ts`
 2. `backend/src/posts/posts.service.ts`
 
-Что уже изменено локально:
+Что изменили:
 
 - `backend/src/places/places.service.ts` больше не возвращает `unknown`.
 - `/places` игнорирует rows без `country`, но включает `country` без `city` как country-level destination.
@@ -47,6 +47,17 @@
 - Frontend navigation больше не генерирует `unknown=true`.
 - `Indonesia / Bali` больше не hardcoded как "Bali root"; это обычный `country + city`.
 - Country-only upload пока не включен: upload metadata по-прежнему ставится только при `country + city`, чтобы случайно не создать `Thailand` без города.
+
+Что полезного получилось:
+
+- Backend contract стал проще: `/places` возвращает только `countries`.
+- `unknownCount`, ветка `unknown` и UI-раздел `unknown` перестали быть частью нормальной модели навигации.
+- `PlacesService` стал короче и читается как один понятный проход по rows: собрать страны, добавить города, отсортировать, вернуть результат.
+- Country-only destinations теперь выражаются явно: страна есть, городов нет.
+- Frontend больше не угадывает специальный смысл `unknown`, а строит UI из структуры `countries/cities`.
+- `Indonesia / Bali` больше не special case: это обычный city-level раздел, как и должно следовать из данных.
+- Важно: заметное ускорение первой загрузки постов, скорее всего, появилось не только из-за этого cleanup. Основной вклад, судя по истории, дал более ранний commit `4d3be6b` (`Speed up initial posts feed loading`), где сильно упростилась backend-выборка постов.
+- Текущий этап усилил этот результат: стало меньше frontend-состояний, меньше лишних веток выбора места и понятнее момент, когда posts query вообще должен запускаться.
 
 Ожидаемый контракт:
 
@@ -58,8 +69,62 @@
 - `/posts?country=Thailand&city=Bangkok` и `/posts?country=Thailand&city=Pattaya` возвращают конкретные city-level ленты.
 - Посты без `country` могут отображаться в `all`, но `unknown` не нужен как нормальный раздел навигации.
 
-Перед реализацией нужно сформулировать минимальное backend-изменение и проверить,
-не ломает ли оно текущие сценарии Indonesia/Bali, Thailand и all.
+Проверено на live:
+
+- `Indonesia / Bali` отображается без отдельного hardcode "Bali root".
+- `China / Beijing` открывается как direct city feed.
+- `Egypt` открывается как country-level feed.
+- `Thailand` показывает выбор `Bangkok / Pattaya`, а не смешанную ленту всей страны.
+- `all` остается местом, где могут отображаться посты без нормального места.
+
+Практический шаг завершен: delete confirmation modal для комментариев.
+
+Что сделали:
+
+- Понять текущий comments/delete flow.
+- Найти, почему delete confirmation modal на desktop иногда позиционируется как часть карточки/поста, а не как стабильное окно поверх страницы.
+- Сделать маленькое изменение, после которого confirmation modal для удаления комментария стабильно показывается по центру viewport на desktop и mobile.
+- Не переписывать весь comments flow и не начинать большой refactor `FeedPostCard`.
+- Проверили экспериментально, что удаление `fixed` превращает modal в обычный layout-блок внутри карточки и не является правильным решением.
+- Оставили `fixed`, но вынесли DOM overlay через `createPortal(..., document.body)`.
+- State удаления (`deleteConfirmCommentId`) остался рядом с comments logic, а визуальный overlay больше не зависит от `overflow-hidden`, hover transform и stacking context карточки.
+- С карточек постов убрали отображение даты создания, потому что она не нужна в текущем UI.
+
+Что оставили на потом:
+
+- Закрытие confirm modal по `Escape`.
+- Более аккуратный focus management для dialog.
+- Блокировка background scroll, если она понадобится.
+- Проверка поведения, когда пользователь печатает комментарий и случайно нажимает `Escape`.
+
+Следующий практический шаг выбран: аккуратно раздробить `FeedPostCard` и `PostCommentsBlock`.
+
+Цель этапа:
+
+- Улучшить читаемость без изменения поведения.
+- Не начинать большой rewrite feed.
+- Разделить UI-части и orchestration маленькими шагами, чтобы каждый шаг можно было проверить.
+
+Порядок для ручного refactor:
+
+1. `PostCommentsBlock`: вынести `DeleteCommentConfirmDialog` в маленький компонент в этом же файле или соседний файл.
+2. `PostCommentsBlock`: вынести список комментариев в `CommentsList`, не меняя query/mutation logic.
+3. `PostCommentsBlock`: вынести форму отправки в `CommentForm`, оставив submit handler во внешнем блоке.
+4. Только после этого решить, выносить ли `formatCommentDate` в `shared/lib/date`.
+5. `FeedPostCard`: вынести media preview в `PostMediaPreview`.
+6. `FeedPostCard`: вынести overlay/actions часть в маленькие компоненты, но пока не трогать like mutation orchestration.
+7. После каждого шага запускать `cd frontend && npx tsc --noEmit` и `cd frontend && npm run lint`.
+
+Правило этапа:
+
+- Сначала дробим JSX и визуальные куски.
+- Mutation orchestration лайков и comments cache пока не переносим.
+- Если пропсов становится больше, чем было, останавливаемся и обсуждаем границу компонента.
+
+Кандидаты на потом:
+
+- Учебно разобрать `FeedPostCard`, где сейчас смешаны UI и mutation orchestration.
+- Разобрать upload flow, потому что права admin и country/city metadata влияют на будущую модель данных.
 
 ## Уже разобрано
 
@@ -189,8 +254,12 @@ type FeedSelection =
 Наблюдения:
 
 - Vercel Toolbar показал INP issue: event handlers заблокировали UI примерно на `421ms`.
-- Delete confirmation modal для комментария визуально ведет себя странно при скролле/смещении карточки.
+- Delete confirmation modal для комментария визуально вел себя странно при скролле/смещении карточки; исправлено через portal, но accessibility-доработки оставлены на потом.
 - Нужно отдельно проверить, относится ли INP issue к places navigation, feed card actions, comment modal или toolbar/dev overlay.
+- На мобильной версии и при холодной первой загрузке долго видны skeleton-заглушки стран/разделов.
+- В Network видно, что `/places` после прогрева может отвечать быстро (`~148ms`), но холодный запрос наблюдался заметно дольше (`~1.2s`).
+- Первичная загрузка постов всё ещё может ощущаться долгой, даже если повторные запросы после cache/warm-up быстрые.
+- В UI не всегда достаточно ясно показано, что именно сейчас грузится: places navigation или первая страница posts.
 
 Почему не делаем сейчас:
 
@@ -200,6 +269,10 @@ type FeedSelection =
 Что сделать позже:
 
 - Воспроизвести INP issue локально без лишних overlays, если возможно.
+- Отдельно измерить cold load и warm load для `/places` и первой страницы `/posts`.
+- В DevTools Network смотреть `Timing`: TTFB, content download, initiator, cache status.
+- Проверить, есть ли на Render cold start или задержка database connection для первых запросов.
+- Решить, нужен ли отдельный `PERFORMANCE_NOTES.md`, если измерений станет больше одного-двух наблюдений.
 - Проверить click handlers в places/sidebar/feed card/comment modal.
 - Разобрать ownership delete confirmation modal.
 - После диагностики предложить маленькое UI/performance изменение.

@@ -123,9 +123,13 @@ export function FeedPostCard({
                 className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
                 alt={p.text ?? "travel video"}
                 src={
-                  cloudinaryVideoPosterUrl(p.media_url, p.cloudinary_public_id, {
-                    width: 600,
-                  }) ?? cloudinaryThumbUrl(p.media_url, p.media_type)
+                  cloudinaryVideoPosterUrl(
+                    p.media_url,
+                    p.cloudinary_public_id,
+                    {
+                      width: 600,
+                    },
+                  ) ?? cloudinaryThumbUrl(p.media_url, p.media_type)
                 }
                 width={720}
                 height={540}
@@ -183,7 +187,6 @@ export function FeedPostCard({
               </h3>
             ) : null}
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/58">
-              <span>{formatPostDate(p.created_at)}</span>
               {showPlaceInCard && (p.country || p.city) ? (
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="size-3" />

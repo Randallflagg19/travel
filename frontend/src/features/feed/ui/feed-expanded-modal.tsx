@@ -56,11 +56,11 @@ export function FeedExpandedModal({
               src={expandedVideoSrc || undefined}
               poster={
                 expandedPost.cloudinary_public_id
-                  ? cloudinaryVideoPosterUrl(
+                  ? (cloudinaryVideoPosterUrl(
                       expandedPost.media_url,
                       expandedPost.cloudinary_public_id,
                       { width: 1200 },
-                    ) ?? undefined
+                    ) ?? undefined)
                   : undefined
               }
               onCanPlay={() => {
@@ -80,7 +80,10 @@ export function FeedExpandedModal({
           >
             <Image
               alt={expandedPost.text ?? "travel media"}
-              src={cloudinaryFullUrl(expandedPost.media_url, expandedPost.media_type)}
+              src={cloudinaryFullUrl(
+                expandedPost.media_url,
+                expandedPost.media_type,
+              )}
               fill
               sizes="100vw"
               className="object-contain"

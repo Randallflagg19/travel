@@ -33,16 +33,6 @@ type FeedPostCardProps = {
   onCommentAdded?: () => void;
 };
 
-function formatPostDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("ru", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
 function preloadExpandedMedia(post: ApiPost) {
   if (post.media_type !== "PHOTO") return;
   if (typeof window === "undefined") return;

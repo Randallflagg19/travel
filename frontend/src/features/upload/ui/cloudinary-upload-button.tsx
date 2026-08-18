@@ -59,9 +59,7 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
   const ctx = useMemo(() => {
     const country = searchParams.get("country") ?? "";
     const city = searchParams.get("city") ?? "";
-    const unknown = searchParams.get("unknown") === "true";
-    const all = searchParams.get("all") === "true";
-    return { country, city, unknown, all };
+    return { country, city };
   }, [searchParams]);
 
   const canUpload = Boolean(auth.user && auth.accessToken && (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"));
@@ -77,7 +75,9 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
       await loadCloudinaryWidgetScript();
 
       const root = auth.user.username || "uploads";
-      const folder = ctx.country && ctx.city ? `${root}/${ctx.country}/${ctx.city}` : ctx.unknown ? `${root}/unknown` : `${root}/all`;
+      const folder = ctx.country && ctx.city
+        ? `${root}/${ctx.country}/${ctx.city}`
+        : `${root}/all`;
 
       if (!widgetRef.current) {
         const widget = window.cloudinary?.createUploadWidget(
@@ -144,4 +144,3 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
     </Button>
   );
 }
-

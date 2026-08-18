@@ -60,7 +60,6 @@ function buildMobileChapters(data?: PlacesResponse): MobileChapter[] {
     data?.countries
       .map((country) => {
         const cityCount = country.cities.length;
-        if (!cityCount) return null;
         const label = displayCountryName(country.country);
         return {
           country: country.country,
@@ -194,7 +193,6 @@ function MobileChapters({
   function selectChapter(chapter: MobileChapter) {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("all");
-    next.delete("unknown");
     next.set("country", chapter.country);
     if (chapter.city) next.set("city", chapter.city);
     else next.delete("city");
@@ -270,7 +268,6 @@ function CitySelection({
   function selectCity(city: string) {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("all");
-    next.delete("unknown");
     next.set("country", selectedCountry);
     next.set("city", city);
     router.push(`/?${next.toString()}`);
@@ -333,14 +330,10 @@ export function Feed() {
     deleteMode,
     selectedCountry,
     selectedCity,
-    unknown,
     all,
     headerTitle,
     isSelectionReady,
   } = feedParams;
-  const isCitySelection = Boolean(
-    selectedCountry && !selectedCity && !unknown && !all,
-  );
 
   const { canDelete, canLike, canComment } = permissions;
 
@@ -352,6 +345,28 @@ export function Feed() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const shouldAutoPlayRef = useRef(false);
 
+  const placesQuery = useQuery({
+    queryKey: ["places"],
+    queryFn: fetchPlaces,
+  });
+
+  const selectedCountryPlace = useMemo(
+    () => placesQuery.data?.countries.find((item) => item.country === selectedCountry),
+    [placesQuery.data, selectedCountry],
+  );
+  const hasCountryOnlySelection = Boolean(selectedCountry && !selectedCity && !all);
+  const isCitySelection = Boolean(
+    hasCountryOnlySelection &&
+      selectedCountryPlace &&
+      selectedCountryPlace.cities.length > 1,
+  );
+  const isCountryFeed = Boolean(
+    hasCountryOnlySelection &&
+      selectedCountryPlace &&
+      selectedCountryPlace.cities.length === 0,
+  );
+  const canLoadPosts = Boolean(all || selectedCity || isCountryFeed);
+
   const postsQueryKey = useMemo(
     () => [
       "posts",
@@ -360,7 +375,6 @@ export function Feed() {
         order,
         country: selectedCountry,
         city: selectedCity,
-        unknown,
         all,
         accessToken: auth.accessToken ?? null,
       },
@@ -370,7 +384,6 @@ export function Feed() {
       order,
       selectedCountry,
       selectedCity,
-      unknown,
       all,
       auth.accessToken,
     ],
@@ -384,25 +397,20 @@ export function Feed() {
           limit,
           cursor: typeof pageParam === "string" ? pageParam : undefined,
           order,
-          ...(unknown
-            ? { unknown: true }
-            : all
-              ? {}
-              : selectedCountry && selectedCity
-                ? { country: selectedCountry, city: selectedCity }
+          ...(all
+            ? {}
+            : selectedCountry && selectedCity
+              ? { country: selectedCountry, city: selectedCity }
+              : isCountryFeed
+                ? { country: selectedCountry }
                 : {}),
         },
         auth.accessToken ?? undefined,
       ),
-    enabled: Boolean(isSelectionReady && auth.hydrated),
+    enabled: Boolean(canLoadPosts && auth.hydrated),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
-  });
-
-  const placesQuery = useQuery({
-    queryKey: ["places"],
-    queryFn: fetchPlaces,
   });
 
   const items = useMemo(
@@ -490,7 +498,7 @@ export function Feed() {
   );
 
   const showPlaceInCard = Boolean(
-    !unknown && !all && !(selectedCountry && selectedCity),
+    !all && !(selectedCountry && selectedCity),
   );
 
   const openComments = useCallback((postId: string) => {
@@ -533,7 +541,7 @@ export function Feed() {
         <FeedEmptyState isSelectionReady={Boolean(isSelectionReady)} />
       )}
 
-      {!isSelectionReady ? null : postsQuery.isLoading ? (
+      {!canLoadPosts ? null : postsQuery.isLoading ? (
         <Card className="travel-glass border-white/10 bg-white/[0.055]">
           <CardHeader>
             <CardTitle className="text-white">Загрузка…</CardTitle>

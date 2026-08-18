@@ -112,7 +112,11 @@ export class PostsService {
                 AND (
                   ${wantUnknown}::boolean = true
                   OR ${country ?? null}::text IS NULL
-                  OR ${city ?? null}::text IS NULL
+                  OR (
+                    ${city ?? null}::text IS NULL
+                    AND p.country = ${country ?? null}
+                    AND (p.city IS NULL OR TRIM(p.city) = '')
+                  )
                   OR (p.country = ${country ?? null} AND p.city = ${city ?? null})
                 )
                 AND (
@@ -159,7 +163,11 @@ export class PostsService {
                 AND (
                   ${wantUnknown}::boolean = true
                   OR ${country ?? null}::text IS NULL
-                  OR ${city ?? null}::text IS NULL
+                  OR (
+                    ${city ?? null}::text IS NULL
+                    AND p.country = ${country ?? null}
+                    AND (p.city IS NULL OR TRIM(p.city) = '')
+                  )
                   OR (p.country = ${country ?? null} AND p.city = ${city ?? null})
                 )
                 AND (

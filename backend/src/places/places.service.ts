@@ -7,15 +7,12 @@ type PlaceRow = {
   count: number;
 };
 
+type CityPlace = { city: string; count: number };
+
+type CountryPlace = { country: string; cities: CityPlace[]; count: number };
+
 export type PlacesResponse = {
-  countries: Array<{
-    country: string;
-    cities: Array<{ city: string; count: number }>;
-    count: number;
-  }>;
-  unknown: {
-    count: number;
-  };
+  countries: CountryPlace[];
 };
 
 @Injectable()
@@ -23,7 +20,7 @@ export class PlacesService {
   constructor(private readonly db: DbService) {}
 
   async listPlaces(): Promise<PlacesResponse> {
-    if (!this.db.client) return { countries: [], unknown: { count: 0 } };
+    if (!this.db.client) return { countries: [] };
 
     const rows = await this.db.client<PlaceRow[]>`
       SELECT
@@ -35,35 +32,27 @@ export class PlacesService {
       ORDER BY 1 NULLS LAST, 2 NULLS LAST
     `;
 
-    const countriesMap = new Map<
-      string,
-      {
-        country: string;
-        cities: Array<{ city: string; count: number }>;
-        count: number;
-      }
-    >();
-
-    let unknownCount = 0;
+    const countriesMap = new Map<string, CountryPlace>();
 
     for (const r of rows) {
       const hasCountry = Boolean(r.country);
       const hasCity = Boolean(r.city);
 
-      if (!hasCountry || !hasCity) {
-        unknownCount += r.count ?? 0;
+      if (!hasCountry) {
         continue;
       }
 
       const country = r.country as string;
-      const city = r.city as string;
-
       const existing = countriesMap.get(country) ?? {
         country,
         cities: [],
         count: 0,
       };
-      existing.cities.push({ city, count: r.count });
+
+      if (hasCity) {
+        existing.cities.push({ city: r.city as string, count: r.count });
+      }
+
       existing.count += r.count;
       countriesMap.set(country, existing);
     }
@@ -79,7 +68,6 @@ export class PlacesService {
 
     return {
       countries,
-      unknown: { count: unknownCount },
     };
   }
 }

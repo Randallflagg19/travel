@@ -15,7 +15,6 @@ export type FeedParams = {
   deleteMode: boolean;
   selectedCountry: string;
   selectedCity: string;
-  unknown: boolean;
   all: boolean;
   headerTitle: string;
   isSelectionReady: boolean;
@@ -30,22 +29,17 @@ export function useFeedParams(): FeedParams {
   const deleteMode = searchParams.get("delete") === "1";
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";
-  const unknown = searchParams.get("unknown") === "true";
   const all = searchParams.get("all") === "true";
 
-  const headerTitle = unknown
-    ? "Unknown"
-    : all
-      ? "Все посты"
-      : selectedCountry && selectedCity
-        ? displayPlaceTitle(selectedCountry, selectedCity)
-        : selectedCountry
-          ? displayCountryName(selectedCountry)
+  const headerTitle = all
+    ? "Все посты"
+    : selectedCountry && selectedCity
+      ? displayPlaceTitle(selectedCountry, selectedCity)
+      : selectedCountry
+        ? displayCountryName(selectedCountry)
         : "Tapir Travel";
 
-  const isSelectionReady = Boolean(
-    all || unknown || (selectedCountry && selectedCity),
-  );
+  const isSelectionReady = Boolean(all || selectedCountry);
 
   const setOrder = useCallback(
     (next: FeedOrder) => {
@@ -62,7 +56,6 @@ export function useFeedParams(): FeedParams {
     deleteMode,
     selectedCountry,
     selectedCity,
-    unknown,
     all,
     headerTitle,
     isSelectionReady,

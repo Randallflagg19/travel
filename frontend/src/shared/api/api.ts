@@ -28,7 +28,6 @@ export type PlacesResponse = {
     count: number;
     cities: Array<{ city: string; count: number }>;
   }>;
-  unknown: { count: number };
 };
 
 export type ApiComment = {
@@ -88,7 +87,6 @@ export async function fetchPostsPage(
     order?: "asc" | "desc";
     country?: string;
     city?: string;
-    unknown?: boolean;
   },
   accessToken?: string | null,
 ): Promise<PostsPage> {
@@ -99,7 +97,6 @@ export async function fetchPostsPage(
   if (params.order) search.set("order", params.order);
   if (params.country) search.set("country", params.country);
   if (params.city) search.set("city", params.city);
-  if (params.unknown) search.set("unknown", "true");
 
   const headers: HeadersInit = { "Content-Type": "application/json" };
   if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
@@ -347,4 +344,3 @@ export async function deleteComment(
   }
   return (await res.json()) as { ok: boolean };
 }
-

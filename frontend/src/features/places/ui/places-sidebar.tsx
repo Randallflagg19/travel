@@ -32,7 +32,6 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   const selectedCountry = searchParams.get("country") ?? "";
   const selectedCity = searchParams.get("city") ?? "";
-  const unknown = searchParams.get("unknown") === "true";
   const all = searchParams.get("all") === "true";
 
   const placesQuery = useQuery({
@@ -41,16 +40,14 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
   });
 
   const initialOpen = useMemo(() => {
-    if (unknown) return "";
     return selectedCountry;
-  }, [selectedCountry, unknown]);
+  }, [selectedCountry]);
 
   const [openCountry, setOpenCountry] = useState<string>(initialOpen);
 
   function selectCity(country: string, city: string) {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("all");
-    next.delete("unknown");
     next.set("country", country);
     next.set("city", city);
     router.push(buildUrl(next));
@@ -60,7 +57,6 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
   function selectCountry(country: string) {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("all");
-    next.delete("unknown");
     next.delete("city");
     next.set("country", country);
     router.push(buildUrl(next));
@@ -68,19 +64,8 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
     onNavigate?.();
   }
 
-  function selectUnknown() {
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("all");
-    next.delete("country");
-    next.delete("city");
-    next.set("unknown", "true");
-    router.push(buildUrl(next));
-    onNavigate?.();
-  }
-
   function selectAll() {
     const next = new URLSearchParams(searchParams.toString());
-    next.delete("unknown");
     next.delete("country");
     next.delete("city");
     next.set("all", "true");
@@ -151,22 +136,6 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <Palmtree className="mr-2 size-4" />
           Все посты
         </Button>
-        {Boolean(placesQuery.data?.unknown.count) ? (
-          <Button
-            variant="ghost"
-            className={`mt-1 w-full justify-start rounded-2xl border ${
-              unknown
-                ? "border-amber-300/25 bg-amber-300/15 text-amber-100"
-                : "border-white/10 bg-white/[0.035] text-white/75 hover:bg-white/10 hover:text-white"
-            }`}
-            onClick={selectUnknown}
-          >
-            Unknown
-            <span className="ml-auto text-xs text-white/45">
-              {placesQuery.data?.unknown.count}
-            </span>
-          </Button>
-        ) : null}
       </div>
 
       <Separator className="bg-white/10" />
@@ -188,7 +157,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <div className="space-y-3 px-2">
             {placesQuery.data?.countries.map((c) => {
               const isOpen = openCountry === c.country;
-              const isActiveCountry = !unknown && selectedCountry === c.country;
+              const isActiveCountry = selectedCountry === c.country;
               const opensDirectly = shouldOpenCountryDirectly(c.cities);
               const displayCountry = displayCountryName(c.country);
               const directCity = c.cities[0];
@@ -214,30 +183,23 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     <span className="mr-3 flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">
                       {displayCountry === "Thailand"
                         ? "🏯"
-                        : displayCountry === "Bali"
-                          ? "🌊"
-                          : displayCountry === "China"
-                            ? "🐉"
-                            : "✈️"}
+                        : displayCountry === "China"
+                          ? "🐉"
+                          : "✈️"}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium">
                         {displayCountry}
                       </span>
-                      {opensDirectly && displayCountry === "Bali" ? (
-                        <span className="block text-xs text-white/42">
-                          Остров, море, память
-                        </span>
-                      ) : null}
                     </span>
                     <span className="ml-auto text-xs text-white/45">{c.count}</span>
                   </Button>
 
-                  {isOpen && !opensDirectly ? (
+                  {isOpen && c.cities.length > 1 ? (
                     <div className="ml-5 mt-2 space-y-1 border-l border-white/10 pl-3">
                       {c.cities.map((cc) => {
                         const isActiveCity =
-                          !unknown && selectedCountry === c.country && selectedCity === cc.city;
+                          selectedCountry === c.country && selectedCity === cc.city;
                         return (
                           <Button
                             key={cc.city}

@@ -1,324 +1,34 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   fetchPostsPage,
   fetchPlaces,
   deletePost,
   type ApiPost,
-  type PlacesResponse,
 } from "@/shared/api/api";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { useAuth } from "@/entities/session/model/auth";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
-import { FeedHeader, FeedEmptyState } from "./feed-header";
+import { FeedHeader } from "./feed-header";
 import { FeedPostCard } from "./feed-post-card";
 import { FeedExpandedModal } from "./feed-expanded-modal";
 import { useFeedParams } from "../model/use-feed-params";
 import { useFeedPermissions } from "../model/use-feed-permissions";
 import { useExpandedModalBehavior } from "../model/use-expanded-modal-behavior";
-import { displayCountryName } from "@/features/places/model/place-labels";
+import { FeedHero } from "./feed-hero";
+import { MobileChapters } from "./mobile-chapters";
+import { CitySelection } from "./city-selection";
+import { buildPostsCountryCityFilter } from "../model/posts-query-params";
 
-type MobileChapter = {
-  country: string;
-  city: string | null;
-  label: string;
-  count: number;
-  emoji: string;
-  cityCount: number;
-};
-
-function chapterEmoji(label: string) {
-  if (label === "Bali") return "🌊";
-  if (label === "Thailand") return "🏯";
-  if (label === "China") return "🐉";
-  if (label === "Egypt") return "𓂀";
-  return "✈️";
-}
-
-function pluralizeRu(count: number, forms: [string, string, string]) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return forms[0];
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
-  return forms[2];
-}
-
-function cityCountLabel(count: number) {
-  return `${count} ${pluralizeRu(count, ["город", "города", "городов"])}`;
-}
-
-function frameCountLabel(count: number) {
-  return `${count} ${pluralizeRu(count, ["кадр", "кадра", "кадров"])}`;
-}
-
-function buildMobileChapters(data?: PlacesResponse): MobileChapter[] {
-  return (
-    data?.countries
-      .map((country) => {
-        const cityCount = country.cities.length;
-        const label = displayCountryName(country.country);
-        return {
-          country: country.country,
-          city: cityCount === 1 ? country.cities[0].city : null,
-          label,
-          count: country.count,
-          emoji: chapterEmoji(label),
-          cityCount,
-        };
-      })
-      .filter((chapter): chapter is MobileChapter => Boolean(chapter)) ?? []
-  );
-}
-
-function FeedHero({
-  title,
-  city,
-  postsCount,
-  isSelectionReady,
-}: {
-  title: string;
-  city: string;
-  postsCount: number;
-  isSelectionReady: boolean;
-}) {
-  return (
-    <>
-      <section className="lg:hidden">
-        <div className="travel-card-glow relative aspect-[4/3] overflow-hidden rounded-[2rem] border border-white/10 bg-[#071014]">
-          <Image
-            src="/me.png"
-            alt="Tapir Travel"
-            fill
-            priority
-            className="object-cover object-center"
-            sizes="100vw"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,10,14,0.04)_0%,rgba(5,10,14,0.1)_48%,rgba(5,10,14,0.36)_100%)]" />
-        </div>
-
-        <div className="travel-card-glow relative z-10 -mt-12 rounded-[1.7rem] border border-white/10 bg-[#071014]/88 p-6 backdrop-blur-xl">
-          <p className="font-serif text-xl italic text-amber-200/88">
-            личный журнал дороги
-          </p>
-          <h1 className="mt-2 font-serif text-5xl font-semibold italic leading-none tracking-tight text-amber-100">
-            {title}
-          </h1>
-          <p className="mt-5 text-[1.05rem] leading-relaxed text-white/72">
-            Не отчёт. Просто места и детали, которые хочется помнить.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium uppercase tracking-[0.22em] text-emerald-200/72">
-            <span>
-              {postsCount ? `${postsCount} кадров` : "выбери главу"}
-            </span>
-            {city ? <span>· {city}</span> : null}
-            {!city && !isSelectionReady ? <span>· маршрут 2026</span> : null}
-          </div>
-        </div>
-      </section>
-
-      <section className="travel-card-glow relative hidden overflow-hidden rounded-[2rem] border border-white/10 bg-[#071014] lg:block">
-      <div className="absolute inset-y-0 right-0 hidden w-[58%] overflow-hidden lg:block">
-        <Image
-          src="/me.png"
-          alt="Tapir Travel"
-          fill
-          priority
-          className="object-cover object-center opacity-88"
-          sizes="58vw"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,16,20,0.92)_0%,rgba(7,16,20,0.2)_34%,rgba(7,16,20,0.18)_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_55%_18%,rgba(245,166,76,0.18),transparent_30%)]" />
-      </div>
-      <Image
-        src="/me.png"
-        alt="Tapir Travel"
-        fill
-        priority
-        className="object-cover object-center opacity-35 lg:hidden"
-        sizes="100vw"
-      />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,14,0.98)_0%,rgba(5,10,14,0.9)_42%,rgba(5,10,14,0.3)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(48,196,143,0.22),transparent_34%),radial-gradient(circle_at_84%_30%,rgba(245,166,76,0.16),transparent_30%)]" />
-
-      <div className="relative flex min-h-[330px] items-center px-6 py-10 sm:px-8 lg:px-10">
-        <div className="max-w-3xl">
-          <p className="mb-4 font-serif text-2xl italic text-amber-200/90">
-            личный журнал дороги
-          </p>
-          <h1 className="font-serif text-5xl font-semibold italic tracking-tight text-amber-100 sm:text-6xl lg:text-7xl xl:text-8xl">
-            {title}
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/70 sm:text-xl">
-            Не отчёт и не витрина. Просто места, где я был, странные детали,
-            случайные находки и фотографии, которые потом внезапно оказываются
-            важнее, чем казались.
-          </p>
-          {!isSelectionReady ? (
-            <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
-              выбери главу слева или открой все посты
-            </p>
-          ) : postsCount ? (
-            <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
-              {postsCount} кадров сейчас в ленте
-            </p>
-          ) : city ? (
-            <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
-              {city}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      </section>
-    </>
-  );
-}
-
-function MobileChapters({
-  selectedCountry,
-  places,
-}: {
-  selectedCountry: string;
-  places?: PlacesResponse;
-}) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const chapters = useMemo(() => buildMobileChapters(places), [places]);
-
-  if (chapters.length === 0) return null;
-
-  function selectChapter(chapter: MobileChapter) {
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("all");
-    next.set("country", chapter.country);
-    if (chapter.city) next.set("city", chapter.city);
-    else next.delete("city");
-    router.push(`/?${next.toString()}`);
-  }
-
-  return (
-    <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 lg:hidden [&::-webkit-scrollbar]:hidden">
-      {chapters.map((chapter) => {
-        const active = selectedCountry === chapter.country;
-        return (
-          <button
-            key={`${chapter.country}/${chapter.city ?? "cities"}`}
-            type="button"
-            onClick={() => selectChapter(chapter)}
-            className={`relative h-24 min-w-32 overflow-hidden rounded-3xl border p-3 text-left transition ${
-              active
-                ? "border-emerald-300/70 bg-emerald-300/14 shadow-lg shadow-emerald-950/30"
-                : "border-white/10 bg-white/[0.055]"
-            }`}
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(245,166,76,0.18),transparent_38%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]" />
-            <div className="relative flex h-full flex-col justify-between">
-              <span className="text-2xl">{chapter.emoji}</span>
-              <span>
-                <span className="block font-serif text-xl italic leading-none text-amber-100">
-                  {chapter.label}
-                </span>
-                <span className="mt-1 block text-xs text-white/45">
-                  {chapter.cityCount > 1
-                    ? cityCountLabel(chapter.cityCount)
-                    : frameCountLabel(chapter.count)}
-                </span>
-              </span>
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function CitySelection({
-  selectedCountry,
-  places,
-}: {
-  selectedCountry: string;
-  places?: PlacesResponse;
-}) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const country = places?.countries.find((item) => item.country === selectedCountry);
-
-  if (!selectedCountry) return null;
-
-  if (!places) {
-    return (
-      <Card className="travel-glass border-white/10 bg-white/[0.055]">
-        <CardHeader>
-          <CardTitle className="text-white">Собираю города…</CardTitle>
-          <CardDescription className="text-white/55">
-            Сейчас покажу, куда можно нырнуть внутри страны.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
-  if (!country || country.cities.length <= 1) return null;
-
-  const displayCountry = displayCountryName(selectedCountry);
-
-  function selectCity(city: string) {
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("all");
-    next.set("country", selectedCountry);
-    next.set("city", city);
-    router.push(`/?${next.toString()}`);
-  }
-
-  return (
-    <section className="travel-glass rounded-[1.7rem] border border-white/10 bg-white/[0.055] p-5 sm:p-6">
-      <p className="text-xs font-medium uppercase tracking-[0.28em] text-emerald-200/70">
-        выбери город
-      </p>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="font-serif text-4xl font-semibold italic text-amber-100 sm:text-5xl">
-            {displayCountry}
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/55 sm:text-base">
-            Здесь несколько направлений. Сначала выбери город — и откроется его
-            отдельная лента.
-          </p>
-        </div>
-        <span className="text-sm text-white/45">
-          {cityCountLabel(country.cities.length)} · {frameCountLabel(country.count)}
-        </span>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {country.cities.map((city) => (
-          <button
-            key={city.city}
-            type="button"
-            onClick={() => selectCity(city.city)}
-            className="group rounded-3xl border border-white/10 bg-[#071014]/70 p-4 text-left transition hover:border-emerald-200/35 hover:bg-emerald-300/10"
-          >
-            <span className="text-xs font-medium uppercase tracking-[0.24em] text-white/38">
-              город
-            </span>
-            <span className="mt-2 block text-2xl font-semibold text-white transition group-hover:text-amber-100">
-              {city.city}
-            </span>
-            <span className="mt-2 block text-sm text-white/45">
-              {frameCountLabel(city.count)}
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
+const POSTS_PAGE_LIMIT = 9;
 
 export function Feed() {
-  const limit = 9;
   const queryClient = useQueryClient();
   const auth = useAuth();
   const feedParams = useFeedParams();
@@ -351,27 +61,36 @@ export function Feed() {
   });
 
   const selectedCountryPlace = useMemo(
-    () => placesQuery.data?.countries.find((item) => item.country === selectedCountry),
+    () =>
+      placesQuery.data?.countries.find(
+        (item) => item.country === selectedCountry,
+      ),
     [placesQuery.data, selectedCountry],
   );
-  const hasCountryOnlySelection = Boolean(selectedCountry && !selectedCity && !all);
+
+  const hasCountryOnlySelection = Boolean(
+    selectedCountry && !selectedCity && !all,
+  );
+
   const isCitySelection = Boolean(
     hasCountryOnlySelection &&
-      selectedCountryPlace &&
-      selectedCountryPlace.cities.length > 1,
+    selectedCountryPlace &&
+    selectedCountryPlace.cities.length > 1,
   );
+
   const isCountryFeed = Boolean(
     hasCountryOnlySelection &&
-      selectedCountryPlace &&
-      selectedCountryPlace.cities.length === 0,
+    selectedCountryPlace &&
+    selectedCountryPlace.cities.length === 0,
   );
+
   const canLoadPosts = Boolean(all || selectedCity || isCountryFeed);
 
   const postsQueryKey = useMemo(
     () => [
       "posts",
       {
-        limit,
+        POSTS_PAGE_LIMIT,
         order,
         country: selectedCountry,
         city: selectedCity,
@@ -379,14 +98,7 @@ export function Feed() {
         accessToken: auth.accessToken ?? null,
       },
     ],
-    [
-      limit,
-      order,
-      selectedCountry,
-      selectedCity,
-      all,
-      auth.accessToken,
-    ],
+    [order, selectedCountry, selectedCity, all, auth.accessToken],
   );
 
   const postsQuery = useInfiniteQuery({
@@ -394,16 +106,15 @@ export function Feed() {
     queryFn: ({ pageParam }) =>
       fetchPostsPage(
         {
-          limit,
+          limit: POSTS_PAGE_LIMIT,
           cursor: typeof pageParam === "string" ? pageParam : undefined,
           order,
-          ...(all
-            ? {}
-            : selectedCountry && selectedCity
-              ? { country: selectedCountry, city: selectedCity }
-              : isCountryFeed
-                ? { country: selectedCountry }
-                : {}),
+          ...buildPostsCountryCityFilter({
+            all,
+            selectedCountry,
+            selectedCity,
+            isCountryFeed,
+          }),
         },
         auth.accessToken ?? undefined,
       ),
@@ -474,7 +185,18 @@ export function Feed() {
     (postId: string, liked: boolean, deltaCount: number) => {
       queryClient.setQueryData(
         postsQueryKey,
-        (old: { pages: { items: ApiPost[]; nextCursor: string | null; hasMore: boolean }[]; pageParams: unknown[] } | undefined) => {
+        (
+          old:
+            | {
+                pages: {
+                  items: ApiPost[];
+                  nextCursor: string | null;
+                  hasMore: boolean;
+                }[];
+                pageParams: unknown[];
+              }
+            | undefined,
+        ) => {
           if (!old) return old;
           return {
             ...old,
@@ -497,19 +219,20 @@ export function Feed() {
     [queryClient, postsQueryKey],
   );
 
-  const showPlaceInCard = Boolean(
-    !all && !(selectedCountry && selectedCity),
-  );
+  const showPlaceInCard = Boolean(!all && !(selectedCountry && selectedCity));
 
-  const openComments = useCallback((postId: string) => {
-    if (commentsPostId === postId) {
-      setCommentsPostId(null);
-      return;
-    }
-    const el = postCardRefs.current[postId];
-    if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
-    setTimeout(() => setCommentsPostId(postId), 380);
-  }, [commentsPostId]);
+  const openComments = useCallback(
+    (postId: string) => {
+      if (commentsPostId === postId) {
+        setCommentsPostId(null);
+        return;
+      }
+      const el = postCardRefs.current[postId];
+      if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+      setTimeout(() => setCommentsPostId(postId), 380);
+    },
+    [commentsPostId],
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-5 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">
@@ -537,9 +260,7 @@ export function Feed() {
           selectedCountry={selectedCountry}
           places={placesQuery.data}
         />
-      ) : (
-        <FeedEmptyState isSelectionReady={Boolean(isSelectionReady)} />
-      )}
+      ) : null}
 
       {!canLoadPosts ? null : postsQuery.isLoading ? (
         <Card className="travel-glass border-white/10 bg-white/[0.055]">

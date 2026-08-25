@@ -97,29 +97,50 @@ Render/Vercel.
 - Блокировка background scroll, если она понадобится.
 - Проверка поведения, когда пользователь печатает комментарий и случайно нажимает `Escape`.
 
-Следующий практический шаг выбран: аккуратно раздробить `FeedPostCard` и `PostCommentsBlock`.
+Следующий практический шаг выбран: сделать `Feed` более понятным orchestrator-компонентом.
 
 Цель этапа:
 
 - Улучшить читаемость без изменения поведения.
 - Не начинать большой rewrite feed.
 - Разделить UI-части и orchestration маленькими шагами, чтобы каждый шаг можно было проверить.
+- Не гнаться за числом строк само по себе: файл может быть 300+ строк, если границы ответственности читаются.
 
-Порядок для ручного refactor:
+Что уже вынесли из `Feed`:
 
-1. `PostCommentsBlock`: вынести `DeleteCommentConfirmDialog` в маленький компонент в этом же файле или соседний файл.
-2. `PostCommentsBlock`: вынести список комментариев в `CommentsList`, не меняя query/mutation logic.
-3. `PostCommentsBlock`: вынести форму отправки в `CommentForm`, оставив submit handler во внешнем блоке.
-4. Только после этого решить, выносить ли `formatCommentDate` в `shared/lib/date`.
-5. `FeedPostCard`: вынести media preview в `PostMediaPreview`.
-6. `FeedPostCard`: вынести overlay/actions часть в маленькие компоненты, но пока не трогать like mutation orchestration.
-7. После каждого шага запускать `cd frontend && npx tsc --noEmit` и `cd frontend && npm run lint`.
+- `FeedHero` в отдельный UI-компонент.
+- `MobileChapters` в отдельный UI-компонент.
+- `MobileChapter`, `buildMobileChapters` и label helpers в `features/feed/model`.
+- `CitySelection` в отдельный UI-компонент.
+- `FeedEmptyState` удален как мертвый компонент, который всегда возвращал `null`.
+
+Что стало заметно после UI-extract:
+
+- JSX в `Feed` уже не главная проблема.
+- Основная сложность теперь в orchestration: URL params, places query, posts query, derived selection state, infinite scroll, expanded modal, delete post, optimistic like update, comments open state.
+- Большие тернарники в posts rendering ухудшают читаемость, но это не первая архитектурная боль.
+
+Следующий порядок для ручного refactor:
+
+1. Дать явное имя константе `limit`: например `POSTS_PAGE_LIMIT`.
+2. Разобрать derived selection state рядом одним блоком: `selectedCountryPlace`, `hasCountryOnlySelection`, `isCitySelection`, `isCountryFeed`, `canLoadPosts`.
+3. Вынести расчет параметров posts query в маленькую функцию/model helper, чтобы убрать вложенный ternary из `queryFn`.
+4. Только потом думать о hook extraction для posts query или feed selection state.
+5. Не выносить `updatePostLike` до тех пор, пока не решим границу optimistic updates и `postsQueryKey`.
+
+Следующие UI-only кандидаты после `Feed`:
+
+- `PostCommentsBlock`: вынести список комментариев в `CommentsList`, не меняя query/mutation logic.
+- `PostCommentsBlock`: вынести форму отправки в `CommentForm`, оставив submit handler во внешнем блоке.
+- `FeedPostCard`: вынести media preview в `PostMediaPreview`.
+- `FeedPostCard`: вынести overlay/actions часть в маленькие компоненты, но пока не трогать like mutation orchestration.
 
 Правило этапа:
 
 - Сначала дробим JSX и визуальные куски.
 - Mutation orchestration лайков и comments cache пока не переносим.
 - Если пропсов становится больше, чем было, останавливаемся и обсуждаем границу компонента.
+- После каждого шага запускать `cd frontend && npx tsc --noEmit` и `cd frontend && npm run lint`, плюс smoke-test `Thailand -> Bangkok/Pattaya`.
 
 Кандидаты на потом:
 

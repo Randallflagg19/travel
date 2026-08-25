@@ -24,7 +24,9 @@ export function FeedHeader({
         <span className="text-white/42">Показывать:</span>
         <select
           value={order}
-          onChange={(event) => onOrderChange(event.target.value as "asc" | "desc")}
+          onChange={(event) =>
+            onOrderChange(event.target.value as "asc" | "desc")
+          }
           className="appearance-none bg-transparent pr-7 font-medium text-amber-100 outline-none"
           aria-label="Порядок постов"
         >
@@ -35,13 +37,4 @@ export function FeedHeader({
       </label>
     </header>
   );
-}
-
-type FeedEmptyStateProps = {
-  isSelectionReady: boolean;
-};
-
-export function FeedEmptyState({ isSelectionReady }: FeedEmptyStateProps) {
-  void isSelectionReady;
-  return null;
 }

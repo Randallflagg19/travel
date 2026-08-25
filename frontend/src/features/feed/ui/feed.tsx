@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -20,20 +20,19 @@ import { FeedPostCard } from "./feed-post-card";
 import { FeedExpandedModal } from "./feed-expanded-modal";
 import { useFeedParams } from "../model/use-feed-params";
 import { useFeedPermissions } from "../model/use-feed-permissions";
-import { useExpandedModalBehavior } from "../model/use-expanded-modal-behavior";
 import { FeedHero } from "./feed-hero";
 import { MobileChapters } from "./mobile-chapters";
 import { CitySelection } from "./city-selection";
 import { buildPostsCountryCityFilter } from "../model/posts-query-params";
+import { useFeedSelectionState } from "../model/use-feed-selection-state";
+import { useExpandedPostModal } from "../model/use-expanded-post-modal";
+import { useOpenFeedComments } from "../model/use-open-feed-comments";
 
 const POSTS_PAGE_LIMIT = 9;
 
 export function Feed() {
   const queryClient = useQueryClient();
   const auth = useAuth();
-  const feedParams = useFeedParams();
-  const permissions = useFeedPermissions(auth.user);
-
   const {
     order,
     setOrder,
@@ -43,48 +42,25 @@ export function Feed() {
     all,
     headerTitle,
     isSelectionReady,
-  } = feedParams;
+  } = useFeedParams();
+  const permissions = useFeedPermissions(auth.user);
 
   const { canDelete, canLike, canComment } = permissions;
 
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [expandedVideoSrc, setExpandedVideoSrc] = useState<string | null>(null);
-  const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
-  const postCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const lastVideoTapRef = useRef(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const shouldAutoPlayRef = useRef(false);
+  const { commentsPostId, postCardRefs, openComments } = useOpenFeedComments();
 
   const placesQuery = useQuery({
     queryKey: ["places"],
     queryFn: fetchPlaces,
   });
 
-  const selectedCountryPlace = useMemo(
-    () =>
-      placesQuery.data?.countries.find(
-        (item) => item.country === selectedCountry,
-      ),
-    [placesQuery.data, selectedCountry],
-  );
-
-  const hasCountryOnlySelection = Boolean(
-    selectedCountry && !selectedCity && !all,
-  );
-
-  const isCitySelection = Boolean(
-    hasCountryOnlySelection &&
-    selectedCountryPlace &&
-    selectedCountryPlace.cities.length > 1,
-  );
-
-  const isCountryFeed = Boolean(
-    hasCountryOnlySelection &&
-    selectedCountryPlace &&
-    selectedCountryPlace.cities.length === 0,
-  );
-
-  const canLoadPosts = Boolean(all || selectedCity || isCountryFeed);
+  const { isCitySelection, isCountryFeed, canLoadPosts } =
+    useFeedSelectionState({
+      places: placesQuery.data,
+      selectedCountry,
+      selectedCity,
+      all,
+    });
 
   const postsQueryKey = useMemo(
     () => [
@@ -129,37 +105,19 @@ export function Feed() {
     [postsQuery.data],
   );
 
-  const expandedPost = useMemo(() => {
-    if (!expandedId) return null;
-    return items.find((p) => p.id === expandedId) ?? null;
-  }, [expandedId, items]);
+  const {
+    expandedPost,
+    expandedVideoSrc,
+    videoRef,
+    shouldAutoPlayRef,
+    lastVideoTapRef,
+    openExpanded,
+    closeExpanded,
+  } = useExpandedPostModal(items);
 
   const inViewOptions = useMemo(() => ({ rootMargin: "300px" }), []);
   const { ref: sentinelRef, inView } = useInView<HTMLDivElement>(inViewOptions);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = postsQuery;
-
-  const openExpanded = useCallback(
-    (id: string) => {
-      const post = items.find((p) => p.id === id);
-      setExpandedId(id);
-      if (post?.media_type === "VIDEO") {
-        setExpandedVideoSrc(post.media_url);
-        shouldAutoPlayRef.current = true;
-      } else {
-        setExpandedVideoSrc(null);
-        shouldAutoPlayRef.current = false;
-      }
-    },
-    [items],
-  );
-
-  const closeExpanded = useCallback(() => {
-    setExpandedId(null);
-    setExpandedVideoSrc(null);
-    shouldAutoPlayRef.current = false;
-  }, []);
-
-  useExpandedModalBehavior(Boolean(expandedId), closeExpanded);
 
   useEffect(() => {
     if (!inView) return;
@@ -220,19 +178,6 @@ export function Feed() {
   );
 
   const showPlaceInCard = Boolean(!all && !(selectedCountry && selectedCity));
-
-  const openComments = useCallback(
-    (postId: string) => {
-      if (commentsPostId === postId) {
-        setCommentsPostId(null);
-        return;
-      }
-      const el = postCardRefs.current[postId];
-      if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
-      setTimeout(() => setCommentsPostId(postId), 380);
-    },
-    [commentsPostId],
-  );
 
   return (
     <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-5 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">

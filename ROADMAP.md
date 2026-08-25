@@ -97,7 +97,7 @@ Render/Vercel.
 - Блокировка background scroll, если она понадобится.
 - Проверка поведения, когда пользователь печатает комментарий и случайно нажимает `Escape`.
 
-Следующий практический шаг выбран: сделать `Feed` более понятным orchestrator-компонентом.
+Практический шаг завершен: сделать `Feed` более понятным orchestrator-компонентом.
 
 Цель этапа:
 
@@ -113,27 +113,61 @@ Render/Vercel.
 - `MobileChapter`, `buildMobileChapters` и label helpers в `features/feed/model`.
 - `CitySelection` в отдельный UI-компонент.
 - `FeedEmptyState` удален как мертвый компонент, который всегда возвращал `null`.
+- `POSTS_PAGE_LIMIT` получил явное имя вместо локального `limit`.
+- `buildPostsCountryCityFilter` вынесен в `features/feed/model/posts-query-params.ts`.
+- Derived selection state вынесен в `useFeedSelectionState`.
+- Expanded post modal state/refs/callbacks вынесены в `useExpandedPostModal`.
+- Comments opening state/refs/callback вынесены в `useOpenFeedComments`.
+- Hero image заменен на более живую travel-заставку.
 
 Что стало заметно после UI-extract:
 
 - JSX в `Feed` уже не главная проблема.
 - Основная сложность теперь в orchestration: URL params, places query, posts query, derived selection state, infinite scroll, expanded modal, delete post, optimistic like update, comments open state.
 - Большие тернарники в posts rendering ухудшают читаемость, но это не первая архитектурная боль.
+- Появился обратный риск: файлов стало больше, а часть компонентов содержит мало собственной логики. Это может улучшать локальную читаемость, но ухудшать навигацию по проекту.
+- Простое правило "один видимый кусок JSX = отдельный файл" здесь не подходит. Нужны более крупные смысловые границы.
 
-Следующий порядок для ручного refactor:
+Вывод по `Feed`:
 
-1. Дать явное имя константе `limit`: например `POSTS_PAGE_LIMIT`.
-2. Разобрать derived selection state рядом одним блоком: `selectedCountryPlace`, `hasCountryOnlySelection`, `isCitySelection`, `isCountryFeed`, `canLoadPosts`.
-3. Вынести расчет параметров posts query в маленькую функцию/model helper, чтобы убрать вложенный ternary из `queryFn`.
-4. Только потом думать о hook extraction для posts query или feed selection state.
-5. Не выносить `updatePostLike` до тех пор, пока не решим границу optimistic updates и `postsQueryKey`.
+- Дальше не стоит просто дробить `Feed` на еще больше мелких UI-файлов.
+- Более полезно выделять смысловые orchestration-куски: posts query, feed selection state, expanded modal behavior, comments open behavior.
+- Для UI-компонентов лучше держать баланс: если компонент только прокидывает 2-3 props и не дает имени важной идее, возможно, он не нужен отдельным файлом.
+- `FeedHero`, `MobileChapters` и `CitySelection` пока оправданы: это крупные визуальные блоки с понятной ролью.
+- Следующий refactor должен либо уменьшать mental load в `Feed`, либо убирать реально повторяющуюся/сложную логику. Само уменьшение числа строк больше не цель.
+- Останавливаемся на текущем компромиссе: `Feed` остается orchestrator-компонентом, а не превращается в набор мелких wrapper-файлов.
 
-Следующие UI-only кандидаты после `Feed`:
+Что сделали в ручном refactor:
+
+- Дали явное имя константе `POSTS_PAGE_LIMIT`.
+- Вынесли расчет country/city фильтра posts query.
+- Вынесли derived selection state.
+- Вынесли expanded modal behavior.
+- Вынесли comments opening behavior.
+- Проверили руками: выбор `Thailand -> Bangkok/Pattaya`, comments add/delete, modal overlay, hero image.
+
+Следующий практический шаг выбран: `FeedPostCard`.
+
+Почему именно он:
+
+- `FeedPostCard` получает слишком много props.
+- Внутри смешаны media preview, overlay/actions, delete post UI, like mutation orchestration, comments toggle и place/text rendering.
+- Like flow уже разобран, поэтому можно рефакторить осторожно и понимать, что нельзя сломать.
+- Главный вопрос этапа: должна ли карточка сама orchestrate like mutation, или она должна стать более чистым UI-компонентом?
+
+Порядок для следующей сессии:
+
+1. Сначала перечитать `FeedPostCard` и перечислить его ответственности.
+2. Не писать код сразу: выбрать одну границу.
+3. Самый безопасный UI-only кандидат: вынести media preview в `PostMediaPreview`.
+4. Не трогать optimistic like/cache flow до отдельного обсуждения.
+5. Если группируем props, делать это только когда группа отражает реальную идею, а не просто прячет длинный список.
+
+Кандидаты на потом:
 
 - `PostCommentsBlock`: вынести список комментариев в `CommentsList`, не меняя query/mutation logic.
 - `PostCommentsBlock`: вынести форму отправки в `CommentForm`, оставив submit handler во внешнем блоке.
-- `FeedPostCard`: вынести media preview в `PostMediaPreview`.
-- `FeedPostCard`: вынести overlay/actions часть в маленькие компоненты, но пока не трогать like mutation orchestration.
+- `Feed`: отдельно разобрать posts query / delete post / optimistic update hooks, если `Feed` снова начнет разрастаться.
 
 Правило этапа:
 
@@ -142,9 +176,6 @@ Render/Vercel.
 - Если пропсов становится больше, чем было, останавливаемся и обсуждаем границу компонента.
 - После каждого шага запускать `cd frontend && npx tsc --noEmit` и `cd frontend && npm run lint`, плюс smoke-test `Thailand -> Bangkok/Pattaya`.
 
-Кандидаты на потом:
-
-- Учебно разобрать `FeedPostCard`, где сейчас смешаны UI и mutation orchestration.
 - Разобрать upload flow, потому что права admin и country/city metadata влияют на будущую модель данных.
 
 ## Уже разобрано

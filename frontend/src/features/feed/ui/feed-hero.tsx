@@ -77,21 +77,13 @@ export function FeedHero({
               {title}
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/70 sm:text-xl">
-              Не отчёт и не витрина. Просто места, где я был, странные детали,
-              случайные находки и фотографии, которые потом внезапно оказываются
-              важнее, чем казались.
+              Места, в которых я оказался. Люди, которых встретил. Странные
+              детали, случайные находки и фотографии, которые захотелось
+              оставить себе.
             </p>
             {!isSelectionReady ? (
               <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
-                выбери главу слева или открой все посты
-              </p>
-            ) : postsCount ? (
-              <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
-                {postsCount} кадров сейчас в ленте
-              </p>
-            ) : city ? (
-              <p className="mt-5 text-sm font-medium uppercase tracking-[0.26em] text-emerald-200/70">
-                {city}
+                Выбери главу слева или открой все посты
               </p>
             ) : null}
           </div>

@@ -1,19 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Heart, MapPin, MessageSquare, Play, Trash2 } from "lucide-react";
+import { Heart, MapPin, MessageSquare, Trash2 } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
 import { likePost, unlikePost } from "@/shared/api/api";
-import {
-  cloudinaryFullUrl,
-  cloudinaryThumbUrl,
-  cloudinaryVideoPosterUrl,
-} from "@/shared/lib/cloudinary";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PostCommentsBlock } from "./post-comments-block";
 import { displayPlaceTitle } from "@/features/places/model/place-labels";
+import { PostMediaPreview } from "./post-media-preview";
 
 type FeedPostCardProps = {
   post: ApiPost;
@@ -32,13 +27,6 @@ type FeedPostCardProps = {
   onOpenComments: (postId: string) => void;
   onCommentAdded?: () => void;
 };
-
-function preloadExpandedMedia(post: ApiPost) {
-  if (post.media_type !== "PHOTO") return;
-  if (typeof window === "undefined") return;
-  const img = new window.Image();
-  img.src = cloudinaryFullUrl(post.media_url, post.media_type);
-}
 
 export function FeedPostCard({
   post: p,
@@ -101,66 +89,7 @@ export function FeedPostCard({
         </button>
       ) : null}
       <CardContent className="p-0">
-        {p.media_type === "VIDEO" ? (
-          <button
-            type="button"
-            className="relative block w-full cursor-zoom-in overflow-hidden"
-            onClick={() => onOpen(p.id)}
-            aria-label="Открыть видео"
-          >
-            {p.cloudinary_public_id ? (
-              <Image
-                className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
-                alt={p.text ?? "travel video"}
-                src={
-                  cloudinaryVideoPosterUrl(
-                    p.media_url,
-                    p.cloudinary_public_id,
-                    {
-                      width: 600,
-                    },
-                  ) ?? cloudinaryThumbUrl(p.media_url, p.media_type)
-                }
-                width={720}
-                height={540}
-                sizes="(max-width: 768px) 100vw, 720px"
-                unoptimized
-              />
-            ) : (
-              <video
-                className="pointer-events-none aspect-[4/3] w-full object-cover"
-                playsInline
-                muted
-                preload="metadata"
-                src={p.media_url}
-              />
-            )}
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/30 backdrop-blur transition duration-300 group-hover:scale-110">
-                <Play className="ml-0.5 size-6 fill-white" />
-              </div>
-            </div>
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="block w-full cursor-zoom-in overflow-hidden"
-            onClick={() => onOpen(p.id)}
-            onFocus={() => preloadExpandedMedia(p)}
-            onPointerEnter={() => preloadExpandedMedia(p)}
-            onPointerDown={() => preloadExpandedMedia(p)}
-          >
-            <Image
-              className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
-              alt={p.text ?? "travel media"}
-              src={cloudinaryThumbUrl(p.media_url, p.media_type)}
-              width={720}
-              height={540}
-              sizes="(max-width: 768px) 100vw, 720px"
-              unoptimized
-            />
-          </button>
-        )}
+        <PostMediaPreview post={p} onOpen={onOpen} />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/55 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/84 via-black/42 to-transparent" />

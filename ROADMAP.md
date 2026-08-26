@@ -155,6 +155,15 @@ Render/Vercel.
 - Like flow уже разобран, поэтому можно рефакторить осторожно и понимать, что нельзя сломать.
 - Главный вопрос этапа: должна ли карточка сама orchestrate like mutation, или она должна стать более чистым UI-компонентом?
 
+Текущие ответственности `FeedPostCard`:
+
+1. Root card shell: внешний `Card`, hover/overflow/visual container.
+2. Delete post UI: кнопка удаления поста в `deleteMode`.
+3. Media preview: выбор video/photo preview, Cloudinary urls, play overlay, preload full photo.
+4. Visual overlay: top/bottom gradients и badge `PHOTO`/`VIDEO`.
+5. Post info/actions: text, place/coords, like button, comments button.
+6. Comments slot: условный рендер `PostCommentsBlock`.
+
 Порядок для следующей сессии:
 
 1. Сначала перечитать `FeedPostCard` и перечислить его ответственности.
@@ -162,6 +171,14 @@ Render/Vercel.
 3. Самый безопасный UI-only кандидат: вынести media preview в `PostMediaPreview`.
 4. Не трогать optimistic like/cache flow до отдельного обсуждения.
 5. Если группируем props, делать это только когда группа отражает реальную идею, а не просто прячет длинный список.
+
+Первый выбранный extract:
+
+- Создать `features/feed/ui/post-media-preview.tsx`.
+- Вынести туда video/photo branch из `FeedPostCard`.
+- Оставить root `Card`, delete post button, overlays/actions и comments slot в `FeedPostCard`.
+- Props нового компонента держать минимальными: `post` и `onOpen`.
+- `preloadExpandedMedia` переезжает вместе с media preview, потому что относится к поведению preview.
 
 Кандидаты на потом:
 

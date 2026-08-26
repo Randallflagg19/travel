@@ -1,14 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Heart, MapPin, MessageSquare, Trash2 } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
-import { likePost, unlikePost } from "@/shared/api/api";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PostCommentsBlock } from "./post-comments-block";
 import { displayPlaceTitle } from "@/features/places/model/place-labels";
 import { PostMediaPreview } from "./post-media-preview";
+import { usePostLikeToggle } from "../model/use-post-like-toggle";
 
 type FeedPostCardProps = {
   post: ApiPost;
@@ -29,7 +27,7 @@ type FeedPostCardProps = {
 };
 
 export function FeedPostCard({
-  post: p,
+  post,
   deleteMode,
   canDelete,
   onDelete,
@@ -45,31 +43,21 @@ export function FeedPostCard({
   onOpenComments,
   onCommentAdded,
 }: FeedPostCardProps) {
-  const router = useRouter();
-  const [likePending, setLikePending] = useState(false);
-  const liked = Boolean(p.liked_by_me);
+  const liked = Boolean(post.liked_by_me);
+
+  const { likePending, toggleLike } = usePostLikeToggle({
+    canLike,
+    accessToken,
+    onLikeToggled,
+    onLikeSuccess,
+    liked,
+    post,
+  });
 
   async function handleLikeClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (likePending) return;
-    if (!canLike || !accessToken) {
-      router.push("/login");
-      return;
-    }
-    const nextLiked = !liked;
-    const delta = nextLiked ? 1 : -1;
-    onLikeToggled(p.id, nextLiked, delta);
-    setLikePending(true);
-    try {
-      if (nextLiked) await likePost(accessToken, p.id);
-      else await unlikePost(accessToken, p.id);
-      onLikeSuccess?.();
-    } catch {
-      onLikeToggled(p.id, liked, -delta);
-    } finally {
-      setLikePending(false);
-    }
+    toggleLike();
   }
 
   return (
@@ -81,7 +69,7 @@ export function FeedPostCard({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onDelete(p.id);
+            onDelete(post.id);
           }}
           aria-label="Удалить пост"
         >
@@ -89,32 +77,35 @@ export function FeedPostCard({
         </button>
       ) : null}
       <CardContent className="p-0">
-        <PostMediaPreview post={p} onOpen={onOpen} />
+        <PostMediaPreview post={post} onOpen={onOpen} />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/55 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/84 via-black/42 to-transparent" />
 
         <div className="absolute left-4 top-4 rounded-xl bg-black/55 px-3 py-1 text-[11px] font-semibold tracking-wide text-white ring-1 ring-white/15 backdrop-blur">
-          {p.media_type === "VIDEO" ? "VIDEO" : "PHOTO"}
+          {post.media_type === "VIDEO" ? "VIDEO" : "PHOTO"}
         </div>
 
         <div className="absolute inset-x-0 bottom-0 space-y-3 p-4 text-white">
           <div>
-            {p.text ? (
+            {post.text ? (
               <h3 className="line-clamp-2 text-lg font-medium leading-tight">
-                {p.text}
+                {post.text}
               </h3>
             ) : null}
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/58">
-              {showPlaceInCard && (p.country || p.city) ? (
+              {showPlaceInCard && (post.country || post.city) ? (
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="size-3" />
-                  {displayPlaceTitle(p.country ?? "Unknown", p.city ?? "")}
+                  {displayPlaceTitle(
+                    post.country ?? "Unknown",
+                    post.city ?? "",
+                  )}
                 </span>
               ) : null}
-              {p.lat != null && p.lng != null ? (
+              {post.lat != null && post.lng != null ? (
                 <span>
-                  {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
+                  {post.lat.toFixed(4)}, {post.lng.toFixed(4)}
                 </span>
               ) : null}
             </div>
@@ -131,20 +122,20 @@ export function FeedPostCard({
               <Heart
                 className={`size-4 ${liked ? "fill-red-400 text-red-400" : ""}`}
               />
-              <span>{p.like_count}</span>
+              <span>{post.like_count}</span>
             </button>
             <button
               type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                onOpenComments(p.id);
+                onOpenComments(post.id);
               }}
               className="relative z-10 flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 transition hover:bg-white/16"
               aria-label="Комментарии"
             >
               <MessageSquare className="size-4" />
-              <span>{p.comment_count}</span>
+              <span>{post.comment_count}</span>
             </button>
           </div>
         </div>
@@ -152,7 +143,7 @@ export function FeedPostCard({
         {isCommentsOpen ? (
           <div className="relative z-20 border-t border-white/10 bg-[#081117] p-4">
             <PostCommentsBlock
-              postId={p.id}
+              postId={post.id}
               canComment={canComment}
               currentUserId={currentUserId}
               accessToken={accessToken}

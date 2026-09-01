@@ -54,8 +54,7 @@ export class CommentsService {
       SELECT user_id FROM comments WHERE id = ${commentId}::uuid
     `;
     const comment = rows[0];
-    if (!comment)
-      throw new BadRequestException('Comment not found');
+    if (!comment) throw new BadRequestException('Comment not found');
     if (comment.user_id !== userId)
       throw new ForbiddenException('You can only delete your own comment');
     await this.db.client`

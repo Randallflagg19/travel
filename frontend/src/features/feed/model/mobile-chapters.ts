@@ -1,5 +1,8 @@
 import type { PlacesResponse } from "@/shared/api/api";
-import { displayCountryName } from "@/features/places/model/place-labels";
+import {
+  displayCountryIcon,
+  displayCountryName,
+} from "@/features/places/model/place-labels";
 export type MobileChapter = {
   country: string;
   city: string | null;
@@ -8,14 +11,6 @@ export type MobileChapter = {
   emoji: string;
   cityCount: number;
 };
-
-export function chapterEmoji(label: string) {
-  if (label === "Bali") return "🌊";
-  if (label === "Thailand") return "🏯";
-  if (label === "China") return "🐉";
-  if (label === "Egypt") return "𓂀";
-  return "✈️";
-}
 
 export function buildMobileChapters(data?: PlacesResponse): MobileChapter[] {
   return (
@@ -27,7 +22,7 @@ export function buildMobileChapters(data?: PlacesResponse): MobileChapter[] {
         city: cityCount === 1 ? country.cities[0].city : null,
         label,
         count: country.count,
-        emoji: chapterEmoji(label),
+        emoji: displayCountryIcon(label),
         cityCount,
       };
     }) ?? []

@@ -12,6 +12,7 @@ import { Separator } from "@/shared/ui/separator";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Button } from "@/shared/ui/button";
 import {
+  displayCountryIcon,
   displayCountryName,
   shouldOpenCountryDirectly,
 } from "@/features/places/model/place-labels";
@@ -181,11 +182,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     }}
                   >
                     <span className="mr-3 flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">
-                      {displayCountry === "Thailand"
-                        ? "🏯"
-                        : displayCountry === "China"
-                          ? "🐉"
-                          : "✈️"}
+                      {displayCountryIcon(displayCountry)}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium">

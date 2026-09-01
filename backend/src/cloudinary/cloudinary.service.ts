@@ -173,15 +173,19 @@ export class CloudinaryService {
       );
     }
 
-    const timestamp = Math.floor(Date.now() / 1000);
-
     const input = paramsToSign ?? {};
+    const inputTimestamp = input.timestamp;
+    const timestamp =
+      typeof inputTimestamp === 'number' || typeof inputTimestamp === 'string'
+        ? String(inputTimestamp)
+        : String(Math.floor(Date.now() / 1000));
+
     // Cloudinary signature: sort params, join "k=v" with "&", append api_secret, sha1.
     const entries: Array<[string, string]> = [];
     for (const [k, v] of Object.entries(input)) {
       if (v === null || v === undefined) continue;
       if (k === 'file' || k === 'signature' || k === 'api_key') continue;
-      if (k === 'timestamp') continue; // server will set
+      if (k === 'timestamp') continue;
       const s =
         typeof v === 'string'
           ? v
@@ -191,7 +195,7 @@ export class CloudinaryService {
       if (!s.trim()) continue;
       entries.push([k, s]);
     }
-    entries.push(['timestamp', String(timestamp)]);
+    entries.push(['timestamp', timestamp]);
     entries.sort((a, b) => a[0].localeCompare(b[0]));
 
     const toSign = entries.map(([k, v]) => `${k}=${v}`).join('&');
@@ -199,7 +203,7 @@ export class CloudinaryService {
       .update(`${toSign}${this.apiSecret}`, 'utf8')
       .digest('hex');
 
-    return { signature, timestamp };
+    return { signature, timestamp: Number(timestamp) };
   }
 
   /** Delete asset from Cloudinary by public_id. resourceType: 'image' | 'video' | 'raw'. */

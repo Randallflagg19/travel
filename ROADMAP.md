@@ -68,7 +68,7 @@
 ```bash
 date
 curl -sS -o /dev/null -w "places: %{time_total}s\n" https://travel-313c.onrender.com/places
-curl -sS -o /dev/null -w "posts: %{time_total}s\n" "https://travel-313c.onrender.com/posts?limit=9&order=desc"
+curl -sS -o /dev/null -w "posts: %{time_total}s\n" "https://travel-313c.onrender.com/api/posts?limit=9&order=desc"
 ```
 
 Правило проверки:
@@ -89,6 +89,14 @@ curl -sS -o /dev/null -w "posts: %{time_total}s\n" "https://travel-313c.onrender
   расследованием.
 - UI/performance polishing: INP, skeleton states, modal accessibility и визуальные
   детали, но после понимания причины первой загрузки.
+- Data correction/admin tooling: уметь менять `country/city/folder` у уже созданного
+  post, чтобы исправлять случаи вроде ролика, который должен быть в `Indonesia / Bali`,
+  но в базе числится как `Thailand / Bangkok`.
+- API/frontend orchestration cleanup: `frontend/src/shared/api/api.ts` стал большим
+  файлом всех запросов сразу, а часть mutation orchestration (`deletePost`,
+  optimistic like update, upload success -> createPost) живет слишком близко к UI.
+- Upload reliability: Cloudinary signed upload должен подписывать ровно те параметры,
+  которые виджет отправляет в `paramsToSign`, включая timestamp виджета.
 
 ## Завершенные практические шаги
 
@@ -343,12 +351,47 @@ type FeedSelection =
 
 `Upload button -> auth/session -> current URL context -> Cloudinary config/signature -> widget success -> createPost -> backend`
 
+Текущее понимание:
+
+- Cloudinary хранит сами файлы.
+- Backend/database хранит post record: `country`, `city`, `folder`, `media_url`,
+  `cloudinary_public_id`, counters и остальную модель приложения.
+- Frontend строит ленту из backend API, а не из структуры папок Cloudinary.
+- Upload через приложение идет по цепочке `frontend -> backend -> Cloudinary ->
+  backend/database -> frontend cache invalidation`.
+- Сейчас после успешного upload post создается, но UI может не обновиться сразу:
+  нужно явно инвалидировать/refetch `posts` и `places` queries после `createPost`, чтобы
+  новая карточка и счетчики появились без ручного refresh.
+- Delete через приложение идет по цепочке `frontend -> backend`, а backend удаляет
+  запись из базы и asset из Cloudinary.
+- Ручной move/delete в Cloudinary не уведомляет backend. Post record в базе не меняется,
+  поэтому карточка может остаться в ленте. Медиа может временно продолжать открываться
+  из-за browser/CDN cache, даже если asset уже удален или перемещен в Cloudinary UI.
+- Папка Cloudinary не является источником правды для географии поста. Источник правды:
+  `country/city/folder` в базе.
+- `cloudinary_public_id` у текущих записей хранится без папки, а `folder` хранится
+  отдельным полем. Поэтому перенос asset между Cloudinary folders сам по себе не
+  меняет `country/city/folder` у post record.
+- Invalid Signature на signed upload был связан с подписью: Cloudinary widget присылает
+  `paramsToSign`, включая свой `timestamp`, и backend должен подписывать именно этот
+  набор параметров. Если backend генерирует новый timestamp, строка подписи не совпадает.
+- После исправления подписи video upload в `Indonesia / Bali` проходит: asset появился
+  в Cloudinary, post появился во frontend после refresh/догрузки.
+- Отдельную фичу `move post location` пока не делаем: для единичных ошибок проще
+  удалить/перезалить или вручную исправить запись в базе.
+
+Следующий практический шаг:
+
+- Исправить upload UX/cache: после успешного `createPost` сразу обновлять `posts` и
+  `places`, чтобы новая карточка и счетчики появлялись без ручного refresh.
+
 Файлы:
 
 - `frontend/src/features/upload/ui/cloudinary-upload-button.tsx`
 - `frontend/src/shared/api/api.ts`
 - `backend/src/cloudinary/cloudinary.controller.ts`
 - `backend/src/posts/posts.controller.ts`
+- `backend/src/posts/posts.service.ts`
 
 Вопросы:
 
@@ -359,8 +402,35 @@ type FeedSelection =
 - Upload обновляет или инвалидирует feed/places cache после создания post?
 - Как upload должен вести себя в состоянии `country-needs-city`?
 - Как upload должен поддерживать country-level destinations без риска создать post в стране, где нужно выбрать город?
+- После `createPost` в upload callback добавить TanStack invalidation/refetch для
+  `posts` и `places`.
 - Отдельно проверить delete media flow: при удалении поста удаляется ли файл из
   Cloudinary или только запись из базы/ленты.
+- Нужна ли admin-фича `move post` / `edit post location`, которая меняет `country`,
+  `city`, `folder` в базе и, опционально, синхронизирует расположение asset в Cloudinary?
+- Для текущего кейса с роликом: быстрый ручной путь — удалить post через приложение и
+  заново загрузить в правильный раздел. Правильный продуктовый путь — сделать backend
+  endpoint для изменения места существующего post, но сейчас это не оправдывает
+  сложность.
+- Еще один быстрый ручной путь для единичной правки: изменить строку `posts` в базе
+  (`country`, `city`, `folder`) по `id` post. Это исправляет ленту и places counts, но
+  требует аккуратно найти правильный `id`.
+
+Технические запахи, которые заметили по пути:
+
+- `frontend/src/shared/api/api.ts` содержит слишком много доменов сразу: posts, likes,
+  comments, auth, upload/cloudinary.
+- `frontend/src/features/upload/ui/cloudinary-upload-button.tsx` выглядит как UI-компонент,
+  но внутри содержит сценарий загрузки, подписи Cloudinary widget и создания post.
+- `frontend/src/features/feed/ui/feed.tsx` все еще содержит mutation orchestration:
+  `handleDeletePost` и cache invalidation.
+- `updatePostLike` в `Feed` управляет TanStack cache и выглядит как отдельная model/helper
+  ответственность, хотя переносить это стоит только отдельным шагом.
+- `CloudinaryUploadButton` строит folder из `auth.user.username`; если username отличается
+  регистром (`Tapir` вместо `tapir`), Cloudinary может создать параллельную папку. Нужно
+  решить, нормализуем ли root folder к lowercase или храним явный `cloudinaryRoot`.
+- Invalid Signature при upload: backend не должен генерировать новый timestamp для
+  function signature, а должен использовать timestamp из Cloudinary widget params.
 
 ### Comments flow
 

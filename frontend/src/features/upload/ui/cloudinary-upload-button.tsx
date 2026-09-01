@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { adminCloudinaryConfig, adminCloudinarySignUpload, createPost } from "@/shared/api/api";
@@ -52,9 +53,11 @@ function pickMediaType(resourceType: string | undefined, format: string | undefi
 
 export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant?: "default" | "secondary" | "ghost" }) {
   const auth = useAuth();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
   const widgetRef = useRef<{ open: () => void } | null>(null);
+  const widgetFolderRef = useRef<string | null>(null);
 
   const ctx = useMemo(() => {
     const country = searchParams.get("country") ?? "";
@@ -79,7 +82,7 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
         ? `${root}/${ctx.country}/${ctx.city}`
         : `${root}/all`;
 
-      if (!widgetRef.current) {
+      if (!widgetRef.current || widgetFolderRef.current !== folder) {
         const widget = window.cloudinary?.createUploadWidget(
           {
             cloudName,
@@ -97,6 +100,10 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
             },
           },
           async (_error: unknown, result: unknown) => {
+            if (_error) {
+              setBusy(false);
+              return;
+            }
             const r = result as {
               event?: string;
               info?: {
@@ -107,6 +114,9 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
                 folder?: string;
               };
             };
+            if (r.event === "display-changed" || r.event === "close") {
+              setBusy(false);
+            }
             if (r.event !== "success" || !r.info) return;
             const info = r.info;
             const mediaUrl = (info.secure_url ?? "").trim();
@@ -122,16 +132,25 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
                 country: ctx.country && ctx.city ? ctx.country : undefined,
                 city: ctx.country && ctx.city ? ctx.city : undefined,
               });
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["posts"] }),
+                queryClient.invalidateQueries({ queryKey: ["places"] }),
+              ]);
             } catch (e) {
               console.error("createPost failed", e);
             }
           },
         );
         widgetRef.current = widget ?? null;
+        widgetFolderRef.current = widget ? folder : null;
       }
 
       widgetRef.current?.open();
-    } finally {
+      if (!widgetRef.current) {
+        setBusy(false);
+      }
+    } catch (e) {
+      console.error("Cloudinary upload widget failed to open", e);
       setBusy(false);
     }
   }

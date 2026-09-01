@@ -384,6 +384,11 @@ type FeedSelection =
 
 - Исправить upload UX/cache: после успешного `createPost` сразу обновлять `posts` и
   `places`, чтобы новая карточка и счетчики появлялись без ручного refresh.
+- Исправить состояние кнопки Upload: `busy` не должен сбрасываться сразу после
+  `widget.open()`, потому что Cloudinary widget открывается не синхронно. Сбрасывать
+  состояние нужно по событию widget (`display-changed`, `close`, error).
+- При смене выбранного раздела пересоздавать Cloudinary widget для нового `folder`, иначе
+  уже созданный widget может продолжить грузить в старую папку.
 
 Файлы:
 
@@ -404,6 +409,8 @@ type FeedSelection =
 - Как upload должен поддерживать country-level destinations без риска создать post в стране, где нужно выбрать город?
 - После `createPost` в upload callback добавить TanStack invalidation/refetch для
   `posts` и `places`.
+- После клика Upload держать кнопку в состоянии подготовки до фактического открытия
+  Cloudinary widget, а не только до вызова `open()`.
 - Отдельно проверить delete media flow: при удалении поста удаляется ли файл из
   Cloudinary или только запись из базы/ленты.
 - Нужна ли admin-фича `move post` / `edit post location`, которая меняет `country`,

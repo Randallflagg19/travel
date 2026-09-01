@@ -10,13 +10,31 @@ import {
 export function MobileChapters({
   selectedCountry,
   places,
+  isLoading,
 }: {
   selectedCountry: string;
   places?: PlacesResponse;
+  isLoading?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const chapters = useMemo(() => buildMobileChapters(places), [places]);
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-3 gap-3 lg:hidden" aria-label="Загрузка глав">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-28 rounded-3xl border border-white/10 bg-white/[0.055] p-3"
+          >
+            <div className="size-9 animate-pulse rounded-2xl bg-white/10" />
+            <div className="mt-6 h-4 w-16 animate-pulse rounded-full bg-white/10" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (chapters.length === 0) return null;
 
@@ -30,7 +48,7 @@ export function MobileChapters({
   }
 
   return (
-    <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 lg:hidden [&::-webkit-scrollbar]:hidden">
+    <div className="grid grid-cols-3 gap-3 lg:hidden">
       {chapters.map((chapter) => {
         const active = selectedCountry === chapter.country;
         return (
@@ -38,7 +56,7 @@ export function MobileChapters({
             key={`${chapter.country}/${chapter.city ?? "cities"}`}
             type="button"
             onClick={() => selectChapter(chapter)}
-            className={`relative h-24 min-w-32 overflow-hidden rounded-3xl border p-3 text-left transition ${
+            className={`relative h-28 min-w-0 overflow-hidden rounded-3xl border p-3 text-left transition ${
               active
                 ? "border-emerald-300/70 bg-emerald-300/14 shadow-lg shadow-emerald-950/30"
                 : "border-white/10 bg-white/[0.055]"
@@ -48,10 +66,10 @@ export function MobileChapters({
             <div className="relative flex h-full flex-col justify-between">
               <span className="text-2xl">{chapter.emoji}</span>
               <span>
-                <span className="block font-serif text-xl italic leading-none text-amber-100">
+                <span className="block truncate font-serif text-lg italic leading-none text-amber-100">
                   {chapter.label}
                 </span>
-                <span className="mt-1 block text-xs text-white/45">
+                <span className="mt-1 block truncate text-[11px] text-white/45">
                   {chapter.cityCount > 1
                     ? cityCountLabel(chapter.cityCount)
                     : frameCountLabel(chapter.count)}

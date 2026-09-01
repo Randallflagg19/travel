@@ -23,6 +23,7 @@ import { useFeedPermissions } from "../model/use-feed-permissions";
 import { FeedHero } from "./feed-hero";
 import { MobileChapters } from "./mobile-chapters";
 import { CitySelection } from "./city-selection";
+import { FeedServerLoadingNotice } from "./feed-server-loading-notice";
 import { buildPostsCountryCityFilter } from "../model/posts-query-params";
 import { useFeedSelectionState } from "../model/use-feed-selection-state";
 import { useExpandedPostModal } from "../model/use-expanded-post-modal";
@@ -178,6 +179,7 @@ export function Feed() {
   );
 
   const showPlaceInCard = Boolean(!all && !(selectedCountry && selectedCity));
+  const isInitialPostsLoading = Boolean(canLoadPosts && postsQuery.isLoading);
 
   return (
     <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-5 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">
@@ -188,9 +190,15 @@ export function Feed() {
         isSelectionReady={Boolean(isSelectionReady)}
       />
 
+      <FeedServerLoadingNotice
+        isPlacesLoading={placesQuery.isLoading}
+        isPostsLoading={isInitialPostsLoading}
+      />
+
       <MobileChapters
         selectedCountry={selectedCountry}
         places={placesQuery.data}
+        isLoading={placesQuery.isLoading}
       />
 
       <FeedHeader
@@ -207,16 +215,7 @@ export function Feed() {
         />
       ) : null}
 
-      {!canLoadPosts ? null : postsQuery.isLoading ? (
-        <Card className="travel-glass border-white/10 bg-white/[0.055]">
-          <CardHeader>
-            <CardTitle className="text-white">Загрузка…</CardTitle>
-            <CardDescription className="text-white/55">
-              Тянем первую страницу постов.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : postsQuery.isError ? (
+      {!canLoadPosts ? null : postsQuery.isLoading ? null : postsQuery.isError ? (
         <Card className="travel-glass border-white/10 bg-white/[0.055]">
           <CardHeader>
             <CardTitle className="text-white">Ошибка</CardTitle>

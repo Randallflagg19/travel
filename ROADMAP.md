@@ -18,7 +18,81 @@
 
 ## Текущий фокус
 
-Последний практический шаг: нормализовать backend contract для places/posts.
+Текущий практический фокус: сделать первую загрузку понятной для пользователя и
+улучшить мобильную навигацию по местам.
+
+Почему это следующий фокус:
+
+- Render Free cold start, скорее всего, не проблема кода, а свойство инфраструктуры.
+- Пользователь не должен смотреть на hero и гадать, живо ли приложение: нужно явно
+  показывать, что лента и места загружаются с сервера.
+- Сейчас на мобильной версии плашки мест доступны через горизонтальный scroll. Это
+  работает, но воспринимается хуже, чем простая сетка видимых вариантов.
+- Первый полезный UX-fix: показать понятный loading state и после загрузки вывести
+  места на mobile сеткой, например по 3 иконки в ряд с названием страны.
+
+Что сделать первым:
+
+1. Добавить явную плашку/состояние загрузки для server data: places и первой страницы
+   posts.
+2. Текст должен объяснять не абстрактное "Loading", а смысл: например "Загружаем
+   места и первые посты".
+3. На mobile заменить горизонтальный список глав на сетку: 2-3 элемента в ряд,
+   иконка + название страны/раздела, без необходимости свайпать слева направо.
+4. Проверить состояние до загрузки places: пользователь должен понимать, что список
+   мест еще придет с сервера.
+5. Проверить после загрузки: страны/города остаются читаемыми, активный раздел виден,
+   Thailand с Bangkok/Pattaya по-прежнему работает.
+
+Где смотреть:
+
+- `frontend/src/features/feed/ui/feed.tsx`
+- `frontend/src/features/feed/ui/mobile-chapters.tsx`
+- `frontend/src/features/feed/model/mobile-chapters.ts`
+- `frontend/src/features/places/ui/mobile-places.tsx`
+- `frontend/src/features/places/ui/places-sidebar.tsx`
+
+Гипотеза по cold start:
+
+- Теплый backend отвечает быстро: `/places` около `0.37s`, `/posts?limit=9&order=desc`
+  около `0.16s`.
+- На Render Free backend instance засыпает при неактивности, и Render сам предупреждает
+  о задержке до `50s+` на первом запросе.
+- Если warm load быстрый, а первый визит после паузы долгий, главная гипотеза:
+  тормозит не React-компонент и не Cloudinary, а холодный старт backend process на Render.
+- Сначала нужны измерения, потом решение: оставить Render, перейти на платный план,
+  настроить keep-alive или перенести текущий Nest backend на свой Timeweb-сервер.
+
+Команды для проверки cold start после долгого простоя:
+
+```bash
+date
+curl -sS -o /dev/null -w "places: %{time_total}s\n" https://travel-313c.onrender.com/places
+curl -sS -o /dev/null -w "posts: %{time_total}s\n" "https://travel-313c.onrender.com/posts?limit=9&order=desc"
+```
+
+Правило проверки:
+
+- Выполнить команды до открытия сайта, Render dashboard или любых вкладок, которые могут
+  разбудить backend.
+- Если первый запрос занимает `20-60s`, а следующий сразу `0.1-1s`, это почти точно
+  Render cold start.
+- Если оба запроса быстрые, надо искать задержку в браузере: JS chunks, auth hydration,
+  Cloudinary images, rendering или client-side cache/state.
+
+Соседние направления, но не текущий фокус:
+
+- FSD/import boundaries: проверить, не импортируют ли `features` друг друга слишком
+  свободно, не течет ли UI в model/shared, и не стоит ли ввести более строгие правила.
+- API layer cleanup: большой `frontend/src/shared/api/api.ts` постепенно разделить по
+  доменам (`posts`, `places`, `auth`, `upload`), но не смешивать это с cold-start
+  расследованием.
+- UI/performance polishing: INP, skeleton states, modal accessibility и визуальные
+  детали, но после понимания причины первой загрузки.
+
+## Завершенные практические шаги
+
+Практический шаг завершен: нормализовать backend contract для places/posts.
 
 Статус: реализовано, проверено локально, закоммичено, запушено и выложено через
 Render/Vercel.
@@ -145,8 +219,9 @@ Render/Vercel.
 - Вынесли expanded modal behavior.
 - Вынесли comments opening behavior.
 - Проверили руками: выбор `Thailand -> Bangkok/Pattaya`, comments add/delete, modal overlay, hero image.
+- Упростили hero copy: убрали лишний runtime-текст про число кадров в ленте на desktop.
 
-Следующий практический шаг выбран: `FeedPostCard`.
+Практический шаг завершен: первый refactor `FeedPostCard`.
 
 Почему именно он:
 
@@ -164,32 +239,41 @@ Render/Vercel.
 5. Post info/actions: text, place/coords, like button, comments button.
 6. Comments slot: условный рендер `PostCommentsBlock`.
 
-Порядок для следующей сессии:
+Что сделали:
 
-1. Сначала перечитать `FeedPostCard` и перечислить его ответственности.
-2. Не писать код сразу: выбрать одну границу.
-3. Самый безопасный UI-only кандидат: вынести media preview в `PostMediaPreview`.
-4. Не трогать optimistic like/cache flow до отдельного обсуждения.
-5. Если группируем props, делать это только когда группа отражает реальную идею, а не просто прячет длинный список.
+1. Перечитали `FeedPostCard` и перечислили его ответственности.
+2. Вынесли безопасный UI-only кусок media preview в `PostMediaPreview`.
+3. Переименовали короткий alias `p` обратно в более читаемый `post`.
+4. Вынесли like orchestration в `usePostLikeToggle`.
+5. Оставили DOM click plumbing (`preventDefault`, `stopPropagation`) внутри `FeedPostCard`, потому что это UI-поведение.
 
-Первый выбранный extract:
+Что вынесли:
 
 - Создать `features/feed/ui/post-media-preview.tsx`.
 - Вынести туда video/photo branch из `FeedPostCard`.
 - Оставить root `Card`, delete post button, overlays/actions и comments slot в `FeedPostCard`.
 - Props нового компонента держать минимальными: `post` и `onOpen`.
 - `preloadExpandedMedia` переезжает вместе с media preview, потому что относится к поведению preview.
+- Создать `features/feed/model/use-post-like-toggle.ts`.
+- Вынести туда `likePending`, auth check, переход на `/login`, optimistic update call, API call, success callback и rollback.
+
+Что стало лучше:
+
+- `FeedPostCard` меньше знает о сценарии лайка.
+- UI-компонент по-прежнему знает о клике, но не содержит весь mutation flow.
+- Like flow стал отдельной учебной единицей: его можно читать без JSX карточки.
 
 Кандидаты на потом:
 
 - `PostCommentsBlock`: вынести список комментариев в `CommentsList`, не меняя query/mutation logic.
 - `PostCommentsBlock`: вынести форму отправки в `CommentForm`, оставив submit handler во внешнем блоке.
 - `Feed`: отдельно разобрать posts query / delete post / optimistic update hooks, если `Feed` снова начнет разрастаться.
+- `FeedPostCard`: подумать над `PostCardActions` или `PostCardMeta`, только если это уменьшит props/mental load, а не создаст лишние мелкие wrapper-компоненты.
 
 Правило этапа:
 
 - Сначала дробим JSX и визуальные куски.
-- Mutation orchestration лайков и comments cache пока не переносим.
+- Mutation orchestration переносим только когда она уже понята как отдельный flow. С лайком это сделано; comments cache пока не трогаем.
 - Если пропсов становится больше, чем было, останавливаемся и обсуждаем границу компонента.
 - После каждого шага запускать `cd frontend && npx tsc --noEmit` и `cd frontend && npm run lint`, плюс smoke-test `Thailand -> Bangkok/Pattaya`.
 
@@ -275,6 +359,8 @@ type FeedSelection =
 - Upload обновляет или инвалидирует feed/places cache после создания post?
 - Как upload должен вести себя в состоянии `country-needs-city`?
 - Как upload должен поддерживать country-level destinations без риска создать post в стране, где нужно выбрать город?
+- Отдельно проверить delete media flow: при удалении поста удаляется ли файл из
+  Cloudinary или только запись из базы/ленты.
 
 ### Comments flow
 
@@ -318,7 +404,9 @@ type FeedSelection =
 
 ### UI/performance и визуальные дефекты
 
-Статус: зафиксировано, но не текущий фокус.
+Статус: cold-start investigation стал текущим направлением после завершения маленького
+refactor `FeedPostCard`. Ближайшая практическая задача — не ускорять наугад, а
+сделать ожидание загрузки понятным и улучшить mobile places navigation.
 
 Наблюдения:
 
@@ -329,22 +417,39 @@ type FeedSelection =
 - В Network видно, что `/places` после прогрева может отвечать быстро (`~148ms`), но холодный запрос наблюдался заметно дольше (`~1.2s`).
 - Первичная загрузка постов всё ещё может ощущаться долгой, даже если повторные запросы после cache/warm-up быстрые.
 - В UI не всегда достаточно ясно показано, что именно сейчас грузится: places navigation или первая страница posts.
+- Теплые terminal-замеры показали быстрый backend: `/places ~0.37s`, `/posts ~0.16s`.
+- Render Free прямо предупреждает, что instance может засыпать и первый запрос после простоя может задерживаться на `50s+`.
+- На mobile текущие chapter cards скроллятся горизонтально; это скрывает часть
+  вариантов и хуже подходит для короткого списка стран/разделов.
 
-Почему не делаем сейчас:
+Что делаем сейчас:
 
-- Это frontend/UI задача, а текущий практический фокус — backend contract для places/posts.
-- Не хотим смешивать data model change, UI polishing и performance investigation в один refactor.
+- Не меняем код наугад.
+- Показываем явное состояние загрузки server data, чтобы пользователь понимал, что
+  приложение ждёт backend, а не просто зависло на hero.
+- Для mobile places/chapters меняем горизонтальный scroll на сетку: ориентир —
+  3 элемента в ряд, иконка + название, без длинного описания.
+- Cold start продолжаем измерять через `curl`, но не блокируем UX-улучшение этим
+  исследованием.
 
 Что сделать позже:
 
 - Воспроизвести INP issue локально без лишних overlays, если возможно.
-- Отдельно измерить cold load и warm load для `/places` и первой страницы `/posts`.
+- Отдельно сравнить cold load и warm load для `/places` и первой страницы `/posts`.
 - В DevTools Network смотреть `Timing`: TTFB, content download, initiator, cache status.
 - Проверить, есть ли на Render cold start или задержка database connection для первых запросов.
 - Решить, нужен ли отдельный `PERFORMANCE_NOTES.md`, если измерений станет больше одного-двух наблюдений.
 - Проверить click handlers в places/sidebar/feed card/comment modal.
 - Разобрать ownership delete confirmation modal.
 - После диагностики предложить маленькое UI/performance изменение.
+
+Критерии готовности ближайшего UX-fix:
+
+- На холодной загрузке видно понятное сообщение о загрузке мест/постов.
+- На mobile места не спрятаны в горизонтальный scroll.
+- Активный раздел визуально различим.
+- `all`, direct city feed, country-level feed и `Thailand -> Bangkok/Pattaya`
+  сохраняют текущее поведение.
 
 ## Недавний cleanup
 

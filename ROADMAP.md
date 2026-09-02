@@ -28,9 +28,28 @@
 - Render Free может засыпать, поэтому первый backend request после простоя может
   быть долгим. Теплые запросы уже измерялись и были быстрыми.
 
-## Следующий шаг
+## Сегодняшний Фокус
 
-Следующий практический шаг: разобрать upload feature и сделать ее понятнее.
+На 2026-09-02 лучший день делим на два результата:
+
+1. Быстрый видимый результат: начать перенос выбранного first-screen направления
+   `road journal / archive desk` в реальный UI.
+2. Учебный инженерный результат: после визуального шага вернуться к upload feature
+   refactor и разнести `CloudinaryUploadButton` по понятным границам.
+
+Почему так:
+
+- Первый экран — то, что можно показать в LinkedIn, и он даст быстрый эмоциональный
+  результат.
+- Upload — главная интерактивная feature проекта, и ее refactor даст инженерную
+  пользу.
+- Если весь день потратить только на дизайн, архитектурный долг upload останется
+  раздражающим. Если весь день потратить только на upload, не будет видимого
+  портфолио-результата.
+
+## Следующий Инженерный Шаг
+
+Следующий инженерный шаг: разобрать upload feature и сделать ее понятнее.
 
 Параллельно зафиксирован визуальный ориентир для первого экрана:
 
@@ -95,6 +114,51 @@
 - Не переносим backend с Render, пока понятно, что долгий первый request связан
   с free cold start и это терпимо для личного проекта.
 - Не трогаем auth/security до отдельного этапа.
+
+## Выбранное Визуальное Направление
+
+Финальный reference:
+
+- `design-concepts/tapir-travel-first-screen/32-final-road-journal-mobile-dropdown.png`
+
+Суть направления:
+
+- темный личный журнал дороги / archive desk / road journal;
+- не SaaS, не туристический лендинг, не яркая открытка;
+- центральный образ: раскрытый кожаный журнал на темном столе;
+- внутри журнала: страна/город, год, карта/маршрут, фото, счетчики фото/видео;
+- desktop: слева страны как главы журнала, справа/центр journal hero и записи;
+- mobile: компактный hero, страна выбирается dropdown/bottom sheet, города остаются chips;
+- посты на mobile лучше широкими карточками с фото/видео на всю ширину, но небольшой
+  высоты, с затемнением и meta-info поверх.
+
+Ассеты:
+
+- `design-concepts/tapir-travel-first-screen/assets/main-journal-indonesia-bali.png`
+- `design-concepts/tapir-travel-first-screen/assets/bg-desk-dark.png`
+- `design-concepts/tapir-travel-first-screen/assets/country-china.png`
+- `design-concepts/tapir-travel-first-screen/assets/country-egypt.png`
+- `design-concepts/tapir-travel-first-screen/assets/country-indonesia.png`
+- `design-concepts/tapir-travel-first-screen/assets/country-thailand.png`
+- Bright variants лежат рядом и могут быть удалены позже, если не понадобятся.
+
+Не использовать:
+
+- красные точки выбора;
+- лишний компас в описании;
+- слишком желтую бумагу;
+- паспортные/официальные штампы;
+- координаты;
+- neon/cyberpunk.
+
+Практичный план:
+
+1. Закоммитить design assets как reference material.
+2. Перенести только выбранные production assets в `frontend/public` или оставить
+   концепты в `design-concepts`, если пока работаем только по reference.
+3. Сначала обновить `FeedHero`, не трогая feed orchestration.
+4. Потом проверить desktop/mobile.
+5. Только после hero решить, нужны ли изменения sidebar/mobile navigation.
 
 ## Недавно сделано
 

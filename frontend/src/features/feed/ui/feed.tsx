@@ -183,11 +183,7 @@ export function Feed() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-5 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">
-      <FeedHero
-        title={headerTitle}
-        postsCount={items.length}
-        isSelectionReady={Boolean(isSelectionReady)}
-      />
+      <FeedHero />
 
       <FeedServerLoadingNotice
         isPlacesLoading={placesQuery.isLoading}

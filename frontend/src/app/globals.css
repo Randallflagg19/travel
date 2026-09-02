@@ -123,6 +123,10 @@
   body {
     @apply overflow-x-hidden;
   }
+  html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
     background:

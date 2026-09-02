@@ -180,10 +180,14 @@ export function Feed() {
 
   const showPlaceInCard = Boolean(!all && !(selectedCountry && selectedCity));
   const isInitialPostsLoading = Boolean(canLoadPosts && postsQuery.isLoading);
+  const heroTitle =
+    isSelectionReady && !all
+      ? headerTitle.replace(" / ", ": ")
+      : "Tapir Travel";
 
   return (
     <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-5 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">
-      <FeedHero />
+      <FeedHero title={heroTitle} />
 
       <FeedServerLoadingNotice
         isPlacesLoading={placesQuery.isLoading}

@@ -48,11 +48,11 @@ export function FeedHero({
             {eyebrow}
           </p>
 
-          <div className="mt-[4.2%] flex flex-col items-center">
-            <p className="text-[3.2cqw] font-normal leading-none">
+          <div className="mt-[4.2%] grid w-full grid-rows-[3.45cqw_1.55cqw] justify-items-center gap-[0.55cqw]">
+            <p className="flex max-w-full items-center justify-center whitespace-nowrap text-[3.2cqw] font-normal leading-none">
               {title}
             </p>
-            <p className="mt-[4.6%] text-[1.42cqw] italic leading-none text-[#6b5139]">
+            <p className="flex items-center justify-center text-[1.42cqw] italic leading-none text-[#6b5139]">
               {year}
             </p>
           </div>

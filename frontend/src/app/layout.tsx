@@ -18,10 +18,37 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://travel-coral-five-50.vercel.app"),
   title: "Tapir Travel",
   description: "Личный журнал путешествий, фото и историй.",
   icons: {
     icon: "/icon.png",
+  },
+  openGraph: {
+    title: "Tapir Travel",
+    description: "Личный журнал путешествий, фото и историй.",
+    url: "/",
+    siteName: "Tapir Travel",
+    type: "website",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1419,
+        height: 1109,
+        alt: "Tapir Travel mascot",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Tapir Travel",
+    description: "Личный журнал путешествий, фото и историй.",
+    images: [
+      {
+        url: "/twitter-image.png",
+        alt: "Tapir Travel mascot",
+      },
+    ],
   },
 };
 

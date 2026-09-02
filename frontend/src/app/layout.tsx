@@ -34,7 +34,7 @@ export default function RootLayout({
     <html lang="ru">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
-          <div className="min-h-dvh bg-background text-foreground">
+          <div className="min-h-dvh bg-background/20 text-foreground">
             {/* Mobile header (dynamic) */}
             <Suspense
               fallback={

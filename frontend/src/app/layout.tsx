@@ -32,7 +32,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
         <Providers>
           <div className="min-h-dvh bg-background/20 text-foreground">
             {/* Mobile header (dynamic) */}
@@ -53,9 +55,11 @@ export default function RootLayout({
               <DesktopHeader />
             </Suspense>
 
-            <div className="grid min-h-dvh lg:grid-cols-[300px_1fr]">
+            <div className="grid min-h-dvh lg:grid-cols-[320px_1fr]">
               <aside className="hidden lg:block">
-                <Suspense fallback={<div className="h-dvh border-r border-white/10" />}>
+                <Suspense
+                  fallback={<div className="h-dvh border-r border-white/10" />}
+                >
                   <PlacesSidebar />
                 </Suspense>
               </aside>

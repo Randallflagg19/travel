@@ -23,8 +23,8 @@ export function MobilePlaces() {
           <Menu className="size-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[320px] p-0">
-        <SheetHeader className="px-4 pt-4">
+      <SheetContent side="left" className="w-[340px] max-w-[92vw] p-0">
+        <SheetHeader className="sr-only">
           <SheetTitle>Места</SheetTitle>
         </SheetHeader>
         <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Загрузка…</div>}>

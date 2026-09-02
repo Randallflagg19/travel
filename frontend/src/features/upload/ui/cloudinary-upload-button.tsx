@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { Upload } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { adminCloudinaryConfig, adminCloudinarySignUpload, createPost } from "@/shared/api/api";
@@ -51,7 +52,12 @@ function pickMediaType(resourceType: string | undefined, format: string | undefi
   return "PHOTO" as const;
 }
 
-export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant?: "default" | "secondary" | "ghost" }) {
+export function CloudinaryUploadButton(props: {
+  size?: "sm" | "default" | "icon";
+  variant?: "default" | "secondary" | "ghost";
+  iconOnly?: boolean;
+  className?: string;
+}) {
   const auth = useAuth();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -158,8 +164,21 @@ export function CloudinaryUploadButton(props: { size?: "sm" | "default"; variant
   if (!canUpload) return null;
 
   return (
-    <Button size={props.size ?? "sm"} variant={props.variant ?? "secondary"} onClick={onClick} disabled={busy || auth.isLoading}>
-      {busy ? "Upload…" : "Upload"}
+    <Button
+      size={props.size ?? "sm"}
+      variant={props.variant ?? "secondary"}
+      className={props.className}
+      onClick={onClick}
+      disabled={busy || auth.isLoading}
+      aria-label={busy ? "Загрузка..." : "Загрузить"}
+    >
+      {props.iconOnly ? (
+        <Upload className="size-4" />
+      ) : busy ? (
+        "Upload…"
+      ) : (
+        "Upload"
+      )}
     </Button>
   );
 }

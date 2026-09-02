@@ -2,14 +2,6 @@ export function displayCountryName(country: string): string {
   return country;
 }
 
-export function displayCountryIcon(countryOrLabel: string): string {
-  if (countryOrLabel === "China") return "⛩️";
-  if (countryOrLabel === "Egypt") return "𓂀";
-  if (countryOrLabel === "Indonesia" || countryOrLabel === "Bali") return "🌋";
-  if (countryOrLabel === "Thailand") return "🐘";
-  return "✈️";
-}
-
 export function displayCountryImage(countryOrLabel: string): string | null {
   if (countryOrLabel === "China") {
     return "/first-screen/sidebar/country-china-bright.png";

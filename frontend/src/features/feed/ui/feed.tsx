@@ -186,7 +186,7 @@ export function Feed() {
       : "Tapir Travel";
 
   return (
-    <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-5 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">
+    <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-4 overflow-x-hidden px-0 py-3 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
       <FeedHero title={heroTitle} />
 
       <FeedServerLoadingNotice
@@ -196,8 +196,11 @@ export function Feed() {
 
       <MobileChapters
         selectedCountry={selectedCountry}
+        selectedCity={selectedCity}
         places={placesQuery.data}
         isLoading={placesQuery.isLoading}
+        order={order}
+        onOrderChange={setOrder}
       />
 
       <FeedHeader

@@ -1,84 +1,147 @@
 import type { PlacesResponse } from "@/shared/api/api";
 import { useRouter, useSearchParams } from "next/navigation";
-import { cityCountLabel, frameCountLabel } from "../model/feed-labels";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useMemo } from "react";
+import { buildMobileChapters } from "../model/mobile-chapters";
 import {
-  buildMobileChapters,
-  type MobileChapter,
-} from "../model/mobile-chapters";
+  displayCountryName,
+  shouldOpenCountryDirectly,
+} from "@/features/places/model/place-labels";
 
 export function MobileChapters({
   selectedCountry,
+  selectedCity,
   places,
   isLoading,
+  order,
+  onOrderChange,
 }: {
   selectedCountry: string;
+  selectedCity: string;
   places?: PlacesResponse;
   isLoading?: boolean;
+  order: "asc" | "desc";
+  onOrderChange: (next: "asc" | "desc") => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const chapters = useMemo(() => buildMobileChapters(places), [places]);
+  const selectedPlace = places?.countries.find(
+    (item) => item.country === selectedCountry,
+  );
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-3 gap-3 lg:hidden" aria-label="Загрузка глав">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <div
-            key={index}
-            className="h-28 rounded-3xl border border-white/10 bg-white/[0.055] p-3"
-          >
-            <div className="size-9 animate-pulse rounded-2xl bg-white/10" />
-            <div className="mt-6 h-4 w-16 animate-pulse rounded-full bg-white/10" />
-          </div>
-        ))}
+      <div className="space-y-2 px-3 lg:hidden" aria-label="Загрузка глав">
+        <div className="h-9 animate-pulse rounded-xl border border-white/10 bg-white/[0.055]" />
+        <div className="flex gap-2">
+          <div className="h-8 w-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.055]" />
+          <div className="h-8 w-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.055]" />
+          <div className="h-8 w-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.055]" />
+        </div>
       </div>
     );
   }
 
   if (chapters.length === 0) return null;
 
-  function selectChapter(chapter: MobileChapter) {
+  function selectAll() {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("country");
+    next.delete("city");
+    next.set("all", "true");
+    router.push(`/?${next.toString()}`);
+  }
+
+  function selectCountry(country: string) {
+    if (country === "__all") {
+      selectAll();
+      return;
+    }
+
+    const target = places?.countries.find((item) => item.country === country);
     const next = new URLSearchParams(searchParams.toString());
     next.delete("all");
-    next.set("country", chapter.country);
-    if (chapter.city) next.set("city", chapter.city);
-    else next.delete("city");
+    next.set("country", country);
+    if (shouldOpenCountryDirectly(target?.cities) && target?.cities[0]) {
+      next.set("city", target.cities[0].city);
+    } else {
+      next.delete("city");
+    }
+    router.push(`/?${next.toString()}`);
+  }
+
+  function selectCity(city: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("all");
+    next.set("country", selectedCountry);
+    next.set("city", city);
     router.push(`/?${next.toString()}`);
   }
 
   return (
-    <div className="grid grid-cols-3 gap-3 lg:hidden">
-      {chapters.map((chapter) => {
-        const active = selectedCountry === chapter.country;
-        return (
-          <button
-            key={`${chapter.country}/${chapter.city ?? "cities"}`}
-            type="button"
-            onClick={() => selectChapter(chapter)}
-            className={`relative h-28 min-w-0 overflow-hidden rounded-3xl border p-3 text-left transition ${
-              active
-                ? "border-emerald-300/70 bg-emerald-300/14 shadow-lg shadow-emerald-950/30"
-                : "border-white/10 bg-white/[0.055]"
-            }`}
+    <section className="space-y-2 px-3 lg:hidden">
+      <div className="grid grid-cols-[minmax(0,1fr)_2.25rem] gap-2">
+        <label className="relative min-w-0">
+          <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[0.65rem] text-white/48">
+            Страна:
+          </span>
+          <select
+            value={selectedCountry || "__all"}
+            onChange={(event) => selectCountry(event.target.value)}
+            className="h-9 w-full appearance-none rounded-lg border border-emerald-300/20 bg-[#061014]/88 pl-[4.35rem] pr-8 text-xs text-amber-50 outline-none focus:border-emerald-300/55"
+            aria-label="Выбрать страну"
           >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(245,166,76,0.18),transparent_38%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]" />
-            <div className="relative flex h-full flex-col justify-between">
-              <span className="text-2xl">{chapter.emoji}</span>
-              <span>
-                <span className="block truncate font-serif text-lg italic leading-none text-amber-100">
-                  {chapter.label}
-                </span>
-                <span className="mt-1 block truncate text-[11px] text-white/45">
-                  {chapter.cityCount > 1
-                    ? cityCountLabel(chapter.cityCount)
-                    : frameCountLabel(chapter.count)}
-                </span>
-              </span>
-            </div>
-          </button>
-        );
-      })}
-    </div>
+            <option value="__all">Все посты</option>
+            {chapters.map((chapter) => (
+              <option
+                key={`${chapter.country}/${chapter.city ?? "cities"}`}
+                value={chapter.country}
+              >
+                {displayCountryName(chapter.country)}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-amber-100/70" />
+        </label>
+
+        <label className="relative flex size-9 items-center justify-center rounded-lg border border-amber-200/14 bg-[#061014]/88 text-amber-100/78">
+          <SlidersHorizontal className="size-4" />
+          <select
+            value={order}
+            onChange={(event) =>
+              onOrderChange(event.target.value as "asc" | "desc")
+            }
+            className="absolute inset-0 cursor-pointer appearance-none opacity-0"
+            aria-label="Порядок постов"
+          >
+            <option value="desc">Сначала новые</option>
+            <option value="asc">Сначала старые</option>
+          </select>
+        </label>
+      </div>
+
+      {selectedPlace && selectedPlace.cities.length > 1 ? (
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {selectedPlace.cities.map((city) => {
+            const active = selectedCity === city.city;
+            return (
+              <button
+                key={city.city}
+                type="button"
+                onClick={() => selectCity(city.city)}
+                className={`h-8 shrink-0 rounded-lg border px-3 text-xs transition ${
+                  active
+                    ? "border-emerald-300/55 bg-emerald-400/18 text-emerald-50"
+                    : "border-amber-100/12 bg-[#061014]/70 text-white/72"
+                }`}
+              >
+                {city.city}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </section>
   );
 }

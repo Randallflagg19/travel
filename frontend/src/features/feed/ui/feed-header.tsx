@@ -18,7 +18,7 @@ export function FeedHeader({
   if (!isSelectionReady) return null;
 
   return (
-    <header className="flex items-center justify-end">
+    <header className="hidden items-center justify-end lg:flex">
       <span className="sr-only">{headerTitle}</span>
       <label className="travel-glass relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm text-white/70">
         <span className="text-white/42">Показывать:</span>

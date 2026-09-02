@@ -45,7 +45,7 @@ export function CitySelection({
   }
 
   return (
-    <section className="travel-glass rounded-[1.7rem] border border-white/10 bg-white/[0.055] p-5 sm:p-6">
+    <section className="travel-glass hidden rounded-[1.7rem] border border-white/10 bg-white/[0.055] p-5 sm:p-6 lg:block">
       <p className="text-xs font-medium uppercase tracking-[0.28em] text-emerald-200/70">
         выбери город
       </p>

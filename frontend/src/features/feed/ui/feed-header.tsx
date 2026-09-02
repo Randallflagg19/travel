@@ -20,20 +20,20 @@ export function FeedHeader({
   return (
     <header className="hidden items-center justify-end lg:flex">
       <span className="sr-only">{headerTitle}</span>
-      <label className="travel-glass relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm text-white/70">
-        <span className="text-white/42">Показывать:</span>
+      <label className="relative inline-flex items-center gap-2 rounded-full border border-amber-100/10 bg-[#071014]/42 px-4 py-2 text-sm text-white/58 shadow-lg shadow-black/15 backdrop-blur-xl">
+        <span className="text-white/34">Показывать:</span>
         <select
           value={order}
           onChange={(event) =>
             onOrderChange(event.target.value as "asc" | "desc")
           }
-          className="appearance-none bg-transparent pr-7 font-medium text-amber-100 outline-none"
+          className="appearance-none bg-transparent pr-7 font-medium text-amber-50/82 outline-none"
           aria-label="Порядок постов"
         >
           <option value="desc">Сначала новые</option>
           <option value="asc">Сначала старые</option>
         </select>
-        <ChevronDown className="pointer-events-none absolute right-3 size-4 text-amber-100/70" />
+        <ChevronDown className="pointer-events-none absolute right-3 size-4 text-amber-100/52" />
       </label>
     </header>
   );

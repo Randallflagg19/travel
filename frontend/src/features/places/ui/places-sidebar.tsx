@@ -23,7 +23,7 @@ function buildUrl(params: URLSearchParams) {
 }
 
 const SIDEBAR_NOTE =
-  "Места, в которых я оказался. Люди, которых встретил. Странные детали, случайные находки и фотографии, которые захотелось оставить себе.";
+  "Мой личный архив путешествий. Фотографии, видео и маленькие истории из мест, где я побывал. Чтобы воспоминания не терялись где-то в галерее и переписках.";
 
 export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
@@ -31,7 +31,8 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const auth = useAuth();
   const deleteMode = searchParams.get("delete") === "1";
   const canDelete = Boolean(
-    auth.user && (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
+    auth.user &&
+    (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
   );
 
   const selectedCountry = searchParams.get("country") ?? "";
@@ -114,7 +115,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
               Tapir Travel
             </div>
             <p className="mt-0.5 font-serif text-[0.82rem] font-semibold text-orange-400">
-              Журнал дороги
+              Личный журнал путешествий
             </p>
           </div>
         </button>
@@ -184,7 +185,8 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
                         : "border-amber-100/10 hover:border-amber-100/25"
                     }`}
                     onClick={() => {
-                      if (opensDirectly && directCity) selectCity(c.country, directCity.city);
+                      if (opensDirectly && directCity)
+                        selectCity(c.country, directCity.city);
                       else selectCountry(c.country);
                     }}
                   >
@@ -215,7 +217,8 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     <div className="ml-5 mt-2 space-y-1 border-l border-white/10 pl-3">
                       {c.cities.map((cc) => {
                         const isActiveCity =
-                          selectedCountry === c.country && selectedCity === cc.city;
+                          selectedCountry === c.country &&
+                          selectedCity === cc.city;
                         return (
                           <Button
                             key={cc.city}
@@ -246,9 +249,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="px-4">
         <div className="rounded-[1.35rem] border border-amber-100/10 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
-          <p className="text-sm leading-6 text-amber-50/78">
-            {SIDEBAR_NOTE}
-          </p>
+          <p className="text-sm leading-6 text-amber-50/78">{SIDEBAR_NOTE}</p>
         </div>
       </div>
     </aside>

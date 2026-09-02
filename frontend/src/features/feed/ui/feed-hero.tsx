@@ -2,12 +2,10 @@ import Image from "next/image";
 
 export function FeedHero({
   title,
-  city,
   postsCount,
   isSelectionReady,
 }: {
   title: string;
-  city: string;
   postsCount: number;
   isSelectionReady: boolean;
 }) {
@@ -38,8 +36,6 @@ export function FeedHero({
           </p>
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium uppercase tracking-[0.22em] text-emerald-200/72">
             <span>{postsCount ? `${postsCount} кадров` : "выбери главу"}</span>
-            {city ? <span>· {city}</span> : null}
-            {!city && !isSelectionReady ? <span>· маршрут 2026</span> : null}
           </div>
         </div>
       </section>

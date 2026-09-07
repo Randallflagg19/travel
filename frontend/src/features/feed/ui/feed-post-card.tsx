@@ -61,7 +61,7 @@ export function FeedPostCard({
   }
 
   return (
-    <Card className="travel-card-glow group relative overflow-hidden rounded-[1.75rem] border-white/10 bg-white/[0.055] p-0 transition duration-300 hover:-translate-y-1 hover:border-amber-200/25">
+    <Card className="travel-card-glow group relative overflow-hidden rounded-xl border-amber-200/20 bg-[#071014] p-0 transition duration-300 hover:border-amber-200/25">
       {deleteMode && canDelete ? (
         <button
           type="button"
@@ -77,67 +77,70 @@ export function FeedPostCard({
         </button>
       ) : null}
       <CardContent className="p-0">
-        <PostMediaPreview post={post} onOpen={onOpen} />
+        <div className="relative">
+          <PostMediaPreview post={post} onOpen={onOpen} />
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/55 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/84 via-black/42 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/35 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/90 via-black/45 to-transparent lg:hidden" />
 
-        <div className="absolute left-4 top-4 rounded-xl bg-black/55 px-3 py-1 text-[11px] font-semibold tracking-wide text-white ring-1 ring-white/15 backdrop-blur">
-          {post.media_type === "VIDEO" ? "VIDEO" : "PHOTO"}
-        </div>
+          <div className="pointer-events-none absolute left-2.5 top-2.5 rounded-md bg-[#071014]/75 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white ring-1 ring-white/15 backdrop-blur">
+            {post.media_type === "VIDEO" ? "VIDEO" : "PHOTO"}
+          </div>
 
-        <div className="absolute inset-x-0 bottom-0 space-y-3 p-4 text-white">
-          <div>
-            {post.text ? (
-              <h3 className="line-clamp-2 text-lg font-medium leading-tight">
-                {post.text}
-              </h3>
-            ) : null}
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/58">
-              {showPlaceInCard && (post.country || post.city) ? (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="size-3" />
-                  {displayPlaceTitle(
-                    post.country ?? "Unknown",
-                    post.city ?? "",
-                  )}
-                </span>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 px-3 pt-3 pb-1 text-amber-50 lg:relative lg:border-t lg:border-amber-200/10 lg:px-4 lg:pt-2">
+            <div>
+              {post.text ? (
+                <h3 className="line-clamp-1 font-serif text-base font-normal leading-tight lg:line-clamp-2 lg:text-lg">
+                  {post.text}
+                </h3>
               ) : null}
-              {post.lat != null && post.lng != null ? (
-                <span>
-                  {post.lat.toFixed(4)}, {post.lng.toFixed(4)}
-                </span>
-              ) : null}
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-amber-100/65 lg:text-xs">
+                {showPlaceInCard && (post.country || post.city) ? (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="size-3" />
+                    {displayPlaceTitle(
+                      post.country ?? "Unknown",
+                      post.city ?? "",
+                    )}
+                  </span>
+                ) : null}
+                {post.lat != null && post.lng != null ? (
+                  <span>
+                    {post.lat.toFixed(4)}, {post.lng.toFixed(4)}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 text-xs text-amber-100/75">
+              <button
+                type="button"
+                onClick={handleLikeClick}
+                disabled={likePending}
+                className="pointer-events-auto relative z-10 flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-1 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-200 disabled:opacity-50"
+                aria-label={liked ? "Снять лайк" : "Лайкнуть"}
+              >
+                <Heart
+                  className={`size-4 ${liked ? "fill-red-400 text-red-400" : ""}`}
+                />
+                <span>{post.like_count}</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenComments(post.id);
+                }}
+                className="pointer-events-auto relative z-10 flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-1 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-amber-200"
+                aria-label="Комментарии"
+              >
+                <MessageSquare className="size-4" />
+                <span>{post.comment_count}</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-sm text-white/72">
-            <button
-              type="button"
-              onClick={handleLikeClick}
-              disabled={likePending}
-              className="relative z-10 flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 transition hover:bg-white/16 disabled:opacity-50"
-              aria-label={liked ? "Снять лайк" : "Лайкнуть"}
-            >
-              <Heart
-                className={`size-4 ${liked ? "fill-red-400 text-red-400" : ""}`}
-              />
-              <span>{post.like_count}</span>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onOpenComments(post.id);
-              }}
-              className="relative z-10 flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 transition hover:bg-white/16"
-              aria-label="Комментарии"
-            >
-              <MessageSquare className="size-4" />
-              <span>{post.comment_count}</span>
-            </button>
-          </div>
         </div>
 
         {isCommentsOpen ? (

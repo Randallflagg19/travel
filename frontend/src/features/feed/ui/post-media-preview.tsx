@@ -29,7 +29,7 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
     >
       {post.cloudinary_public_id ? (
         <Image
-          className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+          className="aspect-[2/1] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
           alt={post.text ?? "travel video"}
           src={
             cloudinaryVideoPosterUrl(
@@ -47,7 +47,7 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
         />
       ) : (
         <video
-          className="pointer-events-none aspect-[4/3] w-full object-cover"
+          className="pointer-events-none aspect-[2/1] lg:aspect-[4/3] w-full object-cover"
           playsInline
           muted
           preload="metadata"
@@ -55,8 +55,8 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
         />
       )}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="flex size-14 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/30 backdrop-blur transition duration-300 group-hover:scale-110">
-          <Play className="ml-0.5 size-6 fill-white" />
+        <div className="flex size-9 lg:size-11 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/30 backdrop-blur transition duration-300 group-hover:scale-110">
+          <Play className="ml-0.5 size-4 fill-white lg:size-5" />
         </div>
       </div>
     </button>
@@ -70,7 +70,7 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
       onPointerDown={() => preloadExpandedMedia(post)}
     >
       <Image
-        className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+        className="aspect-[2/1] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
         alt={post.text ?? "travel media"}
         src={cloudinaryThumbUrl(post.media_url, post.media_type)}
         width={720}

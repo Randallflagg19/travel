@@ -238,7 +238,7 @@ export function Feed() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 px-3 sm:px-0 lg:grid-cols-2 lg:gap-4 2xl:grid-cols-3">
           {items.map((p) => (
             <div
               key={p.id}

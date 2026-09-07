@@ -32,7 +32,16 @@ export function FeedHero({
           sizes="(min-width: 1024px) calc(100vw - 364px), 920px"
         />
 
-        <div className="absolute left-[54.62%] top-[15.50%] h-[49.10%] w-[25.12%] overflow-hidden bg-stone-200 shadow-[inset_0_0_0_1px_rgba(74,54,33,0.2)]">
+        {/* Inner photo window in the 1672 × 941 journal bitmap: (909, 141)–(1327, 604). */}
+        <div
+          className="absolute overflow-hidden bg-stone-200 shadow-[inset_0_0_0_1px_rgba(74,54,33,0.2)]"
+          style={{
+            left: `${(909 / 1672) * 100}%`,
+            top: `${(141 / 941) * 100}%`,
+            width: `${(418 / 1672) * 100}%`,
+            height: `${(463 / 941) * 100}%`,
+          }}
+        >
           <Image
             src={photoSrc}
             alt="Фотография из путешествия"

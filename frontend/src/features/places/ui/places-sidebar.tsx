@@ -11,6 +11,7 @@ import { ScrollArea } from "@/shared/ui/scroll-area";
 import { Separator } from "@/shared/ui/separator";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Button } from "@/shared/ui/button";
+import { readPlaceSelection } from "@/features/places/model/place-selection";
 import {
   displayCountryImage,
   displayCountryName,
@@ -35,9 +36,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
     (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
   );
 
-  const selectedCountry = searchParams.get("country") ?? "";
-  const selectedCity = searchParams.get("city") ?? "";
-  const all = searchParams.get("all") === "true";
+  const { selectedCountry, selectedCity, all } = readPlaceSelection(searchParams);
 
   const placesQuery = useQuery({
     queryKey: ["places"],
@@ -140,6 +139,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
               : "border-amber-100/10 bg-white/[0.035] text-white/78 hover:bg-white/10 hover:text-white"
           }`}
           onClick={selectAll}
+          aria-pressed={all}
         >
           <Palmtree className="mr-2 size-4" />
           Все посты

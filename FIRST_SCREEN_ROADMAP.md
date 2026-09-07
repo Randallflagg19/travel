@@ -35,25 +35,23 @@
 
 ### 2. Исправить initial «Все посты»
 
-Причина всё ещё присутствует в коде:
+Исправлено локально 2026-09-07, ожидает пользовательской приёмки.
 
-- `MobileChapters`: `value={selectedCountry || "__all"}`.
-- `useFeedParams`: `all` только при `searchParams.get("all") === "true"`.
-- `useFeedSelectionState`: `canLoadPosts = all || selectedCity || isCountryFeed`.
-- `Feed`: query включается только при `canLoadPosts && auth.hydrated`.
-
-На `/` интерфейс показывает «Все посты», но posts query выключен. Повторный
-выбор уже выбранного option может не вызвать onChange. Это отдельный UI/query
-баг, не объяснение обрывов статических файлов из сетевого инцидента.
-
-1. Выбрать единый контракт: `/` считается all-feed или канонизируется в `?all=true`.
-2. Согласовать `use-feed-params.ts`, `mobile-chapters.tsx`,
-   `use-feed-selection-state.ts`, `posts-query-params.ts` и отображение desktop.
-3. Проверить `/`, `/?all=true`, refresh, back/forward,
-   страна → город → «Все посты» и смену сортировки.
-
-Готово: visual selection, URL, query key, фильтр API и показанные данные совпадают;
-начальная загрузка работает без предварительного выбора страны.
+- Контракт: отсутствие страны и города означает all-feed, в том числе на `/`
+  и `/?order=asc`. `/?all=true` сохраняет прежнее значение.
+- Общий `places/model/place-selection.ts` используется лентой и sidebar.
+  Явный `all=true` имеет приоритет над оставшимися country/city: они исключаются
+  из эффективного выбора, query key и фильтра API, dropdown показывает «Все посты».
+- Начальный query включается после гидратации auth без дополнительного выбора;
+  кнопка sidebar получает активный стиль и `aria-pressed`.
+- Проверено в браузере на localhost:3000: `/` и refresh на мобильной ширине
+  390 px, Thailand → Bangkok → «Все посты», сортировка asc, back/forward;
+  на desktop 1440 px — начальная лента и активный пункт «Все посты».
+- Два теста `e2e/feed-selection.spec.ts` проверяют эквивалентность начального
+  и явного all, приоритет all и сохранение API-фильтров страны/города.
+  Запуск: `npx playwright test e2e/feed-selection.spec.ts --reporter=line` — пройден.
+  TypeScript, lint и production build пройдены. Реальный телефон и production
+  не проверялись; переходы в браузере проверялись вручную через автоматизацию UI.
 
 ### 3. Довести первый viewport и мобильный flow
 

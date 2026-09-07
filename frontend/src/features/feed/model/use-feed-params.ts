@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { readPlaceSelection } from "@/features/places/model/place-selection";
 import {
   displayCountryName,
   displayPlaceTitle,
@@ -27,9 +28,7 @@ export function useFeedParams(): FeedParams {
   const order: FeedOrder =
     searchParams.get("order") === "asc" ? "asc" : "desc";
   const deleteMode = searchParams.get("delete") === "1";
-  const selectedCountry = searchParams.get("country") ?? "";
-  const selectedCity = searchParams.get("city") ?? "";
-  const all = searchParams.get("all") === "true";
+  const { selectedCountry, selectedCity, all } = readPlaceSelection(searchParams);
 
   const headerTitle = all
     ? "Все посты"

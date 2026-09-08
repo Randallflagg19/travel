@@ -111,7 +111,6 @@ export function Feed() {
     expandedVideoSrc,
     videoRef,
     shouldAutoPlayRef,
-    lastVideoTapRef,
     openExpanded,
     closeExpanded,
   } = useExpandedPostModal(items);
@@ -295,7 +294,6 @@ export function Feed() {
           expandedVideoSrc={expandedVideoSrc}
           videoRef={videoRef}
           shouldAutoPlayRef={shouldAutoPlayRef}
-          lastVideoTapRef={lastVideoTapRef}
         />
       ) : null}
     </main>

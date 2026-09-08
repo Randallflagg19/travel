@@ -6,7 +6,6 @@ export function useExpandedPostModal(items: ApiPost[]) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedVideoSrc, setExpandedVideoSrc] = useState<string | null>(null);
 
-  const lastVideoTapRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const shouldAutoPlayRef = useRef(false);
 
@@ -34,6 +33,7 @@ export function useExpandedPostModal(items: ApiPost[]) {
   );
 
   const closeExpanded = useCallback(() => {
+    videoRef.current?.pause();
     setExpandedId(null);
     setExpandedVideoSrc(null);
     shouldAutoPlayRef.current = false;
@@ -46,7 +46,6 @@ export function useExpandedPostModal(items: ApiPost[]) {
     expandedVideoSrc,
     videoRef,
     shouldAutoPlayRef,
-    lastVideoTapRef,
     openExpanded,
     closeExpanded,
   };

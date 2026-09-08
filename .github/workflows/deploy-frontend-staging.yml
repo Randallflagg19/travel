@@ -1,0 +1,119 @@
+name: Deploy frontend to staging VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        required: true
+        default: main
+        type: string
+
+concurrency:
+  group: travel-frontend-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NEXT_PUBLIC_API_URL: https://api.tapir.su/api
+
+    steps:
+      - name: Check out selected revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build standalone frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Package release
+        id: release
+        run: |
+          release_id="$(git rev-parse HEAD)"
+          release_dir="$RUNNER_TEMP/travel-frontend-release"
+          mkdir -p "$release_dir/.next"
+          cp -R frontend/.next/standalone/. "$release_dir/"
+          cp -R frontend/public "$release_dir/public"
+          cp -R frontend/.next/static "$release_dir/.next/static"
+          tar -C "$release_dir" -czf "$RUNNER_TEMP/$release_id.tar.gz" .
+          echo "id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "archive=$RUNNER_TEMP/$release_id.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Keep release artifact for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-${{ steps.release.outputs.id }}
+          path: ${{ steps.release.outputs.archive }}
+          retention-days: 7
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.TRAVEL_VPS_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.TRAVEL_VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload release archive
+        env:
+          VPS_HOST: ${{ secrets.TRAVEL_VPS_HOST }}
+          VPS_USER: ${{ secrets.TRAVEL_VPS_USER }}
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" 'mkdir -p ~/travel-frontend/incoming'
+          scp "${{ steps.release.outputs.archive }}" \
+            "$VPS_USER@$VPS_HOST:~/travel-frontend/incoming/${{ steps.release.outputs.id }}.tar.gz"
+
+      - name: Activate release and verify it
+        env:
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+          VPS_HOST: ${{ secrets.TRAVEL_VPS_HOST }}
+          VPS_USER: ${{ secrets.TRAVEL_VPS_USER }}
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" "RELEASE_ID=$RELEASE_ID bash -s" <<'REMOTE'
+            set -euo pipefail
+
+            app_root="$HOME/travel-frontend"
+            release_dir="$app_root/releases/$RELEASE_ID"
+            archive="$app_root/incoming/$RELEASE_ID.tar.gz"
+            previous_release=""
+            if [ -L "$app_root/current" ]; then
+              previous_release="$(readlink -f "$app_root/current")"
+            fi
+
+            mkdir -p "$release_dir"
+            tar -xzf "$archive" -C "$release_dir"
+            ln -sfn "$release_dir" "$app_root/current"
+
+            if ! sudo systemctl restart travel-frontend || ! curl -fsS --max-time 10 http://127.0.0.1:3020/ >/dev/null; then
+              if [ -n "$previous_release" ]; then
+                ln -sfn "$previous_release" "$app_root/current"
+                sudo systemctl restart travel-frontend
+              fi
+              exit 1
+            fi
+
+            rm -f "$archive"
+          REMOTE

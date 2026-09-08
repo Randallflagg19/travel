@@ -1,6 +1,6 @@
 # План переноса frontend с Vercel на VPS
 
-Обновлено 2026-09-07. **Запланировано, не выполнено.** Третий этап
+Обновлено 2026-09-08. **Запланировано, не выполнено.** Третий этап
 [общего плана](ROADMAP.md): после UI/мобильных взаимодействий и ограниченного
 этапа рефакторинга. Backend уже на VPS, Neon и Cloudinary оставляем.
 
@@ -29,34 +29,102 @@ UI/refactor backlog не является предварительным усл�
 
 - Frontend: Next `16.1.5`, React `19.2.3`; `npm run build` выполняет
   `next build --webpack`, `npm start` — `next start`; есть package-lock.
-- `frontend/next.config.ts` разрешает изображения Cloudinary; `output: standalone`
-  не настроен. Это не готовая standalone-сборка или static export.
+- `frontend/next.config.ts` разрешает изображения Cloudinary и настроен
+  `output: "standalone"`; static export не используется.
 - Используются `next/image`, public assets и `next/font/google` в layout.
 - API base берётся из `NEXT_PUBLIC_API_URL` в `shared/api/api.ts`.
   Production-значение должно быть задано при сборке: `https://api.tapir.su/api`.
 - Готовых frontend systemd/nginx конфигов и CI deploy pipeline в просмотренном
-  репозитории нет. Порт, временный поддомен и механизм деплоя ещё не выбраны.
+  репозитории изначально не было. Добавлен ручной workflow
+  `.github/workflows/deploy-frontend-staging.yml`; он ещё не запускался и ждёт
+  GitHub Secrets и подготовки VPS service.
+
+## Выполнено: подготовка standalone release — 2026-09-08
+
+- Выполнены `npm run lint` и production `npm run build` с
+  `NEXT_PUBLIC_API_URL=https://api.tapir.su/api`; обе проверки успешны.
+- Сборка создала `server.js` в `.next/standalone`. Измеренный размер до сжатия:
+  standalone runtime — 70 MB, `.next/static` — 1.4 MB, `public` — 22 MB
+  (всего около 94 MB). Это подтверждает достаточность текущих 9 GB свободного
+  места на VPS для нескольких releases.
+- Workflow запускается только вручную (`workflow_dispatch`), собирает в Linux
+  Node 22, сохраняет артефакт на 7 дней и после будущей настройки секретов
+  доставит его по SSH. До выполнения он не меняет VPS.
+
+## Выполнено: read-only аудит VPS — 2026-09-08
+
+- Диск `/`: 30 GB, занято 21 GB (70%), свободно около 9 GB. Этого достаточно
+  для двух компактных frontend releases, но не для рискованной сборки с полными
+  зависимостями на VPS.
+- RAM: 1.9 GiB, доступно около 1.1 GiB; используется около 1.1 GiB swap.
+  Production build frontend выполнять в Linux CI; macOS `node_modules` на VPS
+  не переносить.
+- `travel-backend.service` — `active` и `enabled`, использует около 45 MB,
+  слушает 3010. `nginx -t` успешен; warnings относятся к `table-booker.ru` и
+  не входят в эту миграцию.
+- Заняты 3000–3003 и 3010; порт `3020` отдельно проверен свободным для
+  frontend. Новый service будет слушать `127.0.0.1:3020`.
+  Nginx должен оставаться единственной публичной точкой входа.
+- Известные потребители места: `/var/log/journal` — около 1.3 GB,
+  `/home/project` — 1.9 GB, `/root` — 2.3 GB (`.npm`, `.cache`, `.local`),
+  `/var/lib/docker` — 1.5 GB. `docker system df` показывает лишь около 40 MB
+  безопасно reclaimable. Эти каталоги без отдельной проверки и согласования не
+  удалять.
+- Отдельный security/ops backlog: Docker proxy слушает `0.0.0.0:5432`; нужно
+  выяснить назначение контейнера и необходимость внешнего доступа. Также нужно
+  задать retention/лимит systemd journal. Не смешивать эти действия с frontend
+  deploy.
+- Выбранное направление: Linux CI → `output: "standalone"` → release
+  directories на VPS с symlink на текущий release и хранением не более двух
+  предыдущих версий. Ручное копирование и сборка на VPS не использовать.
+- Для первого внешнего smoke выбран временный домен `staging.tapir.su`;
+  frontend service будет на `127.0.0.1:3020`. `tapir.su` и `www.tapir.su`
+  остаются прикреплёнными к Vercel до подтверждения VPS-версии, чтобы сохранить
+  быстрый DNS/hosting rollback.
+- Trigger первого pipeline: ручной `workflow_dispatch` в GitHub Actions, а не
+  deploy по каждому push в `main`.
+
+### Кандидаты на очистку — только при реальной необходимости
+
+Текущих ~9 GB свободного места достаточно, чтобы начать frontend deploy без
+очистки. До первого release ничего удалять не нужно; после доставки измерить
+размер артефакта и сохранить запас для двух версий.
+
+- `systemd-journald`: около 1.3 GB, специальных лимитов в конфигурации нет.
+  При необходимости сначала задать постоянные `SystemMaxUse`/`SystemKeepFree`,
+  затем штатно сжать старые журналы. Не удалять journal-файлы вручную.
+- `/root/.npm`: около 731 MB, почти полностью npm `_cacache`; возобновляемый
+  кэш, очищать только штатной npm-командой после отдельного подтверждения.
+- `/root/.cache`: около 449 MB (`pnpm` metadata — 272 MB, Prisma cache —
+  177 MB); очищать только штатными инструментами соответствующего runtime.
+- `/root/.local/share/pnpm`: около 1.8 GB, pnpm store. До очистки выяснить
+  структуру и root-owned глобальные пакеты; допустимый путь — `pnpm store prune`,
+  не ручное удаление.
+- `/home/tapiradmin/.npm` и `.cache`: около 715 MB пользовательских кэшей;
+  низкий приоритет, так как они могут ускорять обычную работу на VPS.
+- Не кандидаты: `/home/project` (root-owned Gustaw production project и его
+  данные), Docker и локальная PostgreSQL. Не изменять их в рамках frontend
+  migration.
 
 ## Запланировано: порядок реализации
 
 ### 1. Проверить площадку и сборку
 
-- Снять свежую карту ресурсов, портов, сервисов и nginx на VPS, используя
-  [backend-документ](VPS_BACKEND_MIGRATION_ROADMAP.md). Старые 70% диска и
-  прерванная backend-сборка не доказывают сегодняшнюю готовность или причину сбоев.
-- Выбрать свободный внутренний порт, отдельный каталог и frontend service;
-  не занимать 3010 и не менять соседние приложения.
-- Выбрать runtime/dependency install по lockfile. Базовый вариант — Node server
-  через next start; standalone рассматривать отдельным изменением с проверкой
-  упаковки public и .next/static. Не предполагать совместимость static export.
+- Свежая карта ресурсов, портов, сервисов и nginx снята 2026-09-08; см. раздел
+  выше. Перед deploy повторить короткую проверку свободного места и сервисов.
+- Использовать `127.0.0.1:3020`, отдельный каталог и frontend service; не
+  занимать 3010 и не менять соседние приложения.
+- Использовать Node server через standalone output. Отдельно проверить упаковку
+  `public` и `.next/static`; не предполагать совместимость static export.
 - Проверить production build с API env и загрузкой шрифтов. Где собирать —
   определить по ресурсам; для CI-артефактов учесть Linux/архитектуру и native deps,
   не переносить macOS node_modules на VPS.
 
-### 2. Сделать автоматический деплой из Git и откат
+### 2. Сделать ручной CI deploy из Git и откат
 
-- Выбрать конкретный механизм (например CI build + доставка release по SSH),
-  ветку/trigger и хранение deploy credentials. Выбор пока открыт.
+- Добавлен GitHub Actions: Linux build + доставка release по SSH. Первый
+  trigger — ручной `workflow_dispatch`; следующий шаг — добавить credentials
+  в GitHub Secrets и подготовить VPS к его запуску.
 - Проверки и build → отдельный release directory → запуск/health smoke →
   переключение на release. При неуспехе сохранять предыдущий рабочий release.
 - Зафиксировать commit, env для сборки, зависимости и команды возврата.
@@ -108,7 +176,9 @@ UI/refactor backlog не является предварительным усл�
 
 ## Требует проверки
 
-Ресурсы VPS, deploy credentials, runtime, свободный порт, временный домен,
-механизм CI, доступность шрифтов при build и сетевой результат переноса.
+Deploy credentials, DNS для `staging.tapir.su`, подготовка VPS service/nginx,
+первый ручной CI deploy и сетевой результат переноса. Аудит ресурсов, runtime,
+свободный порт, standalone-сборка и доступность шрифтов при build подтверждены
+2026-09-08.
 В этой сверке изменены только документы; сборка, сервер, DNS и deployment
 не менялись. Сжатие изображений не является согласованным исправлением инцидента.

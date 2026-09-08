@@ -1,0 +1,2 @@
+Cmnd_Alias TRAVEL_FRONTEND_SERVICE = /usr/bin/systemctl restart travel-frontend.service
+tapiradmin ALL=(root) NOPASSWD: TRAVEL_FRONTEND_SERVICE

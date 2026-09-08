@@ -50,6 +50,25 @@ UI/refactor backlog не является предварительным усл�
 - Workflow запускается только вручную (`workflow_dispatch`), собирает в Linux
   Node 22, сохраняет артефакт на 7 дней и после будущей настройки секретов
   доставит его по SSH. До выполнения он не меняет VPS.
+- Для GitHub Actions создана отдельная ED25519 deploy-пара, не использующая
+  основной SSH-ключ Mac. Публичная часть добавлена для `tapiradmin` на VPS,
+  а вход новым ключом подтверждён. ED25519 host key VPS сверена по доверенному
+  SSH-каналу и подготовлена как known-hosts запись. Все четыре необходимых
+  GitHub Actions Secrets добавлены вручную: host, user, private deploy key и
+  known-hosts. В репозиторий они не записываются.
+- На VPS созданы `/home/tapiradmin/travel-frontend/{incoming,releases}` с
+  владельцем `tapiradmin`. Установлен и включён (но ещё не запущен)
+  `travel-frontend.service`: standalone server будет слушать только
+  `127.0.0.1:3020` и стартует лишь после появления `current/server.js`.
+  Отдельный sudoers-файл прошёл `visudo` и разрешает `tapiradmin` без пароля
+  перезапускать только этот unit; полного sudo для workflow не добавлено.
+- Проверено тем же отдельным deploy-ключом: passwordless restart
+  `travel-frontend.service` успешен. Unit `loaded` и `enabled`, но ожидаемо
+  `inactive` до первого release.
+- `systemd-analyze verify` подтвердил новый unit, но обнаружил не связанные с
+  Travel warnings: `/usr/lib/systemd/system/linux.service` executable и
+  `systemd-kworkerd.service`/`.timer` world-writable. Не исправлять их во
+  время frontend migration; вынести в отдельный security audit.
 
 ## Выполнено: read-only аудит VPS — 2026-09-08
 
@@ -73,7 +92,8 @@ UI/refactor backlog не является предварительным усл�
 - Отдельный security/ops backlog: Docker proxy слушает `0.0.0.0:5432`; нужно
   выяснить назначение контейнера и необходимость внешнего доступа. Также нужно
   задать retention/лимит systemd journal. Не смешивать эти действия с frontend
-  deploy.
+  deploy. Дополнительно проверить и исправить ownership/mode существующих
+  systemd units, отмеченных `systemd-analyze verify`.
 - Выбранное направление: Linux CI → `output: "standalone"` → release
   directories на VPS с symlink на текущий release и хранением не более двух
   предыдущих версий. Ручное копирование и сборка на VPS не использовать.
@@ -135,6 +155,18 @@ UI/refactor backlog не является предварительным усл�
 
 ### 3. Поднять временный HTTPS-домен
 
+- В DNS Timeweb создана запись `A staging.tapir.su → 91.210.170.148` с TTL
+  600. Распространение подтверждено с самого VPS 2026-09-08: имя разрешается
+  в `91.210.170.148`. Основные `tapir.su` и `www.tapir.su` не менялись и
+  продолжают обслуживаться Vercel.
+- Nginx vhost хранится в репозитории как
+  `infra/travel-frontend/travel-frontend-staging.nginx`; до установки на VPS
+  он должен быть проверен через `nginx -t`.
+- Vhost установлен, включён и мягко применён через `systemctl reload nginx`.
+  Certbot успешно выпустил и подключил сертификат Let's Encrypt для
+  `staging.tapir.su` 2026-09-08; срок текущего сертификата до 2026-12-07,
+  автоматическое продление настроено Certbot. Пока release не активирован,
+  ожидаемый ответ proxy — `502` с `127.0.0.1:3020`.
 - Отдельный systemd unit и nginx vhost с проксированием на выбранный порт,
   автозапуском и логами. Сначала проверить config и локальную доступность.
 - Подготовить временный поддомен и сертификат, добавить его origin в CORS API
@@ -176,9 +208,9 @@ UI/refactor backlog не является предварительным усл�
 
 ## Требует проверки
 
-Deploy credentials, DNS для `staging.tapir.su`, подготовка VPS service/nginx,
-первый ручной CI deploy и сетевой результат переноса. Аудит ресурсов, runtime,
-свободный порт, standalone-сборка и доступность шрифтов при build подтверждены
-2026-09-08.
+Первый ручной CI deploy и сетевой результат переноса. Аудит ресурсов, runtime,
+свободный порт,
+standalone-сборка, SSH deploy key, GitHub Secrets и доступность шрифтов при build
+подтверждены 2026-09-08.
 В этой сверке изменены только документы; сборка, сервер, DNS и deployment
 не менялись. Сжатие изображений не является согласованным исправлением инцидента.

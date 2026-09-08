@@ -107,10 +107,10 @@ jobs:
             tar -xzf "$archive" -C "$release_dir"
             ln -sfn "$release_dir" "$app_root/current"
 
-            if ! sudo systemctl restart travel-frontend || ! curl -fsS --max-time 10 http://127.0.0.1:3020/ >/dev/null; then
+            if ! sudo /usr/bin/systemctl restart travel-frontend.service || ! curl -fsS --max-time 10 http://127.0.0.1:3020/ >/dev/null; then
               if [ -n "$previous_release" ]; then
                 ln -sfn "$previous_release" "$app_root/current"
-                sudo systemctl restart travel-frontend
+                sudo /usr/bin/systemctl restart travel-frontend.service
               fi
               exit 1
             fi

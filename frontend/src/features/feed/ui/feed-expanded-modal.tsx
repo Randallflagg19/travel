@@ -26,33 +26,49 @@ export function FeedExpandedModal({
 }: FeedExpandedModalProps) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const isArrowKey =
+        event.key === "ArrowLeft" || event.key === "ArrowRight";
+      const isSpaceKey = event.code === "Space";
+      if (!isArrowKey && !isSpaceKey) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
 
-      const target = event.target;
+      const activeElement = document.activeElement;
       if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT")
+        activeElement instanceof HTMLElement &&
+        (activeElement.isContentEditable ||
+          activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          activeElement.tagName === "SELECT" ||
+          activeElement.closest("[data-video-close]") !== null)
       ) {
         return;
       }
 
       const video = videoRef.current;
-      if (!video || !Number.isFinite(video.duration)) return;
+      if (!video) return;
 
       event.preventDefault();
       shouldAutoPlayRef.current = false;
+
+      if (isSpaceKey) {
+        if (event.repeat) return;
+        if (video.paused) {
+          void video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+        return;
+      }
+
+      if (!Number.isFinite(video.duration)) return;
       video.currentTime = Math.min(
         video.duration,
         Math.max(0, video.currentTime + (event.key === "ArrowRight" ? 5 : -5)),
       );
     }
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [shouldAutoPlayRef, videoRef]);
 
   return (
@@ -96,6 +112,7 @@ export function FeedExpandedModal({
             />
             <button
               type="button"
+              data-video-close
               aria-label="Закрыть видео"
               className="absolute top-3 left-1/2 z-10 flex size-12 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-white/20 bg-black/40 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:left-auto md:translate-x-0 md:right-3"
               onClick={(e) => {

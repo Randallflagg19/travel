@@ -73,7 +73,7 @@ export function FeedExpandedModal({
           >
             <video
               ref={videoRef}
-              className="h-full w-full bg-black object-contain"
+              className="h-full w-full bg-black object-contain outline-none"
               controls
               playsInline
               preload="auto"

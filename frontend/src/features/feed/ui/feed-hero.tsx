@@ -17,7 +17,7 @@ export function FeedHero({
   year = "2026",
   photosCount = 450,
   videosCount = 9,
-  photoSrc = "/me.png",
+  photoSrc = "/me-hero.jpg",
   tagline = "Путешествие, к которому хочется возвращаться.",
 }: FeedHeroProps) {
   return (
@@ -47,6 +47,7 @@ export function FeedHero({
             alt="Фотография из путешествия"
             fill
             priority
+            unoptimized
             className="object-cover object-center"
             sizes="(min-width: 1024px) 25vw, 230px"
           />

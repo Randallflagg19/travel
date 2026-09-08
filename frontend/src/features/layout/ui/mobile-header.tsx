@@ -2,19 +2,47 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { LogIn, LogOut } from "lucide-react";
-import { MobilePlaces } from "@/features/places/ui/mobile-places";
+import { LogIn, LogOut, Trash2 } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { CloudinaryUploadButton } from "@/features/upload/ui/cloudinary-upload-button";
 
 export function MobileHeader() {
   const auth = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const deleteMode = searchParams.get("delete") === "1";
+  const canDelete = Boolean(
+    pathname === "/" &&
+      auth.user &&
+      (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
+  );
+
+  function toggleDeleteMode() {
+    const next = new URLSearchParams(searchParams.toString());
+    if (deleteMode) next.delete("delete");
+    else next.set("delete", "1");
+    const query = next.toString();
+    router.push(query ? `/?${query}` : "/");
+  }
 
   return (
     <div className="sticky top-0 z-50 grid h-16 grid-cols-[1fr_auto_1fr] items-center border-b border-white/10 bg-[#071014]/88 px-4 backdrop-blur-xl lg:hidden">
       <div className="justify-self-start">
-        <MobilePlaces />
+        {canDelete ? (
+          <Button
+            variant={deleteMode ? "destructive" : "ghost"}
+            size="icon"
+            onClick={toggleDeleteMode}
+            className="rounded-full text-white/76 hover:bg-white/10 hover:text-white data-[variant=destructive]:hover:bg-destructive/90"
+            aria-label={deleteMode ? "Выключить удаление" : "Включить удаление"}
+            aria-pressed={deleteMode}
+          >
+            <Trash2 className="size-5" />
+          </Button>
+        ) : null}
       </div>
 
       <Link

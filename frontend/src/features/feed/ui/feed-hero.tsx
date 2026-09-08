@@ -7,7 +7,9 @@ type FeedHeroProps = {
   year?: string;
   photosCount?: number;
   videosCount?: number;
-  photoSrc?: string;
+  photoSrc?: string | null;
+  photoAlt?: string;
+  photoPosition?: string;
   tagline?: string;
 };
 
@@ -18,6 +20,8 @@ export function FeedHero({
   photosCount = 450,
   videosCount = 9,
   photoSrc = "/me-hero.jpg",
+  photoAlt = "Фотография из путешествия",
+  photoPosition = "center",
   tagline = "Путешествие, к которому хочется возвращаться.",
 }: FeedHeroProps) {
   return (
@@ -40,47 +44,53 @@ export function FeedHero({
           sizes="(min-width: 1024px) calc(100vw - 364px), 920px"
         />
 
-        {/* Inner photo window in the mobile 1440 × 900 crop: (793, 121)–(1211, 584). */}
-        <div
-          className="absolute overflow-hidden bg-stone-200 shadow-[inset_0_0_0_1px_rgba(74,54,33,0.2)] lg:hidden"
-          style={{
-            left: `${(793 / 1440) * 100}%`,
-            top: `${(121 / 900) * 100}%`,
-            width: `${(418 / 1440) * 100}%`,
-            height: `${(463 / 900) * 100}%`,
-          }}
-        >
-          <Image
-            src={photoSrc}
-            alt="Фотография из путешествия"
-            fill
-            priority
-            unoptimized
-            className="object-cover object-center"
-            sizes="(max-width: 1023px) 31vw, 25vw"
-          />
-        </div>
+        {photoSrc ? (
+          <>
+            {/* Inner photo window in the mobile 1440 × 900 crop: (793, 121)–(1211, 584). */}
+            <div
+              className="absolute overflow-hidden bg-stone-200 shadow-[inset_0_0_0_1px_rgba(74,54,33,0.2)] lg:hidden"
+              style={{
+                left: `${(793 / 1440) * 100}%`,
+                top: `${(121 / 900) * 100}%`,
+                width: `${(418 / 1440) * 100}%`,
+                height: `${(463 / 900) * 100}%`,
+              }}
+            >
+              <Image
+                src={photoSrc}
+                alt={photoAlt}
+                fill
+                priority
+                unoptimized
+                className="object-cover"
+                style={{ objectPosition: photoPosition }}
+                sizes="(max-width: 1023px) 31vw, 25vw"
+              />
+            </div>
 
-        {/* Inner photo window in the 1672 × 941 desktop bitmap: (909, 141)–(1327, 604). */}
-        <div
-          className="absolute hidden overflow-hidden bg-stone-200 shadow-[inset_0_0_0_1px_rgba(74,54,33,0.2)] lg:block"
-          style={{
-            left: `${(909 / 1672) * 100}%`,
-            top: `${(141 / 941) * 100}%`,
-            width: `${(418 / 1672) * 100}%`,
-            height: `${(463 / 941) * 100}%`,
-          }}
-        >
-          <Image
-            src={photoSrc}
-            alt="Фотография из путешествия"
-            fill
-            priority
-            unoptimized
-            className="object-cover object-center"
-            sizes="25vw"
-          />
-        </div>
+            {/* Inner photo window in the 1672 × 941 desktop bitmap: (909, 141)–(1327, 604). */}
+            <div
+              className="absolute hidden overflow-hidden bg-stone-200 shadow-[inset_0_0_0_1px_rgba(74,54,33,0.2)] lg:block"
+              style={{
+                left: `${(909 / 1672) * 100}%`,
+                top: `${(141 / 941) * 100}%`,
+                width: `${(418 / 1672) * 100}%`,
+                height: `${(463 / 941) * 100}%`,
+              }}
+            >
+              <Image
+                src={photoSrc}
+                alt={photoAlt}
+                fill
+                priority
+                unoptimized
+                className="object-cover"
+                style={{ objectPosition: photoPosition }}
+                sizes="25vw"
+              />
+            </div>
+          </>
+        ) : null}
 
         <div className="pointer-events-none absolute hidden left-[14.45%] top-[13.6%] h-[69.4%] w-[37.7%] flex-col items-center text-center text-[#4f3a2a] [font-family:Georgia,'Times_New_Roman',serif] lg:flex">
           <p className="text-[1.02cqw] italic leading-none text-[#5f4936]">

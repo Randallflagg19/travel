@@ -97,11 +97,7 @@ export function FeedExpandedModal({
             <button
               type="button"
               aria-label="Закрыть видео"
-              className="absolute z-10 flex size-12 cursor-pointer items-center justify-center rounded-full border border-white/25 bg-black/70 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              style={{
-                top: "max(0.75rem, env(safe-area-inset-top, 0px))",
-                right: "max(0.75rem, env(safe-area-inset-right, 0px))",
-              }}
+              className="absolute top-3 left-1/2 z-10 flex size-12 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-white/20 bg-black/40 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:left-auto md:translate-x-0 md:right-3"
               onClick={(e) => {
                 e.stopPropagation();
                 onClose();

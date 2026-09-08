@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useState } from "react";
+import { type RefObject, useEffect } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
@@ -24,7 +24,36 @@ export function FeedExpandedModal({
   videoRef,
   shouldAutoPlayRef,
 }: FeedExpandedModalProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return;
+      }
+
+      const video = videoRef.current;
+      if (!video || !Number.isFinite(video.duration)) return;
+
+      event.preventDefault();
+      shouldAutoPlayRef.current = false;
+      video.currentTime = Math.min(
+        video.duration,
+        Math.max(0, video.currentTime + (event.key === "ArrowRight" ? 5 : -5)),
+      );
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [shouldAutoPlayRef, videoRef]);
 
   return (
     <div
@@ -48,9 +77,6 @@ export function FeedExpandedModal({
               controls
               playsInline
               preload="auto"
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onEnded={() => setIsPlaying(false)}
               src={expandedVideoSrc || undefined}
               poster={
                 expandedPost.cloudinary_public_id
@@ -65,38 +91,6 @@ export function FeedExpandedModal({
                 if (shouldAutoPlayRef.current) {
                   shouldAutoPlayRef.current = false;
                   videoRef.current?.play().catch(() => {});
-                }
-              }}
-            />
-            {/* Keep the native control bar outside the tap-to-toggle area. */}
-            <button
-              type="button"
-              aria-label={
-                isPlaying ? "Приостановить видео" : "Продолжить видео"
-              }
-              className="absolute inset-x-0 top-0 bottom-20 cursor-pointer outline-none"
-              onKeyDown={(e) => {
-                if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-                if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const video = videoRef.current;
-                if (!video || !Number.isFinite(video.duration)) return;
-                shouldAutoPlayRef.current = false;
-                video.currentTime = Math.min(
-                  video.duration,
-                  Math.max(0, video.currentTime + (e.key === "ArrowRight" ? 5 : -5)),
-                );
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                const video = videoRef.current;
-                if (!video) return;
-                shouldAutoPlayRef.current = false;
-                if (video.paused) {
-                  void video.play().catch(() => {});
-                } else {
-                  video.pause();
                 }
               }}
             />

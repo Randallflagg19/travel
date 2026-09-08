@@ -32,7 +32,7 @@ export function MobileChapters({
 
   if (isLoading) {
     return (
-      <div className="space-y-2 px-3 lg:hidden" aria-label="Загрузка глав">
+      <div className="space-y-2 lg:hidden" aria-label="Загрузка глав">
         <div className="h-9 animate-pulse rounded-xl border border-white/10 bg-white/[0.055]" />
         <div className="flex gap-2">
           <div className="h-8 w-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.055]" />
@@ -80,7 +80,7 @@ export function MobileChapters({
   }
 
   return (
-    <section className="space-y-2 px-3 lg:hidden">
+    <section className="space-y-2 lg:hidden">
       <div className="grid grid-cols-[minmax(0,1fr)_2.25rem] gap-2">
         <label className="relative min-w-0">
           <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[0.65rem] text-white/48">

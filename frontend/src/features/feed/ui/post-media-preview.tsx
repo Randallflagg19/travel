@@ -70,7 +70,7 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
       onPointerDown={() => preloadExpandedMedia(post)}
     >
       <Image
-        className="aspect-[2/1] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+        className="aspect-[3/2] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
         alt={post.text ?? "travel media"}
         src={cloudinaryThumbUrl(post.media_url, post.media_type)}
         width={720}

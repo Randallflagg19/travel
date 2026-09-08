@@ -185,7 +185,7 @@ export function Feed() {
       : "Tapir Travel";
 
   return (
-    <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-4 overflow-x-hidden px-0 py-3 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
+    <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-4 overflow-x-hidden px-4 py-3 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
       <FeedHero title={heroTitle} />
 
       <FeedServerLoadingNotice
@@ -237,7 +237,7 @@ export function Feed() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-2.5 px-3 sm:px-0 lg:grid-cols-2 lg:gap-4 2xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2 lg:gap-4 2xl:grid-cols-3">
           {items.map((p) => (
             <div
               key={p.id}

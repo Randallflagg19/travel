@@ -107,7 +107,24 @@ jobs:
             tar -xzf "$archive" -C "$release_dir"
             ln -sfn "$release_dir" "$app_root/current"
 
-            if ! sudo /usr/bin/systemctl restart travel-frontend.service || ! curl -fsS --max-time 10 http://127.0.0.1:3020/ >/dev/null; then
+            if ! sudo /usr/bin/systemctl restart travel-frontend.service; then
+              if [ -n "$previous_release" ]; then
+                ln -sfn "$previous_release" "$app_root/current"
+                sudo /usr/bin/systemctl restart travel-frontend.service
+              fi
+              exit 1
+            fi
+
+            frontend_ready=false
+            for attempt in $(seq 1 20); do
+              if curl -fsS --max-time 2 http://127.0.0.1:3020/ >/dev/null; then
+                frontend_ready=true
+                break
+              fi
+              sleep 1
+            done
+
+            if [ "$frontend_ready" != true ]; then
               if [ -n "$previous_release" ]; then
                 ln -sfn "$previous_release" "$app_root/current"
                 sudo /usr/bin/systemctl restart travel-frontend.service

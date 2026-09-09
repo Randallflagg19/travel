@@ -151,6 +151,61 @@ UI/refactor backlog не является предварительным усл�
   отвечали корректно. Вынести профилактику конфликтов кэша между релизами в
   отдельную техническую задачу, не смешивая с завершённой миграцией.
 
+## Инцидент HTTPS после переключения — 2026-09-09
+
+- Симптом: браузер показывал `ERR_CONNECTION_CLOSED` для `www.tapir.su`.
+  Внешняя проверка показала: TCP к `91.210.170.148:443` устанавливается, но
+  TLS-handshake зависает после ClientHello. Это одинаково воспроизвелось для
+  production и `staging.tapir.su`.
+- В момент диагностики VPS не был перегружен: load около `0.1`, свободно
+  8.5 GB диска и около 979 MB доступной RAM. `travel-frontend` и Nginx были
+  `active`; Next.js на `127.0.0.1:3020` отвечал `200`; Nginx слушал `80/443`.
+  В error log не было ошибок Tapir. HTTP снаружи работал, проблема относилась
+  именно ко всему внешнему TLS на порту `443`.
+- Восстановление: `sudo nginx -t` успешно, затем `sudo systemctl restart nginx`.
+  После перезапуска внешний TLS снова прошёл, сертификат проверен, а
+  `https://www.tapir.su` вернул `HTTP/2 200`.
+- Первопричина не доказана: вероятен зависший Nginx worker либо внешний
+  сетевой/TLS-сбой. Не утверждать, что это ошибка frontend, DNS или кэша.
+  При повторении сначала собрать доказательства, затем перезапускать только
+  Nginx:
+
+  ```bash
+  systemctl is-active nginx
+  systemctl is-active travel-frontend
+  sudo ss -ltnp '( sport = :443 or sport = :80 or sport = :3020 )'
+  curl -fsS -I --max-time 10 http://127.0.0.1:3020/
+  sudo nginx -t
+  sudo journalctl -u nginx --since "30 minutes ago" --no-pager
+  sudo tail -n 100 /var/log/nginx/error.log
+  ```
+
+  Если TCP на `443` доступен, но TLS зависает для нескольких доменов, а
+  локальный frontend отвечает, допустимое восстановление —
+  `sudo systemctl restart nginx`, затем внешний HTTPS-smoke.
+
+  Внешний uptime/TLS-мониторинг настроен и принят 2026-09-09: UptimeRobot
+  каждые 5 минут проверяет `https://www.tapir.su/`; включены iOS Push и email
+  уведомления о падении и восстановлении. Это проверка снаружи VPS, поэтому
+  она обнаружит случай, когда локальный `curl` здоров, а внешний HTTPS нет.
+
+- Для сохранения доказательств до восстановления добавлен
+  `infra/travel-frontend/diagnose-https-incident.sh`. Скрипт намеренно не
+  меняет конфигурацию и не перезапускает сервисы: собирает состояние ресурсов,
+  listeners `80/443/3020`, local frontend/HTTPS health, `nginx -t`, systemd,
+  Nginx и kernel logs в один файл. Он установлен на VPS как
+  `/home/tapiradmin/travel-frontend/diagnose-https-incident.sh` с правами
+  `700`; снимки сохраняются в
+  `/home/tapiradmin/travel-frontend/incidents/`. Пробный запуск 2026-09-09
+  успешен: создан `https-incident-20260909T082834Z.log`.
+
+  При alert: подключиться к VPS, **сначала** выполнить скрипт, сохранить путь
+  к созданному файлу и сообщить его в текущий или новый чат. Только после
+  анализа или при подтверждённом зависании внешнего TLS выполнить
+  `sudo systemctl restart nginx`; затем проверить `https://www.tapir.su/`
+  извне. Не запускать диагностический скрипт с Mac: путь `/home/tapiradmin/...`
+  существует только на VPS.
+
 ## Ближайшая первоочередная задача
 
 - **Переключение основного frontend-домена на VPS выполнено.**

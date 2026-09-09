@@ -1,0 +1,11 @@
+# Allow the deploy user to operate only the isolated Travel staging frontend.
+# Validate with `visudo -cf` before installing into /etc/sudoers.d/.
+Cmnd_Alias TRAVEL_STAGING = \
+  /usr/bin/systemctl daemon-reload, \
+  /usr/bin/systemctl start travel-frontend-staging.service, \
+  /usr/bin/systemctl restart travel-frontend-staging.service, \
+  /usr/bin/systemctl is-active travel-frontend-staging.service, \
+  /usr/bin/systemctl reload nginx, \
+  /usr/sbin/nginx -t
+
+tapiradmin ALL=(root) NOPASSWD: TRAVEL_STAGING

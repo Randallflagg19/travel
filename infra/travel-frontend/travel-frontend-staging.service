@@ -1,0 +1,22 @@
+[Unit]
+Description=Travel staging frontend (Next.js standalone)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/home/tapiradmin/travel-frontend-staging/current/server.js
+
+[Service]
+Type=simple
+User=tapiradmin
+Group=tapiradmin
+WorkingDirectory=/home/tapiradmin/travel-frontend-staging/current
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3021
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -25,23 +25,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - run: npm ci
+          cache: yarn
+          cache-dependency-path: backend/yarn.lock
+      - run: yarn install --frozen-lockfile
         working-directory: backend
-      - run: npm run lint
+      - run: yarn lint
         working-directory: backend
-      - run: npm run build
+      - run: yarn build
         working-directory: backend
       - name: Package release
         id: release
         working-directory: backend
         run: |
-          npm prune --omit=dev
+          rm -rf node_modules
+          yarn install --frozen-lockfile --production=true
           release_id="$(git -C .. rev-parse HEAD)"
           release_dir="$RUNNER_TEMP/travel-backend-release"
           mkdir -p "$release_dir"
-          cp -R dist node_modules package.json package-lock.json "$release_dir/"
+          cp -R dist node_modules package.json yarn.lock "$release_dir/"
           tar -C "$release_dir" -czf "$RUNNER_TEMP/$release_id.tar.gz" .
           echo "id=$release_id" >> "$GITHUB_OUTPUT"
       - name: Configure SSH

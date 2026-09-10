@@ -2,15 +2,15 @@
 Description=Travel staging NestJS Backend
 After=network-online.target
 Wants=network-online.target
-ConditionPathExists=/home/tapiradmin/travel-backend-staging/backend/dist/main.js
+ConditionPathExists=/home/tapiradmin/travel-backend-staging/current/dist/main.js
 
 [Service]
 Type=simple
 User=tapiradmin
-WorkingDirectory=/home/tapiradmin/travel-backend-staging/backend
+WorkingDirectory=/home/tapiradmin/travel-backend-staging/current
 EnvironmentFile=/home/tapiradmin/travel-backend-staging/backend/.env
 Environment=HOST=127.0.0.1
-ExecStart=/usr/bin/node /home/tapiradmin/travel-backend-staging/backend/dist/main.js
+ExecStart=/usr/bin/node /home/tapiradmin/travel-backend-staging/current/dist/main.js
 Restart=always
 RestartSec=5
 KillSignal=SIGTERM

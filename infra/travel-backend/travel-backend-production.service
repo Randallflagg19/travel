@@ -1,0 +1,21 @@
+[Unit]
+Description=Travel production NestJS Backend
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/home/tapiradmin/travel-backend/current/dist/main.js
+
+[Service]
+Type=simple
+User=tapiradmin
+WorkingDirectory=/home/tapiradmin/travel-backend/current
+EnvironmentFile=/home/tapiradmin/travel-backend/backend/.env
+ExecStart=/usr/bin/node /home/tapiradmin/travel-backend/current/dist/main.js
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

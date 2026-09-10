@@ -1,0 +1,1 @@
+tapiradmin ALL=(root) NOPASSWD: /usr/bin/systemctl restart travel-backend.service, /usr/bin/systemctl is-active travel-backend.service

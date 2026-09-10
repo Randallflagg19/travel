@@ -63,6 +63,13 @@ function mediaTypeToCloudinaryResource(
   return 'image';
 }
 
+function normalizePost(row: PostRow): PostRow {
+  if (row.media_type === 'STORY' && !row.media_url) {
+    return { ...row, media_url: null };
+  }
+  return row;
+}
+
 @Injectable()
 export class PostsService {
   constructor(
@@ -202,7 +209,9 @@ export class PostsService {
           `;
 
     const hasMore = rows.length > safeLimit;
-    const items = hasMore ? rows.slice(0, safeLimit) : rows;
+    const items = (hasMore ? rows.slice(0, safeLimit) : rows).map(
+      normalizePost,
+    );
     const last = items[items.length - 1];
     const nextCursor =
       hasMore && last
@@ -266,7 +275,7 @@ export class PostsService {
       VALUES (
         ${input.userId}::uuid,
         ${input.mediaType},
-        ${input.mediaUrl ?? null},
+        ${input.mediaUrl ?? ''},
         ${input.cloudinaryPublicId ?? null},
         ${input.folder ?? null},
         ${input.text ?? null},
@@ -281,7 +290,8 @@ export class PostsService {
         0::int as like_count,
         0::int as comment_count
     `;
-    const post = rows[0];
+    const post = rows[0] ? normalizePost(rows[0]) : undefined;
+    if (!post) throw new BadRequestException('Post was not created');
     if (post && input.cloudinaryPublicId?.trim()) {
       this.updatePostMetadataFromCloudinary(
         post.id,
@@ -291,7 +301,7 @@ export class PostsService {
         // Best effort: не блокируем UI, метаданные подтянутся при следующем запросе или никогда
       });
     }
-    return post;
+    return normalizePost(post);
   }
 
   /** Фоновая подтяжка метаданных (EXIF) из Cloudinary; не блокирует create(). */

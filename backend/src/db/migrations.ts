@@ -170,7 +170,6 @@ export async function runMigrations(sql: Sql) {
         END IF;
       END $$;
     `;
-    await q`ALTER TABLE posts ALTER COLUMN media_url DROP NOT NULL`;
     await q`ALTER TABLE posts DROP CONSTRAINT IF EXISTS posts_media_type_check`;
     await q`
       ALTER TABLE posts

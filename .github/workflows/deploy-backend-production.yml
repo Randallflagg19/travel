@@ -69,12 +69,23 @@ jobs:
             previous=""
             if [ -L "$root/current" ]; then previous="$(readlink -f "$root/current")"; fi
             mkdir -p "$release"; tar -xzf "$archive" -C "$release"; ln -sfn "$release" "$root/current"
-            if ! sudo /usr/bin/systemctl restart travel-backend.service || ! curl -fsS --max-time 5 http://127.0.0.1:3010/api/health >/dev/null; then
+            if ! sudo /usr/bin/systemctl restart travel-backend.service; then
               if [ -n "$previous" ]; then
                 ln -sfn "$previous" "$root/current"
                 sudo /usr/bin/systemctl restart travel-backend.service
               fi
               exit 1
             fi
-            rm -f "$archive"
+            for _ in $(seq 1 15); do
+              if curl -fsS --max-time 5 http://127.0.0.1:3010/api/health >/dev/null; then
+                rm -f "$archive"
+                exit 0
+              fi
+              sleep 2
+            done
+            if [ -n "$previous" ]; then
+              ln -sfn "$previous" "$root/current"
+              sudo /usr/bin/systemctl restart travel-backend.service
+            fi
+            exit 1
           REMOTE

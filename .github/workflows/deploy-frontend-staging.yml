@@ -8,6 +8,11 @@ on:
         required: true
         default: main
         type: string
+      api_url:
+        description: API URL baked into the staging frontend
+        required: true
+        default: https://api-staging.tapir.su/api
+        type: string
 
 concurrency:
   group: travel-frontend-staging
@@ -19,7 +24,7 @@ jobs:
     permissions:
       contents: read
     env:
-      NEXT_PUBLIC_API_URL: https://api.tapir.su/api
+      NEXT_PUBLIC_API_URL: ${{ inputs.api_url }}
 
     steps:
       - name: Check out selected revision
@@ -82,9 +87,9 @@ jobs:
           VPS_HOST: ${{ secrets.TRAVEL_VPS_HOST }}
           VPS_USER: ${{ secrets.TRAVEL_VPS_USER }}
         run: |
-          ssh "$VPS_USER@$VPS_HOST" 'mkdir -p ~/travel-frontend/incoming'
+          ssh "$VPS_USER@$VPS_HOST" 'mkdir -p ~/travel-frontend-staging/incoming'
           scp "${{ steps.release.outputs.archive }}" \
-            "$VPS_USER@$VPS_HOST:~/travel-frontend/incoming/${{ steps.release.outputs.id }}.tar.gz"
+            "$VPS_USER@$VPS_HOST:~/travel-frontend-staging/incoming/${{ steps.release.outputs.id }}.tar.gz"
 
       - name: Activate release and verify it
         env:
@@ -95,7 +100,7 @@ jobs:
           ssh "$VPS_USER@$VPS_HOST" "RELEASE_ID=$RELEASE_ID bash -s" <<'REMOTE'
             set -euo pipefail
 
-            app_root="$HOME/travel-frontend"
+            app_root="$HOME/travel-frontend-staging"
             release_dir="$app_root/releases/$RELEASE_ID"
             archive="$app_root/incoming/$RELEASE_ID.tar.gz"
             previous_release=""
@@ -107,17 +112,17 @@ jobs:
             tar -xzf "$archive" -C "$release_dir"
             ln -sfn "$release_dir" "$app_root/current"
 
-            if ! sudo /usr/bin/systemctl restart travel-frontend.service; then
+            if ! sudo /usr/bin/systemctl restart travel-frontend-staging.service; then
               if [ -n "$previous_release" ]; then
                 ln -sfn "$previous_release" "$app_root/current"
-                sudo /usr/bin/systemctl restart travel-frontend.service
+                sudo /usr/bin/systemctl restart travel-frontend-staging.service
               fi
               exit 1
             fi
 
             frontend_ready=false
             for attempt in $(seq 1 20); do
-              if curl -fsS --max-time 2 http://127.0.0.1:3020/ >/dev/null; then
+              if curl -fsS --max-time 2 http://127.0.0.1:3021/ >/dev/null; then
                 frontend_ready=true
                 break
               fi
@@ -127,7 +132,7 @@ jobs:
             if [ "$frontend_ready" != true ]; then
               if [ -n "$previous_release" ]; then
                 ln -sfn "$previous_release" "$app_root/current"
-                sudo /usr/bin/systemctl restart travel-frontend.service
+                sudo /usr/bin/systemctl restart travel-frontend-staging.service
               fi
               exit 1
             fi

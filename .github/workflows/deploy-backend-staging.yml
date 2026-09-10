@@ -1,0 +1,79 @@
+name: Deploy backend to staging VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy to staging
+        required: true
+        default: staging-infrastructure
+        type: string
+
+concurrency:
+  group: travel-backend-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm run lint
+        working-directory: backend
+      - run: npm run build
+        working-directory: backend
+      - name: Package release
+        id: release
+        working-directory: backend
+        run: |
+          npm prune --omit=dev
+          release_id="$(git -C .. rev-parse HEAD)"
+          release_dir="$RUNNER_TEMP/travel-backend-release"
+          mkdir -p "$release_dir"
+          cp -R dist node_modules package.json package-lock.json "$release_dir/"
+          tar -C "$release_dir" -czf "$RUNNER_TEMP/$release_id.tar.gz" .
+          echo "id=$release_id" >> "$GITHUB_OUTPUT"
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.TRAVEL_VPS_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.TRAVEL_VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Upload and activate release
+        env:
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+          VPS_HOST: ${{ secrets.TRAVEL_VPS_HOST }}
+          VPS_USER: ${{ secrets.TRAVEL_VPS_USER }}
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" 'mkdir -p ~/travel-backend-staging/incoming ~/travel-backend-staging/releases'
+          scp "$RUNNER_TEMP/$RELEASE_ID.tar.gz" "$VPS_USER@$VPS_HOST:~/travel-backend-staging/incoming/$RELEASE_ID.tar.gz"
+          ssh "$VPS_USER@$VPS_HOST" "RELEASE_ID=$RELEASE_ID bash -s" <<'REMOTE'
+            set -euo pipefail
+            root="$HOME/travel-backend-staging"; release="$root/releases/$RELEASE_ID"; archive="$root/incoming/$RELEASE_ID.tar.gz"
+            previous=""
+            if [ -L "$root/current" ]; then previous="$(readlink -f "$root/current")"; fi
+            mkdir -p "$release"; tar -xzf "$archive" -C "$release"; ln -sfn "$release" "$root/current"
+            if ! sudo /usr/bin/systemctl restart travel-backend-staging.service || ! curl -fsS --max-time 5 http://127.0.0.1:3011/api/health >/dev/null; then
+              if [ -n "$previous" ]; then
+                ln -sfn "$previous" "$root/current"
+                sudo /usr/bin/systemctl restart travel-backend-staging.service
+              fi
+              exit 1
+            fi
+            rm -f "$archive"
+          REMOTE

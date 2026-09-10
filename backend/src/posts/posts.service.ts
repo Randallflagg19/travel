@@ -6,16 +6,17 @@ import {
 import { DbService } from '../db/db.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
-export type MediaType = 'PHOTO' | 'VIDEO' | 'AUDIO';
+export type MediaType = 'PHOTO' | 'VIDEO' | 'AUDIO' | 'STORY';
 
 export type PostRow = {
   id: string;
   user_id: string;
   media_type: MediaType;
-  media_url: string;
+  media_url: string | null;
   cloudinary_public_id: string | null;
   folder: string | null;
   text: string | null;
+  title: string | null;
   country: string | null;
   city: string | null;
   lat: number | null;
@@ -231,10 +232,11 @@ export class PostsService {
   async create(input: {
     userId: string;
     mediaType: MediaType;
-    mediaUrl: string;
+    mediaUrl?: string;
     cloudinaryPublicId?: string;
     folder?: string;
     text?: string;
+    title?: string;
     country?: string;
     city?: string;
     lat?: number;
@@ -243,22 +245,32 @@ export class PostsService {
     if (!this.db.client) {
       throw new BadRequestException('Database is not configured');
     }
-    if (!['PHOTO', 'VIDEO', 'AUDIO'].includes(input.mediaType)) {
+    if (!['PHOTO', 'VIDEO', 'AUDIO', 'STORY'].includes(input.mediaType)) {
       throw new BadRequestException('Invalid mediaType');
     }
-    if (!input.mediaUrl) throw new BadRequestException('mediaUrl required');
+    if (input.mediaType === 'STORY') {
+      if (!input.title?.trim()) throw new BadRequestException('title required');
+      if (!input.text?.trim()) throw new BadRequestException('text required');
+      if (input.title.trim().length > 140)
+        throw new BadRequestException('title is too long');
+      if (input.text.trim().length > 12000)
+        throw new BadRequestException('text is too long');
+    } else if (!input.mediaUrl) {
+      throw new BadRequestException('mediaUrl required');
+    }
 
     const rows = await this.db.client<PostRow[]>`
       INSERT INTO posts (
-        user_id, media_type, media_url, cloudinary_public_id, folder, text, country, city, lat, lng
+        user_id, media_type, media_url, cloudinary_public_id, folder, text, title, country, city, lat, lng
       )
       VALUES (
         ${input.userId}::uuid,
         ${input.mediaType},
-        ${input.mediaUrl},
+        ${input.mediaUrl ?? null},
         ${input.cloudinaryPublicId ?? null},
         ${input.folder ?? null},
         ${input.text ?? null},
+        ${input.title?.trim() || null},
         ${input.country ?? null},
         ${input.city ?? null},
         ${input.lat ?? null},

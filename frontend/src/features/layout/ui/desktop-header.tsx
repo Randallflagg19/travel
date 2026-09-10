@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { CloudinaryUploadButton } from "@/features/upload/ui/cloudinary-upload-button";
+import { StoryCreateButton } from "@/features/upload/ui/story-create-button";
 
 export function DesktopHeader() {
   const auth = useAuth();
@@ -22,6 +23,7 @@ export function DesktopHeader() {
             variant="ghost"
             className="h-8 rounded-full px-3 text-sm font-medium text-amber-50/78 hover:bg-white/[0.06] hover:text-amber-50"
           />
+          <StoryCreateButton className="h-8 rounded-full px-3 text-sm font-medium text-amber-50/78 hover:bg-white/[0.06] hover:text-amber-50" />
           <Button
             variant="ghost"
             size="sm"

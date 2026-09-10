@@ -13,13 +13,16 @@ type PostMediaPreviewProps = {
 };
 
 function preloadExpandedMedia(post: ApiPost) {
-  if (post.media_type !== "PHOTO") return;
+  if (post.media_type !== "PHOTO" || !post.media_url) return;
   if (typeof window === "undefined") return;
   const img = new window.Image();
   img.src = cloudinaryFullUrl(post.media_url, post.media_type);
 }
 
 export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
+  if (post.media_type === "STORY") return null;
+  const mediaUrl = post.media_url ?? "";
+
   return post.media_type === "VIDEO" ? (
     <button
       type="button"
@@ -33,12 +36,12 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
           alt={post.text ?? "travel video"}
           src={
             cloudinaryVideoPosterUrl(
-              post.media_url,
+              mediaUrl,
               post.cloudinary_public_id,
               {
                 width: 600,
               },
-            ) ?? cloudinaryThumbUrl(post.media_url, post.media_type)
+            ) ?? cloudinaryThumbUrl(mediaUrl, post.media_type)
           }
           width={720}
           height={540}
@@ -51,7 +54,7 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
           playsInline
           muted
           preload="metadata"
-          src={post.media_url}
+          src={mediaUrl}
         />
       )}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -72,7 +75,7 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
       <Image
         className="aspect-[3/2] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
         alt={post.text ?? "travel media"}
-        src={cloudinaryThumbUrl(post.media_url, post.media_type)}
+        src={cloudinaryThumbUrl(mediaUrl, post.media_type)}
         width={720}
         height={540}
         sizes="(max-width: 768px) 100vw, 720px"

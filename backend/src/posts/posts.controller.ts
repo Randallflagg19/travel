@@ -61,11 +61,12 @@ export class PostsController {
     @CurrentUser() user: JwtUser,
     @Body()
     body: {
-      mediaType: 'PHOTO' | 'VIDEO' | 'AUDIO';
-      mediaUrl: string;
+      mediaType: 'PHOTO' | 'VIDEO' | 'AUDIO' | 'STORY';
+      mediaUrl?: string;
       cloudinaryPublicId?: string;
       folder?: string;
       text?: string;
+      title?: string;
       country?: string;
       city?: string;
       lat?: number;
@@ -79,6 +80,7 @@ export class PostsController {
       cloudinaryPublicId: body.cloudinaryPublicId,
       folder: body.folder,
       text: body.text,
+      title: body.title,
       country: body.country,
       city: body.city,
       lat: body.lat,

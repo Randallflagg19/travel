@@ -1,11 +1,12 @@
 export type ApiPost = {
   id: string;
   user_id: string;
-  media_type: "PHOTO" | "VIDEO" | "AUDIO";
-  media_url: string;
+  media_type: "PHOTO" | "VIDEO" | "AUDIO" | "STORY";
+  media_url: string | null;
   cloudinary_public_id: string | null;
   folder: string | null;
   text: string | null;
+  title: string | null;
   country: string | null;
   city: string | null;
   lat: number | null;
@@ -26,8 +27,16 @@ export type PlacesResponse = {
   countries: Array<{
     country: string;
     count: number;
-    cities: Array<{ city: string; count: number }>;
+    stats: PostTypeStats;
+    cities: Array<{ city: string; count: number; stats: PostTypeStats }>;
   }>;
+};
+
+export type PostTypeStats = {
+  posts: number;
+  photos: number;
+  videos: number;
+  stories: number;
 };
 
 export type ApiComment = {
@@ -253,11 +262,12 @@ export async function adminCloudinarySignUpload(
 export async function createPost(
   accessToken: string,
   body: {
-    mediaType: "PHOTO" | "VIDEO" | "AUDIO";
-    mediaUrl: string;
+    mediaType: "PHOTO" | "VIDEO" | "AUDIO" | "STORY";
+    mediaUrl?: string;
     cloudinaryPublicId?: string;
     folder?: string;
     text?: string;
+    title?: string;
     country?: string;
     city?: string;
     lat?: number;

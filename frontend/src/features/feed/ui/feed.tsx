@@ -114,6 +114,8 @@ export function Feed() {
     shouldAutoPlayRef,
     openExpanded,
     closeExpanded,
+    moveExpanded,
+    canMoveExpanded,
   } = useExpandedPostModal(items);
 
   const inViewOptions = useMemo(() => ({ rootMargin: "300px" }), []);
@@ -305,6 +307,8 @@ export function Feed() {
           expandedVideoSrc={expandedVideoSrc}
           videoRef={videoRef}
           shouldAutoPlayRef={shouldAutoPlayRef}
+          onMove={moveExpanded}
+          canMove={canMoveExpanded}
         />
       ) : null}
     </main>

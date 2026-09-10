@@ -13,6 +13,13 @@ export function useExpandedPostModal(items: ApiPost[]) {
     if (!expandedId) return null;
     return items.find((post) => post.id === expandedId) ?? null;
   }, [expandedId, items]);
+  const mediaItems = useMemo(
+    () => items.filter((post) => post.media_type !== "STORY"),
+    [items],
+  );
+  const expandedMediaIndex = expandedPost
+    ? mediaItems.findIndex((post) => post.id === expandedPost.id)
+    : -1;
 
   const openExpanded = useCallback(
     (postId: string) => {
@@ -39,6 +46,15 @@ export function useExpandedPostModal(items: ApiPost[]) {
     shouldAutoPlayRef.current = false;
   }, []);
 
+  const moveExpanded = useCallback((direction: -1 | 1) => {
+    if (expandedMediaIndex < 0 || mediaItems.length < 2) return;
+    const next = (expandedMediaIndex + direction + mediaItems.length) % mediaItems.length;
+    const post = mediaItems[next];
+    setExpandedId(post.id);
+    setExpandedVideoSrc(post.media_type === "VIDEO" ? post.media_url : null);
+    shouldAutoPlayRef.current = post.media_type === "VIDEO";
+  }, [expandedMediaIndex, mediaItems]);
+
   useExpandedModalBehavior(Boolean(expandedId), closeExpanded);
 
   return {
@@ -48,5 +64,7 @@ export function useExpandedPostModal(items: ApiPost[]) {
     shouldAutoPlayRef,
     openExpanded,
     closeExpanded,
+    moveExpanded,
+    canMoveExpanded: expandedMediaIndex >= 0 && mediaItems.length > 1,
   };
 }

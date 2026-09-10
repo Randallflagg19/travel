@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { CloudinaryUploadButton } from "@/features/upload/ui/cloudinary-upload-button";
+import { StoryCreateButton } from "@/features/upload/ui/story-create-button";
 
 export function MobileHeader() {
   const auth = useAuth();
@@ -69,6 +70,7 @@ export function MobileHeader() {
               iconOnly
               className="rounded-full text-white/76 hover:bg-white/10 hover:text-white"
             />
+            <StoryCreateButton iconOnly className="rounded-full text-white/76 hover:bg-white/10 hover:text-white" />
             <Button
               variant="ghost"
               size="icon"

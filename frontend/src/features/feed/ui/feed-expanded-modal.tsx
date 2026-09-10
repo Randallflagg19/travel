@@ -2,7 +2,7 @@
 
 import { type RefObject, useEffect } from "react";
 import Image from "next/image";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
 import {
   cloudinaryFullUrl,
@@ -15,6 +15,8 @@ type FeedExpandedModalProps = {
   expandedVideoSrc: string | null;
   videoRef: RefObject<HTMLVideoElement | null>;
   shouldAutoPlayRef: RefObject<boolean>;
+  onMove: (direction: -1 | 1) => void;
+  canMove: boolean;
 };
 
 export function FeedExpandedModal({
@@ -23,6 +25,8 @@ export function FeedExpandedModal({
   expandedVideoSrc,
   videoRef,
   shouldAutoPlayRef,
+  onMove,
+  canMove,
 }: FeedExpandedModalProps) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -44,10 +48,10 @@ export function FeedExpandedModal({
         return;
       }
 
+      event.preventDefault();
+      if (isArrowKey && canMove) { onMove(event.key === "ArrowRight" ? 1 : -1); return; }
       const video = videoRef.current;
       if (!video) return;
-
-      event.preventDefault();
       shouldAutoPlayRef.current = false;
 
       if (isSpaceKey) {
@@ -69,7 +73,7 @@ export function FeedExpandedModal({
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [shouldAutoPlayRef, videoRef]);
+  }, [canMove, onMove, shouldAutoPlayRef, videoRef]);
 
   return (
     <div
@@ -80,7 +84,13 @@ export function FeedExpandedModal({
       onClick={onClose}
     >
       <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center">
-        {expandedPost.media_type === "VIDEO" ? (
+        {expandedPost.media_type === "STORY" ? (
+          <article className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl bg-[#e7ddc9] p-7 text-[#33291f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button type="button" aria-label="Закрыть" className="float-right rounded-full p-2 hover:bg-black/10" onClick={onClose}><X className="size-5" /></button>
+            <p className="text-sm text-[#6a5845]">История</p><h2 className="mt-3 font-serif text-4xl leading-tight">{expandedPost.title}</h2>
+            <p className="mt-6 whitespace-pre-line text-base leading-8 text-[#493a2d]">{expandedPost.text}</p>
+          </article>
+        ) : expandedPost.media_type === "VIDEO" ? (
           <div
             className="relative h-full w-full overflow-hidden rounded-lg"
             onClick={(e) => {
@@ -97,7 +107,7 @@ export function FeedExpandedModal({
               poster={
                 expandedPost.cloudinary_public_id
                   ? (cloudinaryVideoPosterUrl(
-                      expandedPost.media_url,
+                      expandedPost.media_url ?? "",
                       expandedPost.cloudinary_public_id,
                       { width: 1200 },
                     ) ?? undefined)
@@ -133,7 +143,7 @@ export function FeedExpandedModal({
             <Image
               alt={expandedPost.text ?? "travel media"}
               src={cloudinaryFullUrl(
-                expandedPost.media_url,
+                expandedPost.media_url ?? "",
                 expandedPost.media_type,
               )}
               fill
@@ -144,6 +154,10 @@ export function FeedExpandedModal({
             />
           </button>
         )}
+        {canMove && expandedPost.media_type !== "STORY" ? <>
+          <button type="button" aria-label="Предыдущее фото или видео" className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white backdrop-blur hover:bg-black/70" onClick={(e) => { e.stopPropagation(); onMove(-1); }}><ChevronLeft /></button>
+          <button type="button" aria-label="Следующее фото или видео" className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white backdrop-blur hover:bg-black/70" onClick={(e) => { e.stopPropagation(); onMove(1); }}><ChevronRight /></button>
+        </> : null}
       </div>
     </div>
   );

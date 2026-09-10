@@ -150,6 +150,34 @@ export async function runMigrations(sql: Sql) {
     await q`CREATE INDEX IF NOT EXISTS posts_country_city_created_at_id_idx ON posts (country, city, created_at, id)`;
     await q`CREATE INDEX IF NOT EXISTS posts_user_id_idx ON posts (user_id)`;
 
+    // A story is a text-first entry in the same chronological journal as media.
+    // Its body lives in the existing `text` column; `title` is optional for media
+    // and required by the application for stories.
+    await q`ALTER TABLE posts ADD COLUMN IF NOT EXISTS title text`;
+    // Earlier staging builds used a separate `story` column. Preserve any text
+    // entered through them before the application stops reading that column.
+    await q`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_name = 'posts' AND column_name = 'story'
+        ) THEN
+          UPDATE posts
+          SET text = COALESCE(NULLIF(text, ''), story)
+          WHERE media_type = 'STORY' AND story IS NOT NULL;
+        END IF;
+      END $$;
+    `;
+    await q`ALTER TABLE posts ALTER COLUMN media_url DROP NOT NULL`;
+    await q`ALTER TABLE posts DROP CONSTRAINT IF EXISTS posts_media_type_check`;
+    await q`
+      ALTER TABLE posts
+      ADD CONSTRAINT posts_media_type_check
+      CHECK (media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY'))
+    `;
+
     // Comments
     await q`
       CREATE TABLE IF NOT EXISTS comments (

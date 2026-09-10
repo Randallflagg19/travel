@@ -5,11 +5,26 @@ type PlaceRow = {
   country: string | null;
   city: string | null;
   count: number;
+  photos: number;
+  videos: number;
+  stories: number;
 };
 
-type CityPlace = { city: string; count: number };
+type PostTypeStats = {
+  posts: number;
+  photos: number;
+  videos: number;
+  stories: number;
+};
 
-type CountryPlace = { country: string; cities: CityPlace[]; count: number };
+type CityPlace = { city: string; count: number; stats: PostTypeStats };
+
+type CountryPlace = {
+  country: string;
+  cities: CityPlace[];
+  count: number;
+  stats: PostTypeStats;
+};
 
 export type PlacesResponse = {
   countries: CountryPlace[];
@@ -26,7 +41,10 @@ export class PlacesService {
       SELECT
         NULLIF(TRIM(country), '') AS country,
         NULLIF(TRIM(city), '') AS city,
-        COUNT(*)::int AS count
+        COUNT(*)::int AS count,
+        COUNT(*) FILTER (WHERE media_type = 'PHOTO')::int AS photos,
+        COUNT(*) FILTER (WHERE media_type = 'VIDEO')::int AS videos,
+        COUNT(*) FILTER (WHERE media_type = 'STORY')::int AS stories
       FROM posts
       GROUP BY 1, 2
       ORDER BY 1 NULLS LAST, 2 NULLS LAST
@@ -47,13 +65,27 @@ export class PlacesService {
         country,
         cities: [],
         count: 0,
+        stats: { posts: 0, photos: 0, videos: 0, stories: 0 },
       };
 
       if (hasCity) {
-        existing.cities.push({ city: r.city as string, count: r.count });
+        existing.cities.push({
+          city: r.city as string,
+          count: r.count,
+          stats: {
+            posts: r.count,
+            photos: r.photos,
+            videos: r.videos,
+            stories: r.stories,
+          },
+        });
       }
 
       existing.count += r.count;
+      existing.stats.posts += r.count;
+      existing.stats.photos += r.photos;
+      existing.stats.videos += r.videos;
+      existing.stats.stories += r.stories;
       countriesMap.set(country, existing);
     }
 

@@ -11,7 +11,7 @@ on:
       api_url:
         description: API URL baked into the staging frontend
         required: true
-        default: https://api.tapir.su/api
+        default: https://api-staging.tapir.su/api
         type: string
 
 concurrency:

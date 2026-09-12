@@ -109,7 +109,7 @@ export function FeedPostCard({
           <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/35 to-transparent" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/90 via-black/45 to-transparent lg:hidden" />
 
-          {post.media_type === "VIDEO" ? <div className="pointer-events-none absolute left-2.5 top-2.5 rounded-md bg-[#071014]/75 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white ring-1 ring-white/15 backdrop-blur">Видео</div> : null}
+          {post.media_type === "VIDEO" ? <div className="pointer-events-none absolute left-2.5 top-2.5 rounded-md bg-[#071014]/75 px-2 py-1 text-[10px] font-semibold tracking-[0.03em] text-white ring-1 ring-white/15 backdrop-blur">Видео</div> : null}
 
           <div className="pointer-events-none absolute inset-x-0 bottom-0 px-3 pt-3 pb-1 text-amber-50 lg:relative lg:border-t lg:border-amber-200/10 lg:px-4 lg:pt-2">
             <div>

@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   ParseIntPipe,
   ParseUUIDPipe,
   Post,
@@ -86,6 +87,16 @@ export class PostsController {
       lat: body.lat,
       lng: body.lng,
     });
+    return { post };
+  }
+
+  @Patch(':id')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
+  async updateMetadata(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: { title?: string | null; text?: string | null },
+  ) {
+    const post = await this.posts.updateMetadata(id, body);
     return { post };
   }
 }

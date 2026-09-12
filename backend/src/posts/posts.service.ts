@@ -304,6 +304,54 @@ export class PostsService {
     return normalizePost(post);
   }
 
+  async updateMetadata(
+    postId: string,
+    input: { title?: string | null; text?: string | null },
+  ): Promise<PostRow> {
+    if (!this.db.client) {
+      throw new BadRequestException('Database is not configured');
+    }
+    const updatesTitle = input.title !== undefined;
+    const updatesText = input.text !== undefined;
+    if (!updatesTitle && !updatesText) {
+      throw new BadRequestException('title or text required');
+    }
+
+    const title = input.title?.trim() || null;
+    const text = input.text?.trim() || null;
+    if (title && title.length > 140)
+      throw new BadRequestException('title is too long');
+    if (text && text.length > 12000)
+      throw new BadRequestException('text is too long');
+
+    let rows: PostRow[];
+    if (updatesTitle && updatesText) {
+      rows = await this.db.client<PostRow[]>`
+        UPDATE posts
+        SET title = ${title}, text = ${text}
+        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
+        RETURNING *, 0::int as like_count, 0::int as comment_count
+      `;
+    } else if (updatesTitle) {
+      rows = await this.db.client<PostRow[]>`
+        UPDATE posts
+        SET title = ${title}
+        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
+        RETURNING *, 0::int as like_count, 0::int as comment_count
+      `;
+    } else {
+      rows = await this.db.client<PostRow[]>`
+        UPDATE posts
+        SET text = ${text}
+        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
+        RETURNING *, 0::int as like_count, 0::int as comment_count
+      `;
+    }
+    const post = rows[0] ? normalizePost(rows[0]) : undefined;
+    if (!post) throw new BadRequestException('Media post was not found');
+    return post;
+  }
+
   /** Фоновая подтяжка метаданных (EXIF) из Cloudinary; не блокирует create(). */
   private async updatePostMetadataFromCloudinary(
     postId: string,

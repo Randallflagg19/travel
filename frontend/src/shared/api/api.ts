@@ -64,7 +64,9 @@ export type AuthResponse = {
 function getApiBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!url) {
-    throw new Error("NEXT_PUBLIC_API_URL is not set. Create .env.local from .env.local.example.");
+    throw new Error(
+      "NEXT_PUBLIC_API_URL is not set. Create .env.local from .env.local.example.",
+    );
   }
   return url.replace(/\/+$/, "");
 }
@@ -249,7 +251,10 @@ export async function adminCloudinarySignUpload(
   const api = getApiBaseUrl();
   const res = await fetch(`${api}/admin/cloudinary/sign-upload`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ paramsToSign }),
   });
   if (!res.ok) {
@@ -277,12 +282,36 @@ export async function createPost(
   const api = getApiBaseUrl();
   const res = await fetch(`${api}/posts`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await readApiError(res);
     throw new Error(`Create post failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { post: ApiPost };
+}
+
+export async function updatePostMetadata(
+  accessToken: string,
+  postId: string,
+  body: { title?: string | null; text?: string | null },
+): Promise<{ post: ApiPost }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/posts/${postId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Update post metadata failed (${res.status}): ${text}`);
   }
   return (await res.json()) as { post: ApiPost };
 }

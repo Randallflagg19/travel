@@ -26,22 +26,18 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
   return post.media_type === "VIDEO" ? (
     <button
       type="button"
-      className="relative block w-full cursor-zoom-in overflow-hidden"
+      className="relative block w-full cursor-pointer overflow-hidden"
       onClick={() => onOpen(post.id)}
       aria-label="Открыть видео"
     >
       {post.cloudinary_public_id ? (
         <Image
           className="aspect-[2/1] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
-          alt={post.text ?? "travel video"}
+          alt={post.title ?? post.text ?? "travel video"}
           src={
-            cloudinaryVideoPosterUrl(
-              mediaUrl,
-              post.cloudinary_public_id,
-              {
-                width: 600,
-              },
-            ) ?? cloudinaryThumbUrl(mediaUrl, post.media_type)
+            cloudinaryVideoPosterUrl(mediaUrl, post.cloudinary_public_id, {
+              width: 600,
+            }) ?? cloudinaryThumbUrl(mediaUrl, post.media_type)
           }
           width={720}
           height={540}
@@ -66,7 +62,7 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
   ) : (
     <button
       type="button"
-      className="block w-full cursor-zoom-in overflow-hidden"
+      className="block w-full cursor-pointer overflow-hidden"
       onClick={() => onOpen(post.id)}
       onFocus={() => preloadExpandedMedia(post)}
       onPointerEnter={() => preloadExpandedMedia(post)}
@@ -74,7 +70,7 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
     >
       <Image
         className="aspect-[3/2] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
-        alt={post.text ?? "travel media"}
+        alt={post.title ?? post.text ?? "travel media"}
         src={cloudinaryThumbUrl(mediaUrl, post.media_type)}
         width={720}
         height={540}

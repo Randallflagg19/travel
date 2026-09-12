@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -10,6 +10,7 @@ import {
   fetchPostsPage,
   fetchPlaces,
   deletePost,
+  updatePostMetadata,
   type ApiPost,
 } from "@/shared/api/api";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
@@ -29,12 +30,14 @@ import { useFeedSelectionState } from "../model/use-feed-selection-state";
 import { useExpandedPostModal } from "../model/use-expanded-post-modal";
 import { useOpenFeedComments } from "../model/use-open-feed-comments";
 import { selectHeroPhoto } from "../model/hero-photo-selection";
+import { PostMetadataDialog } from "@/features/posts/ui/post-metadata-dialog";
 
 const POSTS_PAGE_LIMIT = 9;
 
 export function Feed() {
   const queryClient = useQueryClient();
   const auth = useAuth();
+  const [editingPost, setEditingPost] = useState<ApiPost | null>(null);
   const {
     order,
     setOrder,
@@ -139,6 +142,21 @@ export function Feed() {
       await queryClient.invalidateQueries({ queryKey: ["places"] });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Не удалось удалить");
+    }
+  }
+
+  async function handleMetadataSave(value: { title: string; text: string }) {
+    if (!editingPost || !auth.accessToken || !canDelete) return;
+    try {
+      await updatePostMetadata(auth.accessToken, editingPost.id, {
+        title: value.title || null,
+        text: value.text || null,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+      setEditingPost(null);
+    } catch (error) {
+      console.error("updatePostMetadata failed", error);
+      alert("Не удалось сохранить изменения. Попробуйте ещё раз.");
     }
   }
 
@@ -262,7 +280,9 @@ export function Feed() {
                 post={p}
                 deleteMode={deleteMode}
                 canDelete={canDelete}
+                canEdit={canDelete}
                 onDelete={handleDeletePost}
+                onEdit={setEditingPost}
                 onOpen={openExpanded}
                 showPlaceInCard={showPlaceInCard}
                 canLike={canLike}
@@ -299,6 +319,19 @@ export function Feed() {
           )}
         </div>
       )}
+      <PostMetadataDialog
+        open={editingPost !== null}
+        initialValue={{
+          title: editingPost?.title ?? "",
+          text: editingPost?.text ?? "",
+        }}
+        title="Редактировать запись"
+        submitLabel="Сохранить"
+        onOpenChange={(open) => {
+          if (!open) setEditingPost(null);
+        }}
+        onSubmit={handleMetadataSave}
+      />
 
       {expandedPost ? (
         <FeedExpandedModal

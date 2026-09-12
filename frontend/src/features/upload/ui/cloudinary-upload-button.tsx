@@ -6,12 +6,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
-import { adminCloudinaryConfig, adminCloudinarySignUpload, createPost } from "@/shared/api/api";
+import {
+  adminCloudinaryConfig,
+  adminCloudinarySignUpload,
+  createPost,
+} from "@/shared/api/api";
+import {
+  PostMetadataDialog,
+  type PostMetadata,
+} from "@/features/posts/ui/post-metadata-dialog";
 
 declare global {
   interface Window {
     cloudinary?: {
-      createUploadWidget: (options: unknown, callback: (error: unknown, result: unknown) => void) => {
+      createUploadWidget: (
+        options: unknown,
+        callback: (error: unknown, result: unknown) => void,
+      ) => {
         open: () => void;
       };
     };
@@ -19,14 +30,19 @@ declare global {
 }
 
 function loadCloudinaryWidgetScript(): Promise<void> {
-  if (typeof window === "undefined") return Promise.reject(new Error("No window"));
+  if (typeof window === "undefined")
+    return Promise.reject(new Error("No window"));
   if (window.cloudinary?.createUploadWidget) return Promise.resolve();
 
   return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[data-cloudinary-widget="true"]');
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-cloudinary-widget="true"]',
+    );
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Cloudinary widget failed to load")));
+      existing.addEventListener("error", () =>
+        reject(new Error("Cloudinary widget failed to load")),
+      );
       return;
     }
 
@@ -41,7 +57,10 @@ function loadCloudinaryWidgetScript(): Promise<void> {
   });
 }
 
-function pickMediaType(resourceType: string | undefined, format: string | undefined) {
+function pickMediaType(
+  resourceType: string | undefined,
+  format: string | undefined,
+) {
   if (resourceType === "image") return "PHOTO" as const;
   if (resourceType === "video") {
     const fmt = (format ?? "").toLowerCase();
@@ -62,8 +81,10 @@ export function CloudinaryUploadButton(props: {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
+  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
   const widgetRef = useRef<{ open: () => void } | null>(null);
   const widgetFolderRef = useRef<string | null>(null);
+  const metadataRef = useRef<PostMetadata>({ title: "", text: "" });
 
   const ctx = useMemo(() => {
     const country = searchParams.get("country") ?? "";
@@ -71,22 +92,30 @@ export function CloudinaryUploadButton(props: {
     return { country, city };
   }, [searchParams]);
 
-  const canUpload = Boolean(auth.user && auth.accessToken && (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"));
+  const canUpload = Boolean(
+    auth.user &&
+    auth.accessToken &&
+    (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
+  );
 
-  async function onClick() {
+  async function openCloudinaryWidget(metadata: PostMetadata) {
     if (!canUpload) return;
     if (!auth.accessToken) return;
     if (!auth.user) return;
 
+    metadataRef.current = metadata;
     setBusy(true);
     try {
-      const { cloudName, apiKey } = await adminCloudinaryConfig(auth.accessToken);
+      const { cloudName, apiKey } = await adminCloudinaryConfig(
+        auth.accessToken,
+      );
       await loadCloudinaryWidgetScript();
 
       const root = auth.user.username || "uploads";
-      const folder = ctx.country && ctx.city
-        ? `${root}/${ctx.country}/${ctx.city}`
-        : `${root}/all`;
+      const folder =
+        ctx.country && ctx.city
+          ? `${root}/${ctx.country}/${ctx.city}`
+          : `${root}/all`;
 
       if (!widgetRef.current || widgetFolderRef.current !== folder) {
         const widget = window.cloudinary?.createUploadWidget(
@@ -94,14 +123,20 @@ export function CloudinaryUploadButton(props: {
             cloudName,
             apiKey,
             folder,
-            multiple: true,
+            multiple: false,
             resourceType: "auto",
             sources: ["local", "camera", "url"],
             // Keep Cloudinary filenames (nicer folders). Cloudinary will ensure uniqueness.
             use_filename: true,
             unique_filename: true,
-            uploadSignature: async (callback: (signature: string, timestamp: number) => void, params: unknown) => {
-              const signed = await adminCloudinarySignUpload(auth.accessToken as string, (params ?? {}) as Record<string, unknown>);
+            uploadSignature: async (
+              callback: (signature: string, timestamp: number) => void,
+              params: unknown,
+            ) => {
+              const signed = await adminCloudinarySignUpload(
+                auth.accessToken as string,
+                (params ?? {}) as Record<string, unknown>,
+              );
               callback(signed.signature, signed.timestamp);
             },
           },
@@ -135,6 +170,8 @@ export function CloudinaryUploadButton(props: {
                 mediaUrl,
                 cloudinaryPublicId: publicId || undefined,
                 folder: info.folder || folder,
+                title: metadataRef.current.title || undefined,
+                text: metadataRef.current.text || undefined,
                 country: ctx.country && ctx.city ? ctx.country : undefined,
                 city: ctx.country && ctx.city ? ctx.city : undefined,
               });
@@ -151,6 +188,7 @@ export function CloudinaryUploadButton(props: {
         widgetFolderRef.current = widget ? folder : null;
       }
 
+      setMetadataDialogOpen(false);
       widgetRef.current?.open();
       if (!widgetRef.current) {
         setBusy(false);
@@ -161,24 +199,39 @@ export function CloudinaryUploadButton(props: {
     }
   }
 
+  function onClick() {
+    if (!canUpload) return;
+    setMetadataDialogOpen(true);
+  }
+
   if (!canUpload) return null;
 
   return (
-    <Button
-      size={props.size ?? "sm"}
-      variant={props.variant ?? "secondary"}
-      className={props.className}
-      onClick={onClick}
-      disabled={busy || auth.isLoading}
-      aria-label={busy ? "Загрузка..." : "Загрузить"}
-    >
-      {props.iconOnly ? (
-        <Upload className="size-4" />
-      ) : busy ? (
-        "Upload…"
-      ) : (
-        "Upload"
-      )}
-    </Button>
+    <>
+      <Button
+        size={props.size ?? "sm"}
+        variant={props.variant ?? "secondary"}
+        className={props.className}
+        onClick={onClick}
+        disabled={busy || auth.isLoading}
+        aria-label={busy ? "Загрузка..." : "Загрузить"}
+      >
+        {props.iconOnly ? (
+          <Upload className="size-4" />
+        ) : busy ? (
+          "Upload…"
+        ) : (
+          "Upload"
+        )}
+      </Button>
+      <PostMetadataDialog
+        open={metadataDialogOpen}
+        title="Новая запись"
+        submitLabel="Выбрать файл"
+        saving={busy}
+        onOpenChange={setMetadataDialogOpen}
+        onSubmit={openCloudinaryWidget}
+      />
+    </>
   );
 }

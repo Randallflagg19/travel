@@ -34,7 +34,8 @@ export function FeedExpandedModal({
         event.key === "ArrowLeft" || event.key === "ArrowRight";
       const isSpaceKey = event.code === "Space";
       if (!isArrowKey && !isSpaceKey) return;
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+        return;
 
       const activeElement = document.activeElement;
       if (
@@ -49,7 +50,10 @@ export function FeedExpandedModal({
       }
 
       event.preventDefault();
-      if (isArrowKey && canMove) { onMove(event.key === "ArrowRight" ? 1 : -1); return; }
+      if (isArrowKey && canMove) {
+        onMove(event.key === "ArrowRight" ? 1 : -1);
+        return;
+      }
       const video = videoRef.current;
       if (!video) return;
       shouldAutoPlayRef.current = false;
@@ -85,10 +89,25 @@ export function FeedExpandedModal({
     >
       <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center">
         {expandedPost.media_type === "STORY" ? (
-          <article className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl bg-[#e7ddc9] p-7 text-[#33291f] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <button type="button" aria-label="Закрыть" className="float-right rounded-full p-2 hover:bg-black/10" onClick={onClose}><X className="size-5" /></button>
-            <p className="text-sm text-[#6a5845]">История</p><h2 className="mt-3 font-serif text-4xl leading-tight">{expandedPost.title}</h2>
-            <p className="mt-6 whitespace-pre-line text-base leading-8 text-[#493a2d]">{expandedPost.text}</p>
+          <article
+            className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl bg-[#e7ddc9] p-7 text-[#33291f] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="Закрыть"
+              className="float-right rounded-full p-2 hover:bg-black/10"
+              onClick={onClose}
+            >
+              <X className="size-5" />
+            </button>
+            <p className="text-sm text-[#6a5845]">История</p>
+            <h2 className="mt-3 font-serif text-4xl leading-tight">
+              {expandedPost.title}
+            </h2>
+            <p className="mt-6 whitespace-pre-line text-base leading-8 text-[#493a2d]">
+              {expandedPost.text}
+            </p>
           </article>
         ) : expandedPost.media_type === "VIDEO" ? (
           <div
@@ -141,7 +160,7 @@ export function FeedExpandedModal({
             aria-label="Закрыть"
           >
             <Image
-              alt={expandedPost.text ?? "travel media"}
+              alt={expandedPost.title ?? expandedPost.text ?? "travel media"}
               src={cloudinaryFullUrl(
                 expandedPost.media_url ?? "",
                 expandedPost.media_type,
@@ -154,10 +173,50 @@ export function FeedExpandedModal({
             />
           </button>
         )}
-        {canMove && expandedPost.media_type !== "STORY" ? <>
-          <button type="button" aria-label="Предыдущее фото или видео" className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white backdrop-blur hover:bg-black/70" onClick={(e) => { e.stopPropagation(); onMove(-1); }}><ChevronLeft /></button>
-          <button type="button" aria-label="Следующее фото или видео" className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white backdrop-blur hover:bg-black/70" onClick={(e) => { e.stopPropagation(); onMove(1); }}><ChevronRight /></button>
-        </> : null}
+        {expandedPost.media_type !== "STORY" &&
+        (expandedPost.title || expandedPost.text) ? (
+          <aside
+            className="absolute inset-x-5 bottom-5 z-20 mx-auto max-h-44 max-w-2xl overflow-y-auto rounded-xl border border-white/15 bg-black/65 px-4 py-3 text-left text-amber-50 shadow-xl backdrop-blur"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {expandedPost.title ? (
+              <h2 className="font-serif text-xl leading-tight">
+                {expandedPost.title}
+              </h2>
+            ) : null}
+            {expandedPost.text ? (
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-amber-50/80">
+                {expandedPost.text}
+              </p>
+            ) : null}
+          </aside>
+        ) : null}
+        {canMove && expandedPost.media_type !== "STORY" ? (
+          <>
+            <button
+              type="button"
+              aria-label="Предыдущее фото или видео"
+              className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white backdrop-blur hover:bg-black/70"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(-1);
+              }}
+            >
+              <ChevronLeft />
+            </button>
+            <button
+              type="button"
+              aria-label="Следующее фото или видео"
+              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-3 text-white backdrop-blur hover:bg-black/70"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(1);
+              }}
+            >
+              <ChevronRight />
+            </button>
+          </>
+        ) : null}
       </div>
     </div>
   );

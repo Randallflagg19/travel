@@ -84,7 +84,8 @@ main / production → отдельный production backend → api.tapir.su/api
    release по-прежнему содержит `https://api.tapir.su/api`.
 5. **Сделать backend deploy pipeline — выполнено 10 сентября.** GitHub Actions
    собирает backend в Linux, передаёт версионированный релиз по SSH, переключает
-   `current` на новый релиз и ожидает health-check до 30 секунд. При неуспехе
+   `current` на новый релиз и ожидает health-check до 90 секунд: это оставляет
+   время Neon на пробуждение и миграции. При неуспехе
    возвращается предыдущий релиз. Pipeline проверен на staging: активен релиз
    `331351d`, `/api/health` отвечает успешно, `/api/places` отдаёт агрегаты
    фото/видео/историй. Для production подготовлен отдельный ручной workflow,

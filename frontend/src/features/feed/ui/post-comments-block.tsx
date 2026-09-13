@@ -19,6 +19,8 @@ type PostCommentsBlockProps = {
   currentUserId: string | null;
   accessToken: string | null;
   onCommentAdded?: () => void;
+  onClose?: () => void;
+  variant?: "default" | "story";
 };
 
 function formatCommentDate(iso: string): string {
@@ -53,6 +55,8 @@ export function PostCommentsBlock({
   currentUserId,
   accessToken,
   onCommentAdded,
+  onClose,
+  variant = "default",
 }: PostCommentsBlockProps) {
   const queryClient = useQueryClient();
   const [newText, setNewText] = useState("");
@@ -115,18 +119,43 @@ export function PostCommentsBlock({
     addMutation.mutate(trimmed);
   }
 
+  const isStory = variant === "story";
+
   return (
-    <div className="border-t pt-3">
+    <div className={isStory ? "" : "border-t pt-3"}>
+      {isStory ? (
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="font-story text-lg text-[#4a3b2d]">Комментарии</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-[#6d5b45] transition hover:bg-[#d8c9ad]/70 hover:text-[#33291f] focus-visible:outline-2 focus-visible:outline-[#315b55]"
+            aria-label="Свернуть комментарии"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      ) : null}
       <div
         ref={listRef}
-        className="max-h-[280px] overflow-y-auto overscroll-contain rounded-lg bg-muted/30 py-1"
+        className={`max-h-[280px] overflow-y-auto overscroll-contain py-1 ${
+          isStory ? "" : "rounded-lg bg-muted/30"
+        }`}
       >
         {isLoading ? (
-          <p className="text-muted-foreground px-2 py-4 text-center text-sm">
+          <p
+            className={`px-2 py-4 text-center text-sm ${
+              isStory ? "text-[#796752]" : "text-muted-foreground"
+            }`}
+          >
             Загрузка…
           </p>
         ) : items.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-4 text-center text-sm">
+          <p
+            className={`px-2 py-4 text-center text-sm ${
+              isStory ? "font-story text-base text-[#796752]" : "text-muted-foreground"
+            }`}
+          >
             Пока нет комментариев
           </p>
         ) : (
@@ -134,14 +163,22 @@ export function PostCommentsBlock({
             {items.map((c) => (
               <li
                 key={c.id}
-                className="rounded-lg bg-muted/50 px-3 py-2 text-sm"
+                className={`rounded-lg px-3 py-2 text-sm ${
+                  isStory
+                    ? "border border-[#796752]/20 bg-[#f8f1e2]/80 text-[#493a2d]"
+                    : "bg-muted/50"
+                }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="whitespace-pre-wrap break-words leading-snug">
                       {c.text}
                     </p>
-                    <p className="text-muted-foreground mt-1 text-xs">
+                    <p
+                      className={`mt-1 text-xs ${
+                        isStory ? "text-[#796752]" : "text-muted-foreground"
+                      }`}
+                    >
                       {formatCommentDate(c.created_at)}
                     </p>
                   </div>
@@ -153,7 +190,11 @@ export function PostCommentsBlock({
                         setDeleteConfirmCommentId(c.id)
                       }
                       disabled={deleteMutation.isPending}
-                      className="text-muted-foreground hover:text-destructive flex size-9 shrink-0 items-center justify-center rounded p-1 transition-colors disabled:opacity-50"
+                      className={`flex size-9 shrink-0 items-center justify-center rounded p-1 transition-colors disabled:opacity-50 ${
+                        isStory
+                          ? "text-[#796752] hover:text-red-700"
+                          : "text-muted-foreground hover:text-destructive"
+                      }`}
                       aria-label="Удалить комментарий"
                     >
                       <X className="size-3.5" />
@@ -173,14 +214,22 @@ export function PostCommentsBlock({
             onChange={(e) => setNewText(e.target.value)}
             placeholder="Написать комментарий…"
             rows={1}
-            className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[38px] max-h-20 flex-1 resize-none rounded-lg border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50"
+            className={`min-h-[38px] max-h-20 flex-1 resize-none rounded-lg border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 ${
+              isStory
+                ? "border-[#796752]/45 bg-[#fff9ed] text-[#3f3227] placeholder:text-[#806d56] focus-visible:ring-[#315b55] focus-visible:ring-offset-[#efe4ce]"
+                : "border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring"
+            }`}
             disabled={isSubmitting}
           />
           <Button
             type="submit"
             size="sm"
             disabled={!newText.trim() || isSubmitting}
-            className="shrink-0 self-end rounded-lg"
+            className={`shrink-0 self-end rounded-lg ${
+              isStory
+                ? "bg-[#315b55] text-[#fff9ed] hover:bg-[#274b46]"
+                : ""
+            }`}
           >
             {isSubmitting ? "…" : "Отправить"}
           </Button>

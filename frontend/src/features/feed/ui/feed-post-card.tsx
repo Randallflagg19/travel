@@ -66,7 +66,11 @@ export function FeedPostCard({
   }
 
   const actions = (
-    <div className="pointer-events-auto flex w-full items-center justify-between gap-2 text-xs text-amber-100/75">
+    <div
+      className={`pointer-events-auto flex w-full items-center justify-between gap-2 text-xs ${
+        post.media_type === "STORY" ? "text-[#4a3b2d]" : "text-amber-100/75"
+      }`}
+    >
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -76,7 +80,7 @@ export function FeedPostCard({
           aria-label={liked ? "Снять лайк" : "Лайкнуть"}
         >
           <Heart
-            className={`size-4 ${liked ? "fill-red-400 text-red-400" : ""}`}
+            className={`size-[18px] ${liked ? "fill-red-400 text-red-400" : ""}`}
           />
           <span>{post.like_count}</span>
         </button>
@@ -90,7 +94,7 @@ export function FeedPostCard({
           className="relative z-10 flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-md px-1 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/85"
           aria-label="Комментарии"
         >
-          <MessageSquare className="size-4" />
+          <MessageSquare className="size-[18px]" />
           <span>{post.comment_count}</span>
         </button>
       </div>
@@ -102,15 +106,7 @@ export function FeedPostCard({
 
   if (post.media_type === "STORY")
     return (
-      <Card
-        className="travel-card-glow relative overflow-hidden rounded-xl border-amber-200/25 bg-[#e7ddc9] p-0 text-[#33291f] transition duration-300 hover:border-amber-200/50"
-        style={{
-          backgroundImage: "url('/images/stories/story-bg.webp')",
-          backgroundPosition: "center bottom",
-          backgroundRepeat: "no-repeat",
-          backgroundSize: "100% 100%",
-        }}
-      >
+      <Card className="travel-card-glow relative overflow-hidden rounded-xl border-amber-200/25 bg-[#e7ddc9] p-0 text-[#33291f] transition duration-300 hover:border-amber-200/50">
         {deleteMode && canDelete ? (
           <button
             type="button"
@@ -124,6 +120,12 @@ export function FeedPostCard({
         <CardContent
           className="relative flex aspect-[3/4] min-h-80 flex-col p-5"
           onClick={() => onOpen(post.id)}
+          style={{
+            backgroundImage: "url('/images/stories/story-bg.webp')",
+            backgroundPosition: "center bottom",
+            backgroundRepeat: "no-repeat",
+            backgroundSize: "100% 100%",
+          }}
         >
           <div className="relative flex items-center justify-between text-[11px] text-[#594837]">
             <span className="inline-flex items-center gap-1 rounded bg-[#d5c8ae]/70 px-2 py-1">
@@ -158,13 +160,15 @@ export function FeedPostCard({
           </div>
         </CardContent>
         {isCommentsOpen ? (
-          <div className="relative z-20 border-t border-[#796752]/25 bg-[#ddd0b7] p-4">
+          <div className="relative z-20 border-t border-[#796752]/25 bg-[#efe4ce] p-4">
             <PostCommentsBlock
               postId={post.id}
               canComment={canComment}
               currentUserId={currentUserId}
               accessToken={accessToken}
               onCommentAdded={onCommentAdded}
+              onClose={() => onOpenComments(post.id)}
+              variant="story"
             />
           </div>
         ) : null}

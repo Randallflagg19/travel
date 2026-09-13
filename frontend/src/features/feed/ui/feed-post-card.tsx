@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Heart, MapPin, MessageSquare, Trash2 } from "lucide-react";
+import { BookMarked, Heart, MapPin, MessageSquare, Trash2 } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PostCommentsBlock } from "./post-comments-block";
@@ -128,8 +128,8 @@ export function FeedPostCard({
           }}
         >
           <div className="relative flex items-center justify-between text-[11px] text-[#594837]">
-            <span className="inline-flex items-center gap-1 rounded bg-[#d5c8ae]/70 px-2 py-1">
-              <BookOpen className="size-3" />
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-[#d5c8ae]/70 px-2.5 py-1.5 font-story-body text-sm font-medium leading-none">
+              <BookMarked className="size-[18px]" strokeWidth={1.8} />
               История
             </span>
             {post.country || post.city ? (
@@ -244,9 +244,10 @@ export function FeedPostCard({
               postId={post.id}
               canComment={canComment}
               currentUserId={currentUserId}
-              accessToken={accessToken}
-              onCommentAdded={onCommentAdded}
-            />
+            accessToken={accessToken}
+            onCommentAdded={onCommentAdded}
+            onClose={() => onOpenComments(post.id)}
+          />
           </div>
         ) : null}
       </CardContent>

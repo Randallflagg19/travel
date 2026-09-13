@@ -123,13 +123,25 @@ export function PostCommentsBlock({
 
   return (
     <div className={isStory ? "" : "border-t pt-3"}>
-      {isStory ? (
+      {onClose ? (
         <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="font-story text-lg text-[#4a3b2d]">Комментарии</p>
+          <p
+            className={
+              isStory
+                ? "font-story text-lg text-[#4a3b2d]"
+                : "text-sm font-medium text-amber-50/85"
+            }
+          >
+            Комментарии
+          </p>
           <button
             type="button"
             onClick={onClose}
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-[#6d5b45] transition hover:bg-[#d8c9ad]/70 hover:text-[#33291f] focus-visible:outline-2 focus-visible:outline-[#315b55]"
+            className={`flex size-8 cursor-pointer items-center justify-center rounded-full transition focus-visible:outline-2 ${
+              isStory
+                ? "text-[#6d5b45] hover:bg-[#d8c9ad]/70 hover:text-[#33291f] focus-visible:outline-[#315b55]"
+                : "text-muted-foreground hover:bg-white/10 hover:text-amber-50 focus-visible:outline-white/85"
+            }`}
             aria-label="Свернуть комментарии"
           >
             <X className="size-4" />

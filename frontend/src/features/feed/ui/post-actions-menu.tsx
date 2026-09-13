@@ -26,7 +26,7 @@ export function PostActionsMenu({ onEdit }: PostActionsMenuProps) {
         <MoreVertical className="size-4" />
       </button>
       {open ? (
-        <div className="absolute bottom-full right-0 mb-1 w-44 overflow-hidden rounded-xl border border-[#071014] bg-[#101b1e] text-sm text-amber-50 shadow-2xl transition-colors hover:bg-[#1d2b2e]">
+        <div className="absolute right-full top-1/2 mr-2 w-44 -translate-y-1/2 overflow-hidden rounded-xl border border-[#071014] bg-[#101b1e] text-sm text-amber-50 shadow-2xl transition-colors hover:bg-[#1d2b2e]">
           <button
             type="button"
             className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left"

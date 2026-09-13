@@ -49,6 +49,7 @@ export function FeedPostCard({
   onCommentAdded,
 }: FeedPostCardProps) {
   const liked = Boolean(post.liked_by_me);
+  const storyPlace = post.city?.trim() || post.country?.trim() || null;
 
   const { likePending, toggleLike } = usePostLikeToggle({
     canLike,
@@ -132,10 +133,10 @@ export function FeedPostCard({
               <BookMarked className="size-[18px]" strokeWidth={1.8} />
               История
             </span>
-            {post.country || post.city ? (
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="size-3" />
-                {displayPlaceTitle(post.country ?? "", post.city ?? "")}
+            {storyPlace ? (
+              <span className="inline-flex items-center gap-1.5 font-story-body text-sm font-medium leading-none">
+                <MapPin className="size-[18px]" strokeWidth={1.8} />
+                {storyPlace}
               </span>
             ) : null}
           </div>

@@ -99,8 +99,11 @@ export function FeedPostCard({
           <span>{post.comment_count}</span>
         </button>
       </div>
-      {post.media_type !== "STORY" && !deleteMode && canEdit ? (
-        <PostActionsMenu onEdit={() => onEdit(post)} />
+      {!deleteMode && canEdit ? (
+        <PostActionsMenu
+          onEdit={() => onEdit(post)}
+          variant={post.media_type === "STORY" ? "story" : "default"}
+        />
       ) : null}
     </div>
   );

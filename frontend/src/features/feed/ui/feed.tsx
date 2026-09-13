@@ -325,8 +325,14 @@ export function Feed() {
           title: editingPost?.title ?? "",
           text: editingPost?.text ?? "",
         }}
-        title="Редактировать запись"
+        title={
+          editingPost?.media_type === "STORY"
+            ? "Редактировать историю"
+            : "Редактировать запись"
+        }
         submitLabel="Сохранить"
+        variant={editingPost?.media_type === "STORY" ? "story" : "default"}
+        requireFields={editingPost?.media_type === "STORY"}
         onOpenChange={(open) => {
           if (!open) setEditingPost(null);
         }}

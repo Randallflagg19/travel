@@ -324,31 +324,47 @@ export class PostsService {
     if (text && text.length > 12000)
       throw new BadRequestException('text is too long');
 
+    const existingRows = await this.db.client<
+      { media_type: string; title: string | null; text: string | null }[]
+    >`
+      SELECT media_type, title, text
+      FROM posts
+      WHERE id = ${postId}::uuid
+    `;
+    const existing = existingRows[0];
+    if (!existing) throw new BadRequestException('Post was not found');
+
+    const nextTitle = updatesTitle ? title : existing.title;
+    const nextText = updatesText ? text : existing.text;
+    if (existing.media_type === 'STORY' && (!nextTitle || !nextText)) {
+      throw new BadRequestException('Story title and text are required');
+    }
+
     let rows: PostRow[];
     if (updatesTitle && updatesText) {
       rows = await this.db.client<PostRow[]>`
         UPDATE posts
         SET title = ${title}, text = ${text}
-        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
+        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
         RETURNING *, 0::int as like_count, 0::int as comment_count
       `;
     } else if (updatesTitle) {
       rows = await this.db.client<PostRow[]>`
         UPDATE posts
         SET title = ${title}
-        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
+        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
         RETURNING *, 0::int as like_count, 0::int as comment_count
       `;
     } else {
       rows = await this.db.client<PostRow[]>`
         UPDATE posts
         SET text = ${text}
-        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
+        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
         RETURNING *, 0::int as like_count, 0::int as comment_count
       `;
     }
     const post = rows[0] ? normalizePost(rows[0]) : undefined;
-    if (!post) throw new BadRequestException('Media post was not found');
+    if (!post) throw new BadRequestException('Post was not found');
     return post;
   }
 

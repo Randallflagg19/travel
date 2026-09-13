@@ -2,7 +2,7 @@
 
 import { type RefObject, useEffect } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { BookMarked, ChevronLeft, ChevronRight, MapPin, X } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
 import {
   cloudinaryFullUrl,
@@ -81,7 +81,7 @@ export function FeedExpandedModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/90 p-3"
+      className="fixed inset-0 z-50 bg-black/90 p-5 sm:p-7"
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр медиа"
@@ -90,24 +90,41 @@ export function FeedExpandedModal({
       <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center">
         {expandedPost.media_type === "STORY" ? (
           <article
-            className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl bg-[#e7ddc9] p-7 text-[#33291f] shadow-2xl"
+            className="relative flex h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-[#e7ddc9] text-[#33291f] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              aria-label="Закрыть"
-              className="float-right rounded-full p-2 hover:bg-black/10"
-              onClick={onClose}
-            >
-              <X className="size-5" />
-            </button>
-            <p className="text-sm text-[#6a5845]">История</p>
-            <h2 className="mt-3 font-story text-5xl leading-[0.95]">
-              {expandedPost.title}
-            </h2>
-            <p className="mt-6 whitespace-pre-line font-story-body text-base leading-8 text-[#493a2d]">
-              {expandedPost.text}
-            </p>
+            <div className="z-20 flex shrink-0 items-center justify-between border-b border-[#796752]/20 bg-[#e7ddc9] px-6 py-4">
+              <div className="flex items-center gap-4 text-[#594837]">
+                <span className="inline-flex items-center gap-1.5 font-story-body text-sm font-medium">
+                  <BookMarked className="size-[18px]" strokeWidth={1.8} />
+                  История
+                </span>
+                {expandedPost.city?.trim() || expandedPost.country?.trim() ? (
+                  <span className="inline-flex items-center gap-1.5 font-story-body text-sm font-medium">
+                    <MapPin className="size-[18px]" strokeWidth={1.8} />
+                    {expandedPost.city?.trim() || expandedPost.country?.trim()}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                aria-label="Закрыть историю"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-[#594837] transition hover:bg-[#d5c8ae]/65 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#594837]"
+                onClick={onClose}
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="story-reader-scroll min-h-0 flex-1 overflow-y-auto">
+              <div className="relative px-6 pt-10 pb-28">
+                <h2 className="font-story text-4xl leading-[0.98] sm:text-5xl">
+                  {expandedPost.title}
+                </h2>
+                <p className="mt-7 whitespace-pre-line font-story-body text-base leading-8 text-[#493a2d]">
+                  {expandedPost.text}
+                </p>
+              </div>
+            </div>
           </article>
         ) : expandedPost.media_type === "VIDEO" ? (
           <div

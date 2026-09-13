@@ -137,10 +137,10 @@ export function FeedPostCard({
               </span>
             ) : null}
           </div>
-          <h3 className="relative mt-5 font-serif text-2xl leading-[1.05]">
+          <h3 className="relative mt-5 font-story text-3xl leading-[0.96]">
             {post.title}
           </h3>
-          <p className="relative mt-3 line-clamp-7 whitespace-pre-line text-sm leading-relaxed text-[#4b3d30]">
+          <p className="relative mt-3 line-clamp-7 whitespace-pre-line font-story-body text-sm leading-relaxed text-[#4b3d30]">
             {post.text}
           </p>
           <button
@@ -149,7 +149,7 @@ export function FeedPostCard({
               e.stopPropagation();
               onOpen(post.id);
             }}
-            className="relative mt-auto pt-5 font-serif text-sm text-[#315b55] underline underline-offset-4"
+            className="relative mt-auto pt-5 font-story text-base text-[#315b55] underline underline-offset-4"
           >
             Читать дальше
           </button>

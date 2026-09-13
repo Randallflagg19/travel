@@ -102,10 +102,10 @@ export function FeedExpandedModal({
               <X className="size-5" />
             </button>
             <p className="text-sm text-[#6a5845]">История</p>
-            <h2 className="mt-3 font-serif text-4xl leading-tight">
+            <h2 className="mt-3 font-story text-5xl leading-[0.95]">
               {expandedPost.title}
             </h2>
-            <p className="mt-6 whitespace-pre-line text-base leading-8 text-[#493a2d]">
+            <p className="mt-6 whitespace-pre-line font-story-body text-base leading-8 text-[#493a2d]">
               {expandedPost.text}
             </p>
           </article>

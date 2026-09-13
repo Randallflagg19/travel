@@ -102,7 +102,15 @@ export function FeedPostCard({
 
   if (post.media_type === "STORY")
     return (
-      <Card className="travel-card-glow relative overflow-hidden rounded-xl border-amber-200/25 bg-[#e7ddc9] p-0 text-[#33291f] transition duration-300 hover:border-amber-200/50">
+      <Card
+        className="travel-card-glow relative overflow-hidden rounded-xl border-amber-200/25 bg-[#e7ddc9] p-0 text-[#33291f] transition duration-300 hover:border-amber-200/50"
+        style={{
+          backgroundImage: "url('/images/stories/story-bg.webp')",
+          backgroundPosition: "center bottom",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "100% 100%",
+        }}
+      >
         {deleteMode && canDelete ? (
           <button
             type="button"
@@ -114,10 +122,9 @@ export function FeedPostCard({
           </button>
         ) : null}
         <CardContent
-          className="relative min-h-80 p-5"
+          className="relative flex aspect-[3/4] min-h-80 flex-col p-5"
           onClick={() => onOpen(post.id)}
         >
-          <div className="pointer-events-none absolute inset-0 opacity-45 [background-image:radial-gradient(rgba(77,57,38,.22)_0.7px,transparent_.7px)] [background-size:7px_7px]" />
           <div className="relative flex items-center justify-between text-[11px] text-[#594837]">
             <span className="inline-flex items-center gap-1 rounded bg-[#d5c8ae]/70 px-2 py-1">
               <BookOpen className="size-3" />
@@ -133,7 +140,7 @@ export function FeedPostCard({
           <h3 className="relative mt-5 font-serif text-2xl leading-[1.05]">
             {post.title}
           </h3>
-          <p className="relative mt-3 line-clamp-6 whitespace-pre-line text-sm leading-relaxed text-[#4b3d30]">
+          <p className="relative mt-3 line-clamp-7 whitespace-pre-line text-sm leading-relaxed text-[#4b3d30]">
             {post.text}
           </p>
           <button
@@ -142,11 +149,11 @@ export function FeedPostCard({
               e.stopPropagation();
               onOpen(post.id);
             }}
-            className="relative mt-4 font-serif text-sm text-[#315b55] underline underline-offset-4"
+            className="relative mt-auto pt-5 font-serif text-sm text-[#315b55] underline underline-offset-4"
           >
             Читать дальше
           </button>
-          <div className="relative mt-2 flex items-center justify-between border-t border-[#796752]/25 pt-1 text-[#514334]">
+          <div className="relative mt-3 flex items-center justify-between border-t border-[#796752]/25 pt-1 text-[#514334]">
             {actions}
           </div>
         </CardContent>

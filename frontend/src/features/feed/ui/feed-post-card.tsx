@@ -120,7 +120,6 @@ export function FeedPostCard({
         ) : null}
         <CardContent
           className="relative flex aspect-[3/4] min-h-80 flex-col p-5"
-          onClick={() => onOpen(post.id)}
           style={{
             backgroundImage: "url('/images/stories/story-bg.webp')",
             backgroundPosition: "center bottom",
@@ -148,15 +147,14 @@ export function FeedPostCard({
           </p>
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen(post.id);
-            }}
-            className="relative mt-auto pt-5 font-story text-base text-[#315b55] underline underline-offset-4"
+            onClick={() => onOpen(post.id)}
+            className="group relative mt-auto flex min-h-24 w-full cursor-pointer items-center justify-center rounded-md px-5 pt-5 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#315b55]"
           >
-            Читать дальше
+            <span className="inline-flex rounded-full border border-[#315b55]/20 bg-[#d5c8ae]/55 px-5 py-2 font-story-body text-sm font-medium text-[#315b55] transition-colors group-hover:bg-[#d5c8ae]/80">
+              Открыть историю
+            </span>
           </button>
-          <div className="relative mt-3 flex items-center justify-between border-t border-[#796752]/25 pt-1 text-[#514334]">
+          <div className="relative flex items-center justify-between border-t border-[#796752]/25 pt-1 text-[#514334]">
             {actions}
           </div>
         </CardContent>

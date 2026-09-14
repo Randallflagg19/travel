@@ -17,6 +17,9 @@ export class DbService {
       // Neon requires TLS.
       ssl: 'require',
       max: 1,
+      // The staging URL uses a transaction pool. Server-side prepared statements
+      // can survive a client release there and become invalid after migrations.
+      prepare: false,
     });
   }
 

@@ -1,3 +1,5 @@
+/* eslint-disable @next/next/no-img-element -- natural dimensions drive masonry */
+
 import type { ApiPost } from "@/shared/api/api";
 import {
   cloudinaryFullUrl,
@@ -5,7 +7,6 @@ import {
   cloudinaryVideoPosterUrl,
 } from "@/shared/lib/cloudinary";
 import { Play } from "lucide-react";
-import Image from "next/image";
 
 type PostMediaPreviewProps = {
   post: ApiPost;
@@ -31,22 +32,19 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
       aria-label="Открыть видео"
     >
       {post.cloudinary_public_id ? (
-        <Image
-          className="aspect-[2/1] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+        <img
+          className="block h-auto w-full transition duration-500 group-hover:scale-[1.035]"
           alt={post.title ?? post.text ?? "travel video"}
           src={
             cloudinaryVideoPosterUrl(mediaUrl, post.cloudinary_public_id, {
               width: 600,
             }) ?? cloudinaryThumbUrl(mediaUrl, post.media_type)
           }
-          width={720}
-          height={540}
-          sizes="(max-width: 768px) 100vw, 720px"
-          unoptimized
+          loading="lazy"
         />
       ) : (
         <video
-          className="pointer-events-none aspect-[2/1] lg:aspect-[4/3] w-full object-cover"
+          className="pointer-events-none block h-auto w-full"
           playsInline
           muted
           preload="metadata"
@@ -68,14 +66,11 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
       onPointerEnter={() => preloadExpandedMedia(post)}
       onPointerDown={() => preloadExpandedMedia(post)}
     >
-      <Image
-        className="aspect-[3/2] lg:aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+      <img
+        className="block h-auto w-full transition duration-500 group-hover:scale-[1.035]"
         alt={post.title ?? post.text ?? "travel media"}
         src={cloudinaryThumbUrl(mediaUrl, post.media_type)}
-        width={720}
-        height={540}
-        sizes="(max-width: 768px) 100vw, 720px"
-        unoptimized
+        loading="lazy"
       />
     </button>
   );

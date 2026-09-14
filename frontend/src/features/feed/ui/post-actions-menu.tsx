@@ -1,15 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { MoreVertical, Pencil } from "lucide-react";
+import {
+  Maximize2,
+  Minimize2,
+  MoreVertical,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 
 type PostActionsMenuProps = {
   onEdit: () => void;
+  onDelete: () => void;
+  isFeatured?: boolean;
+  onToggleFeatured?: () => void;
   variant?: "default" | "story";
 };
 
 export function PostActionsMenu({
   onEdit,
+  onDelete,
+  isFeatured = false,
+  onToggleFeatured,
   variant = "default",
 }: PostActionsMenuProps) {
   const [open, setOpen] = useState(false);
@@ -36,7 +48,7 @@ export function PostActionsMenu({
       </button>
       {open ? (
         <div
-          className={`absolute right-full top-1/2 mr-2 w-44 -translate-y-1/2 overflow-hidden rounded-xl border text-sm shadow-2xl transition-colors ${
+          className={`absolute bottom-0 right-full mr-2 w-52 overflow-hidden rounded-xl border p-1.5 text-sm shadow-2xl transition-colors ${
             isStory
               ? "border-[#796752]/25 bg-[#f4ead7] text-[#4b3d30]"
               : "border-[#071014] bg-[#101b1e] text-amber-50 hover:bg-[#1d2b2e]"
@@ -44,7 +56,7 @@ export function PostActionsMenu({
         >
           <button
             type="button"
-            className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/10"
             onClick={() => {
               setOpen(false);
               onEdit();
@@ -52,6 +64,35 @@ export function PostActionsMenu({
           >
             <Pencil className="size-4" />
             Редактировать
+          </button>
+          {onToggleFeatured ? (
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/10"
+              onClick={() => {
+                setOpen(false);
+                onToggleFeatured();
+              }}
+            >
+              {isFeatured ? (
+                <Minimize2 className="size-4" />
+              ) : (
+                <Maximize2 className="size-4" />
+              )}
+              {isFeatured ? "Обычный размер" : "Сделать крупным"}
+            </button>
+          ) : null}
+          <div className="my-1 border-t border-current/10" />
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-red-400 transition hover:bg-red-500/10"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+          >
+            <Trash2 className="size-4" />
+            Удалить
           </button>
         </div>
       ) : null}

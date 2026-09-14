@@ -1,7 +1,19 @@
 "use client";
 
-import { BookMarked, Heart, MapPin, MessageSquare, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  BookMarked,
+  Heart,
+  LoaderCircle,
+  MapPin,
+  MessageSquare,
+  Trash2,
+} from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
+import {
+  cloudinaryThumbUrl,
+  cloudinaryVideoPosterUrl,
+} from "@/shared/lib/cloudinary";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PostCommentsBlock } from "./post-comments-block";
 import { displayPlaceTitle } from "@/features/places/model/place-labels";
@@ -16,6 +28,7 @@ type FeedPostCardProps = {
   canEdit: boolean;
   onDelete: (postId: string) => void;
   onEdit: (post: ApiPost) => void;
+  onToggleFeatured: (post: ApiPost) => void;
   onOpen: (postId: string) => void;
   showPlaceInCard: boolean;
   canLike: boolean;
@@ -29,6 +42,41 @@ type FeedPostCardProps = {
   onCommentAdded?: () => void;
 };
 
+function previewUrl(post: ApiPost): string | null {
+  if (!post.media_url || post.media_type === "STORY") return null;
+  if (post.media_type === "VIDEO") {
+    return post.cloudinary_public_id
+      ? cloudinaryVideoPosterUrl(post.media_url, post.cloudinary_public_id, {
+          width: 600,
+        })
+      : null;
+  }
+  return cloudinaryThumbUrl(post.media_url, post.media_type);
+}
+
+function useMediaPreviewReady(post: ApiPost) {
+  const url = previewUrl(post);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!url) return;
+
+    const image = new Image();
+    const finish = () => setLoadedUrl(url);
+    image.addEventListener("load", finish);
+    image.addEventListener("error", finish);
+    image.src = url;
+    if (image.complete) queueMicrotask(finish);
+
+    return () => {
+      image.removeEventListener("load", finish);
+      image.removeEventListener("error", finish);
+    };
+  }, [url]);
+
+  return !url || loadedUrl === url;
+}
+
 export function FeedPostCard({
   post,
   deleteMode,
@@ -36,6 +84,7 @@ export function FeedPostCard({
   canEdit,
   onDelete,
   onEdit,
+  onToggleFeatured,
   onOpen,
   showPlaceInCard,
   canLike,
@@ -48,6 +97,7 @@ export function FeedPostCard({
   onOpenComments,
   onCommentAdded,
 }: FeedPostCardProps) {
+  const mediaReady = useMediaPreviewReady(post);
   const liked = Boolean(post.liked_by_me);
   const storyPlace = post.city?.trim() || post.country?.trim() || null;
 
@@ -102,6 +152,13 @@ export function FeedPostCard({
       {!deleteMode && canEdit ? (
         <PostActionsMenu
           onEdit={() => onEdit(post)}
+          onDelete={() => onDelete(post.id)}
+          isFeatured={post.layout === "FEATURED"}
+          onToggleFeatured={
+            post.media_type === "STORY"
+              ? undefined
+              : () => onToggleFeatured(post)
+          }
           variant={post.media_type === "STORY" ? "story" : "default"}
         />
       ) : null}
@@ -174,6 +231,23 @@ export function FeedPostCard({
             />
           </div>
         ) : null}
+      </Card>
+    );
+
+  if (!mediaReady)
+    return (
+      <Card className="travel-card-glow overflow-hidden rounded-xl border-amber-200/15 bg-[#071014] p-0">
+        <CardContent className="flex aspect-[3/4] min-h-56 flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,#173136,transparent_58%)] px-5 text-center text-amber-50/80">
+          <span className="flex size-11 items-center justify-center rounded-full border border-amber-100/15 bg-white/5">
+            <LoaderCircle className="size-5 animate-spin text-[#83c8b6]" />
+          </span>
+          <div>
+            <p className="font-serif text-base text-amber-50">Загружаем кадр</p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-50/55">
+              Подготавливаем его для ленты
+            </p>
+          </div>
+        </CardContent>
       </Card>
     );
 

@@ -7,6 +7,7 @@ export type ApiPost = {
   folder: string | null;
   text: string | null;
   title: string | null;
+  layout: "STANDARD" | "FEATURED";
   country: string | null;
   city: string | null;
   lat: number | null;
@@ -298,7 +299,11 @@ export async function createPost(
 export async function updatePostMetadata(
   accessToken: string,
   postId: string,
-  body: { title?: string | null; text?: string | null },
+  body: {
+    title?: string | null;
+    text?: string | null;
+    layout?: "STANDARD" | "FEATURED";
+  },
 ): Promise<{ post: ApiPost }> {
   const api = getApiBaseUrl();
   const res = await fetch(`${api}/posts/${postId}`, {

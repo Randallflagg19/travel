@@ -18,6 +18,7 @@ import { useAuth } from "@/entities/session/model/auth";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 import { FeedHeader } from "./feed-header";
 import { FeedPostCard } from "./feed-post-card";
+import { FeedMasonryItem } from "./feed-masonry-item";
 import { FeedExpandedModal } from "./feed-expanded-modal";
 import { useFeedParams } from "../model/use-feed-params";
 import { useFeedPermissions } from "../model/use-feed-permissions";
@@ -53,7 +54,6 @@ export function Feed() {
   const { canDelete, canLike, canComment } = permissions;
 
   const { commentsPostId, postCardRefs, openComments } = useOpenFeedComments();
-
   const placesQuery = useQuery({
     queryKey: ["places"],
     queryFn: fetchPlaces,
@@ -158,6 +158,28 @@ export function Feed() {
       console.error("updatePostMetadata failed", error);
       alert("Не удалось сохранить изменения. Попробуйте ещё раз.");
     }
+  }
+
+  async function handleToggleFeatured(post: ApiPost) {
+    if (!auth.accessToken || !canDelete) return;
+    const layout = post.layout === "FEATURED" ? "STANDARD" : "FEATURED";
+    try {
+      await updatePostMetadata(auth.accessToken, post.id, {
+        layout,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+    } catch (error) {
+      console.error("update post layout failed", error);
+      alert("Не удалось изменить размер карточки. Попробуйте ещё раз.");
+    }
+  }
+
+  function handleLikeSuccess() {
+    void queryClient.invalidateQueries({ queryKey: ["posts"] });
+  }
+
+  function handleCommentAdded() {
+    void queryClient.invalidateQueries({ queryKey: ["posts"] });
   }
 
   const updatePostLike = useCallback(
@@ -268,11 +290,12 @@ export function Feed() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2 lg:gap-4 2xl:grid-cols-3">
+        <div className="columns-2 gap-2.5 lg:columns-3 lg:gap-4">
           {items.map((p) => (
-            <div
+            <FeedMasonryItem
               key={p.id}
-              ref={(el) => {
+              featured={p.layout === "FEATURED"}
+              onElement={(el) => {
                 postCardRefs.current[p.id] = el;
               }}
             >
@@ -283,6 +306,7 @@ export function Feed() {
                 canEdit={canDelete}
                 onDelete={handleDeletePost}
                 onEdit={setEditingPost}
+                onToggleFeatured={handleToggleFeatured}
                 onOpen={openExpanded}
                 showPlaceInCard={showPlaceInCard}
                 canLike={canLike}
@@ -291,29 +315,25 @@ export function Feed() {
                 currentUserId={auth.user?.id ?? null}
                 accessToken={auth.accessToken}
                 onLikeToggled={updatePostLike}
-                onLikeSuccess={() =>
-                  queryClient.invalidateQueries({ queryKey: ["posts"] })
-                }
+                onLikeSuccess={handleLikeSuccess}
                 onOpenComments={openComments}
-                onCommentAdded={() =>
-                  queryClient.invalidateQueries({ queryKey: ["posts"] })
-                }
+                onCommentAdded={handleCommentAdded}
               />
-            </div>
+            </FeedMasonryItem>
           ))}
 
-          <div ref={sentinelRef} className="col-span-full h-10" />
+          <div ref={sentinelRef} className="[column-span:all] h-10" />
 
           {postsQuery.isFetchingNextPage ? (
-            <p className="col-span-full text-center text-sm text-white/50">
+            <p className="[column-span:all] text-center text-sm text-white/50">
               Загружаю ещё…
             </p>
           ) : postsQuery.hasNextPage ? (
-            <p className="col-span-full text-center text-sm text-white/50">
+            <p className="[column-span:all] text-center text-sm text-white/50">
               Прокрути ниже — подгружу ещё.
             </p>
           ) : (
-            <p className="col-span-full text-center text-sm text-white/50">
+            <p className="[column-span:all] text-center text-sm text-white/50">
               Конец ленты.
             </p>
           )}

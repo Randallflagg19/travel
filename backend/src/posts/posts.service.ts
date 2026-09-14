@@ -7,6 +7,7 @@ import { DbService } from '../db/db.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 export type MediaType = 'PHOTO' | 'VIDEO' | 'AUDIO' | 'STORY';
+export type PostLayout = 'STANDARD' | 'FEATURED';
 
 export type PostRow = {
   id: string;
@@ -17,6 +18,7 @@ export type PostRow = {
   folder: string | null;
   text: string | null;
   title: string | null;
+  layout: PostLayout;
   country: string | null;
   city: string | null;
   lat: number | null;
@@ -306,15 +308,28 @@ export class PostsService {
 
   async updateMetadata(
     postId: string,
-    input: { title?: string | null; text?: string | null },
+    input: {
+      title?: string | null;
+      text?: string | null;
+      layout?: PostLayout;
+    },
   ): Promise<PostRow> {
     if (!this.db.client) {
       throw new BadRequestException('Database is not configured');
     }
     const updatesTitle = input.title !== undefined;
     const updatesText = input.text !== undefined;
-    if (!updatesTitle && !updatesText) {
-      throw new BadRequestException('title or text required');
+    const layout = input.layout;
+    const updatesLayout = layout !== undefined;
+    if (!updatesTitle && !updatesText && !updatesLayout) {
+      throw new BadRequestException('title, text or layout required');
+    }
+
+    if (updatesLayout && layout !== 'STANDARD' && layout !== 'FEATURED') {
+      throw new BadRequestException('invalid layout');
+    }
+    if (updatesLayout && (updatesTitle || updatesText)) {
+      throw new BadRequestException('layout must be updated separately');
     }
 
     const title = input.title?.trim() || null;
@@ -339,9 +354,19 @@ export class PostsService {
     if (existing.media_type === 'STORY' && (!nextTitle || !nextText)) {
       throw new BadRequestException('Story title and text are required');
     }
+    if (existing.media_type === 'STORY' && updatesLayout) {
+      throw new BadRequestException('Story layout cannot be changed');
+    }
 
     let rows: PostRow[];
-    if (updatesTitle && updatesText) {
+    if (layout) {
+      rows = await this.db.client<PostRow[]>`
+        UPDATE posts
+        SET layout = ${layout}
+        WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
+        RETURNING *, 0::int as like_count, 0::int as comment_count
+      `;
+    } else if (updatesTitle && updatesText) {
       rows = await this.db.client<PostRow[]>`
         UPDATE posts
         SET title = ${title}, text = ${text}

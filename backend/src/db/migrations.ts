@@ -154,6 +154,23 @@ export async function runMigrations(sql: Sql) {
     // Its body lives in the existing `text` column; `title` is optional for media
     // and required by the application for stories.
     await q`ALTER TABLE posts ADD COLUMN IF NOT EXISTS title text`;
+    await q`
+      ALTER TABLE posts
+      ADD COLUMN IF NOT EXISTS layout text NOT NULL DEFAULT 'STANDARD'
+    `;
+    await q`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'posts_layout_check'
+        ) THEN
+          ALTER TABLE posts
+          ADD CONSTRAINT posts_layout_check
+          CHECK (layout IN ('STANDARD', 'FEATURED'));
+        END IF;
+      END $$;
+    `;
     // Earlier staging builds used a separate `story` column. Preserve any text
     // entered through them before the application stops reading that column.
     await q`

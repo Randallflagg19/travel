@@ -77,13 +77,17 @@ jobs:
               exit 1
             fi
             # Neon can need extra time to wake up and complete migrations.
-            for _ in $(seq 1 45); do
+            # A schema change may also wait briefly for an existing request to
+            # release its lock on `posts`, so do not roll back after 90 seconds.
+            for _ in $(seq 1 120); do
               if curl -fsS --max-time 5 http://127.0.0.1:3011/api/health >/dev/null; then
                 rm -f "$archive"
                 exit 0
               fi
               sleep 2
             done
+            echo "Backend staging did not become healthy; recent service log:" >&2
+            sudo /usr/bin/journalctl -u travel-backend-staging.service -n 120 --no-pager >&2 || true
             if [ -n "$previous" ]; then
               ln -sfn "$previous" "$root/current"
               sudo /usr/bin/systemctl restart travel-backend-staging.service

@@ -8,6 +8,8 @@ export type ApiPost = {
   text: string | null;
   title: string | null;
   layout: "STANDARD" | "FEATURED";
+  media_width: number | null;
+  media_height: number | null;
   country: string | null;
   city: string | null;
   lat: number | null;
@@ -278,6 +280,8 @@ export async function createPost(
     city?: string;
     lat?: number;
     lng?: number;
+    mediaWidth?: number;
+    mediaHeight?: number;
   },
 ): Promise<{ post: ApiPost }> {
   const api = getApiBaseUrl();

@@ -237,7 +237,15 @@ export const FeedPostCard = memo(function FeedPostCard({
   if (!mediaReady)
     return (
       <Card className="travel-card-glow overflow-hidden rounded-xl border-amber-200/15 bg-[#071014] p-0">
-        <CardContent className="flex aspect-[3/4] min-h-56 flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,#173136,transparent_58%)] px-5 text-center text-amber-50/80">
+        <CardContent
+          className="flex min-h-56 flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,#173136,transparent_58%)] px-5 text-center text-amber-50/80"
+          style={{
+            aspectRatio:
+              post.media_width && post.media_height
+                ? `${post.media_width} / ${post.media_height}`
+                : undefined,
+          }}
+        >
           <span className="flex size-11 items-center justify-center rounded-full border border-amber-100/15 bg-white/5">
             <LoaderCircle className="size-5 animate-spin text-[#83c8b6]" />
           </span>

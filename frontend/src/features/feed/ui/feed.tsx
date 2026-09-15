@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -44,7 +50,12 @@ type PostsInfiniteData = {
 export function Feed() {
   const queryClient = useQueryClient();
   const auth = useAuth();
+  const gridRef = useRef<HTMLDivElement | null>(null);
   const [editingPost, setEditingPost] = useState<ApiPost | null>(null);
+  const [gridMetrics, setGridMetrics] = useState<{
+    columnWidth: number | null;
+    isDesktop: boolean;
+  }>({ columnWidth: null, isDesktop: false });
   const {
     order,
     setOrder,
@@ -220,6 +231,43 @@ export function Feed() {
     void queryClient.invalidateQueries({ queryKey: ["posts"] });
   }, [queryClient]);
 
+  const updateGridMetrics = useCallback((element?: HTMLDivElement | null) => {
+    const grid = element ?? gridRef.current;
+    if (!grid) return;
+
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+    const columns = isDesktop ? 3 : 2;
+    const gap = isDesktop ? 16 : 10;
+    const width = Math.round(grid.getBoundingClientRect().width);
+    const columnWidth = Math.max(0, (width - gap * (columns - 1)) / columns);
+
+    setGridMetrics((current) =>
+      current.isDesktop === isDesktop && current.columnWidth === columnWidth
+        ? current
+        : { isDesktop, columnWidth },
+    );
+  }, []);
+
+  const setGridRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      gridRef.current = element;
+      // Card heights come from saved media proportions. This callback runs
+      // when the Grid itself enters the DOM, so no collapsed 8px-row state is
+      // painted while asynchronous posts are still loading.
+      if (element) updateGridMetrics(element);
+    },
+    [updateGridMetrics],
+  );
+
+  const handleWindowResize = useCallback(() => {
+    updateGridMetrics();
+  }, [updateGridMetrics]);
+
+  useEffect(() => {
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, [handleWindowResize]);
+
   const handleCommentAdded = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["posts"] });
   }, [queryClient]);
@@ -332,54 +380,65 @@ export function Feed() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="columns-2 gap-2.5 lg:columns-3 lg:gap-4">
-          {items.map((p) => (
-            <FeedMasonryItem
-              key={p.id}
-              featured={p.layout === "FEATURED"}
-              onElement={(el) => {
-                postCardRefs.current[p.id] = el;
-              }}
-            >
-              <FeedPostCard
+        <>
+          <div
+            ref={setGridRef}
+            className={`grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-4 ${
+              gridMetrics.columnWidth !== null
+                ? "grid-flow-row-dense auto-rows-[8px]"
+                : "invisible"
+            }`}
+          >
+            {items.map((p) => (
+              <FeedMasonryItem
+                key={p.id}
                 post={p}
-                deleteMode={deleteMode}
-                canDelete={canDelete}
-                canEdit={canDelete}
-                onDelete={handleDeletePost}
-                onEdit={setEditingPost}
-                onToggleFeatured={handleToggleFeatured}
-                onOpen={openExpanded}
-                showPlaceInCard={showPlaceInCard}
-                canLike={canLike}
-                canComment={canComment}
-                isCommentsOpen={commentsPostId === p.id}
-                currentUserId={auth.user?.id ?? null}
-                accessToken={auth.accessToken}
-                onLikeToggled={updatePostLike}
-                onLikeSuccess={handleLikeSuccess}
-                onOpenComments={openComments}
-                onCommentAdded={handleCommentAdded}
-              />
-            </FeedMasonryItem>
-          ))}
+                columnWidth={gridMetrics.columnWidth}
+                isDesktop={gridMetrics.isDesktop}
+                onElement={(el) => {
+                  postCardRefs.current[p.id] = el;
+                }}
+              >
+                <FeedPostCard
+                  post={p}
+                  deleteMode={deleteMode}
+                  canDelete={canDelete}
+                  canEdit={canDelete}
+                  onDelete={handleDeletePost}
+                  onEdit={setEditingPost}
+                  onToggleFeatured={handleToggleFeatured}
+                  onOpen={openExpanded}
+                  showPlaceInCard={showPlaceInCard}
+                  canLike={canLike}
+                  canComment={canComment}
+                  isCommentsOpen={commentsPostId === p.id}
+                  currentUserId={auth.user?.id ?? null}
+                  accessToken={auth.accessToken}
+                  onLikeToggled={updatePostLike}
+                  onLikeSuccess={handleLikeSuccess}
+                  onOpenComments={openComments}
+                  onCommentAdded={handleCommentAdded}
+                />
+              </FeedMasonryItem>
+            ))}
+          </div>
 
-          <div ref={sentinelRef} className="[column-span:all] h-10" />
+          <div ref={sentinelRef} className="h-10" />
 
           {postsQuery.isFetchingNextPage ? (
-            <p className="[column-span:all] text-center text-sm text-white/50">
+            <p className="text-center text-sm text-white/50">
               Загружаю ещё…
             </p>
           ) : postsQuery.hasNextPage ? (
-            <p className="[column-span:all] text-center text-sm text-white/50">
+            <p className="text-center text-sm text-white/50">
               Прокрути ниже — подгружу ещё.
             </p>
           ) : (
-            <p className="[column-span:all] text-center text-sm text-white/50">
+            <p className="text-center text-sm text-white/50">
               Конец ленты.
             </p>
           )}
-        </div>
+        </>
       )}
       <PostMetadataDialog
         open={editingPost !== null}

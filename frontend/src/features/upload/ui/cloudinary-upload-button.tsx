@@ -153,6 +153,8 @@ export function CloudinaryUploadButton(props: {
                 resource_type?: string;
                 format?: string;
                 folder?: string;
+                width?: number;
+                height?: number;
               };
             };
             if (r.event === "display-changed" || r.event === "close") {
@@ -174,6 +176,8 @@ export function CloudinaryUploadButton(props: {
                 text: metadataRef.current.text || undefined,
                 country: ctx.country && ctx.city ? ctx.country : undefined,
                 city: ctx.country && ctx.city ? ctx.city : undefined,
+                mediaWidth: info.width,
+                mediaHeight: info.height,
               });
               await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ["posts"] }),

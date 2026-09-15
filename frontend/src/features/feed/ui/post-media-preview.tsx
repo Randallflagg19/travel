@@ -35,6 +35,8 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
         <img
           className="block h-auto w-full transition duration-500 group-hover:scale-[1.035]"
           alt={post.title ?? post.text ?? "travel video"}
+          width={post.media_width ?? undefined}
+          height={post.media_height ?? undefined}
           src={
             cloudinaryVideoPosterUrl(mediaUrl, post.cloudinary_public_id, {
               width: 600,
@@ -69,6 +71,8 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
       <img
         className="block h-auto w-full transition duration-500 group-hover:scale-[1.035]"
         alt={post.title ?? post.text ?? "travel media"}
+        width={post.media_width ?? undefined}
+        height={post.media_height ?? undefined}
         src={cloudinaryThumbUrl(mediaUrl, post.media_type)}
         loading="lazy"
       />

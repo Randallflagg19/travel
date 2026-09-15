@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import {
   BookMarked,
   Heart,
@@ -77,7 +77,7 @@ function useMediaPreviewReady(post: ApiPost) {
   return !url || loadedUrl === url;
 }
 
-export function FeedPostCard({
+export const FeedPostCard = memo(function FeedPostCard({
   post,
   deleteMode,
   canDelete,
@@ -329,4 +329,4 @@ export function FeedPostCard({
       </CardContent>
     </Card>
   );
-}
+});

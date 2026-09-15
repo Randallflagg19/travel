@@ -1,13 +1,18 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApiPost } from "@/shared/api/api";
 import { useExpandedModalBehavior } from "./use-expanded-modal-behavior";
 
 export function useExpandedPostModal(items: ApiPost[]) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedVideoSrc, setExpandedVideoSrc] = useState<string | null>(null);
+  const itemsRef = useRef(items);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const shouldAutoPlayRef = useRef(false);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const expandedPost = useMemo(() => {
     if (!expandedId) return null;
@@ -23,7 +28,7 @@ export function useExpandedPostModal(items: ApiPost[]) {
 
   const openExpanded = useCallback(
     (postId: string) => {
-      const post = items.find((item) => item.id === postId);
+      const post = itemsRef.current.find((item) => item.id === postId);
 
       setExpandedId(postId);
 
@@ -36,7 +41,7 @@ export function useExpandedPostModal(items: ApiPost[]) {
       setExpandedVideoSrc(null);
       shouldAutoPlayRef.current = false;
     },
-    [items],
+    [],
   );
 
   const closeExpanded = useCallback(() => {

@@ -12,6 +12,7 @@ import {
   deletePost,
   updatePostMetadata,
   type ApiPost,
+  type PostsPage,
 } from "@/shared/api/api";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { useAuth } from "@/entities/session/model/auth";
@@ -34,6 +35,11 @@ import { selectHeroPhoto } from "../model/hero-photo-selection";
 import { PostMetadataDialog } from "@/features/posts/ui/post-metadata-dialog";
 
 const POSTS_PAGE_LIMIT = 9;
+
+type PostsInfiniteData = {
+  pages: PostsPage[];
+  pageParams: unknown[];
+};
 
 export function Feed() {
   const queryClient = useQueryClient();
@@ -110,6 +116,25 @@ export function Feed() {
     [postsQuery.data],
   );
 
+  const updatePostsCache = useCallback(
+    (update: (post: ApiPost) => ApiPost | null) => {
+      queryClient.setQueryData<PostsInfiniteData>(postsQueryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            items: page.items.flatMap((post) => {
+              const nextPost = update(post);
+              return nextPost ? [nextPost] : [];
+            }),
+          })),
+        };
+      });
+    },
+    [postsQueryKey, queryClient],
+  );
+
   const {
     expandedPost,
     expandedVideoSrc,
@@ -132,55 +157,72 @@ export function Feed() {
     void fetchNextPage();
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  async function handleDeletePost(postId: string) {
+  const handleDeletePost = useCallback(async (postId: string) => {
     if (!auth.accessToken || !canDelete) return;
     if (!confirm("Удалить пост? Файл будет удалён из Cloudinary и из ленты."))
       return;
+    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
+    updatePostsCache((post) => (post.id === postId ? null : post));
     try {
       await deletePost(auth.accessToken, postId);
-      await queryClient.invalidateQueries({ queryKey: ["posts"] });
       await queryClient.invalidateQueries({ queryKey: ["places"] });
     } catch (e) {
+      queryClient.setQueryData(postsQueryKey, previousPosts);
       alert(e instanceof Error ? e.message : "Не удалось удалить");
     }
-  }
+  }, [auth.accessToken, canDelete, postsQueryKey, queryClient, updatePostsCache]);
 
   async function handleMetadataSave(value: { title: string; text: string }) {
     if (!editingPost || !auth.accessToken || !canDelete) return;
+    const postId = editingPost.id;
+    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
+    updatePostsCache((post) =>
+      post.id === postId
+        ? { ...post, title: value.title || null, text: value.text || null }
+        : post,
+    );
+    setEditingPost(null);
     try {
-      await updatePostMetadata(auth.accessToken, editingPost.id, {
+      const { post: savedPost } = await updatePostMetadata(auth.accessToken, postId, {
         title: value.title || null,
         text: value.text || null,
       });
-      await queryClient.invalidateQueries({ queryKey: ["posts"] });
-      setEditingPost(null);
+      updatePostsCache((post) => (post.id === postId ? savedPost : post));
     } catch (error) {
+      queryClient.setQueryData(postsQueryKey, previousPosts);
       console.error("updatePostMetadata failed", error);
       alert("Не удалось сохранить изменения. Попробуйте ещё раз.");
     }
   }
 
-  async function handleToggleFeatured(post: ApiPost) {
+  const handleToggleFeatured = useCallback(async (post: ApiPost) => {
     if (!auth.accessToken || !canDelete) return;
     const layout = post.layout === "FEATURED" ? "STANDARD" : "FEATURED";
+    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
+    updatePostsCache((cachedPost) =>
+      cachedPost.id === post.id ? { ...cachedPost, layout } : cachedPost,
+    );
     try {
-      await updatePostMetadata(auth.accessToken, post.id, {
+      const { post: savedPost } = await updatePostMetadata(auth.accessToken, post.id, {
         layout,
       });
-      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+      updatePostsCache((cachedPost) =>
+        cachedPost.id === post.id ? savedPost : cachedPost,
+      );
     } catch (error) {
+      queryClient.setQueryData(postsQueryKey, previousPosts);
       console.error("update post layout failed", error);
       alert("Не удалось изменить размер карточки. Попробуйте ещё раз.");
     }
-  }
+  }, [auth.accessToken, canDelete, postsQueryKey, queryClient, updatePostsCache]);
 
-  function handleLikeSuccess() {
+  const handleLikeSuccess = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["posts"] });
-  }
+  }, [queryClient]);
 
-  function handleCommentAdded() {
+  const handleCommentAdded = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["posts"] });
-  }
+  }, [queryClient]);
 
   const updatePostLike = useCallback(
     (postId: string, liked: boolean, deltaCount: number) => {

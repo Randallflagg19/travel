@@ -19,6 +19,8 @@ export type PostRow = {
   text: string | null;
   title: string | null;
   layout: PostLayout;
+  media_width: number | null;
+  media_height: number | null;
   country: string | null;
   city: string | null;
   lat: number | null;
@@ -70,6 +72,28 @@ function normalizePost(row: PostRow): PostRow {
     return { ...row, media_url: null };
   }
   return row;
+}
+
+function normalizeMediaDimensions(
+  width: number | undefined,
+  height: number | undefined,
+): { width: number | null; height: number | null } {
+  if (width === undefined && height === undefined) {
+    return { width: null, height: null };
+  }
+  if (
+    width === undefined ||
+    height === undefined ||
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    width > 100_000 ||
+    height > 100_000
+  ) {
+    throw new BadRequestException('invalid media dimensions');
+  }
+  return { width, height };
 }
 
 @Injectable()
@@ -252,6 +276,8 @@ export class PostsService {
     city?: string;
     lat?: number;
     lng?: number;
+    mediaWidth?: number;
+    mediaHeight?: number;
   }): Promise<PostRow> {
     if (!this.db.client) {
       throw new BadRequestException('Database is not configured');
@@ -269,10 +295,14 @@ export class PostsService {
     } else if (!input.mediaUrl) {
       throw new BadRequestException('mediaUrl required');
     }
+    const dimensions = normalizeMediaDimensions(
+      input.mediaWidth,
+      input.mediaHeight,
+    );
 
     const rows = await this.db.client<PostRow[]>`
       INSERT INTO posts (
-        user_id, media_type, media_url, cloudinary_public_id, folder, text, title, country, city, lat, lng
+        user_id, media_type, media_url, cloudinary_public_id, folder, text, title, country, city, lat, lng, media_width, media_height
       )
       VALUES (
         ${input.userId}::uuid,
@@ -285,7 +315,9 @@ export class PostsService {
         ${input.country ?? null},
         ${input.city ?? null},
         ${input.lat ?? null},
-        ${input.lng ?? null}
+        ${input.lng ?? null},
+        ${dimensions.width},
+        ${dimensions.height}
       )
       RETURNING
         *,
@@ -407,13 +439,24 @@ export class PostsService {
     const lat = meta.lat ?? null;
     const lng = meta.lng ?? null;
     const created_at = meta.shotAt?.toISOString() ?? null;
-    if (lat != null || lng != null || created_at != null) {
+    const dimensions =
+      meta.width != null && meta.height != null
+        ? { width: meta.width, height: meta.height }
+        : null;
+    if (
+      lat != null ||
+      lng != null ||
+      created_at != null ||
+      dimensions != null
+    ) {
       await this.db.client`
         UPDATE posts
         SET
           lat = COALESCE(${lat}, lat),
           lng = COALESCE(${lng}, lng),
-          created_at = COALESCE(${created_at}::timestamptz, created_at)
+          created_at = COALESCE(${created_at}::timestamptz, created_at),
+          media_width = COALESCE(${dimensions?.width ?? null}, media_width),
+          media_height = COALESCE(${dimensions?.height ?? null}, media_height)
         WHERE id = ${postId}::uuid
       `;
     }

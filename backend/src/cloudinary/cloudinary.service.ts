@@ -14,6 +14,8 @@ type CloudinaryResource = {
   created_at?: string;
   folder?: string;
   asset_folder?: string;
+  width?: number;
+  height?: number;
 };
 
 type ResourceType = 'image' | 'video' | 'raw';
@@ -125,7 +127,26 @@ export type ResourceMetadata = {
   lat: number | null;
   lng: number | null;
   shotAt: Date | null;
+  width: number | null;
+  height: number | null;
 };
+
+function asPositiveDimension(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+    ? value
+    : null;
+}
+
+function dimensionsFromValues(
+  width: unknown,
+  height: unknown,
+): { width: number; height: number } | null {
+  const normalizedWidth = asPositiveDimension(width);
+  const normalizedHeight = asPositiveDimension(height);
+  return normalizedWidth != null && normalizedHeight != null
+    ? { width: normalizedWidth, height: normalizedHeight }
+    : null;
+}
 
 @Injectable()
 export class CloudinaryService {
@@ -325,7 +346,13 @@ export class CloudinaryService {
     publicId: string,
     resourceType: ResourceType,
   ): Promise<ResourceMetadata> {
-    const out: ResourceMetadata = { lat: null, lng: null, shotAt: null };
+    const out: ResourceMetadata = {
+      lat: null,
+      lng: null,
+      shotAt: null,
+      width: null,
+      height: null,
+    };
     if (!this.isConfigured) return out;
     let raw: unknown;
     try {
@@ -337,6 +364,8 @@ export class CloudinaryService {
       return out;
     }
     const res = raw as Record<string, unknown>;
+    out.width = asPositiveDimension(res.width);
+    out.height = asPositiveDimension(res.height);
     if (resourceType === 'image') {
       const meta = res.media_metadata as Record<string, unknown> | undefined;
       if (meta) {
@@ -414,11 +443,13 @@ export class CloudinaryService {
       let createdAt = r.created_at ? new Date(r.created_at) : new Date();
       let lat: number | null = null;
       let lng: number | null = null;
+      let dimensions = dimensionsFromValues(r.width, r.height);
       try {
         const meta = await this.getResourceMetadata(r.public_id, rt);
         if (meta.shotAt) createdAt = meta.shotAt;
         if (meta.lat != null) lat = meta.lat;
         if (meta.lng != null) lng = meta.lng;
+        dimensions ??= dimensionsFromValues(meta.width, meta.height);
       } catch {
         // Оставляем created_at из Cloudinary, lat/lng null
       }
@@ -426,7 +457,7 @@ export class CloudinaryService {
       try {
         const rows = await sql<{ id: string }[]>`
           INSERT INTO posts (
-            user_id, media_type, media_url, cloudinary_public_id, folder, country, city, lat, lng, created_at
+            user_id, media_type, media_url, cloudinary_public_id, folder, country, city, lat, lng, created_at, media_width, media_height
           )
           VALUES (
             ${params.userId}::uuid,
@@ -438,7 +469,9 @@ export class CloudinaryService {
             ${city},
             ${lat},
             ${lng},
-            ${createdAt.toISOString()}
+            ${createdAt.toISOString()},
+            ${dimensions?.width ?? null},
+            ${dimensions?.height ?? null}
           )
           -- Our DB uses a PARTIAL unique index:
           --   posts_cloudinary_public_id_unique ON (cloudinary_public_id) WHERE cloudinary_public_id IS NOT NULL
@@ -510,6 +543,53 @@ export class CloudinaryService {
       scanned,
       inserted,
       errors: errors.slice(0, 50),
+    };
+  }
+
+  async backfillMediaDimensions(params?: { max?: number }) {
+    const sql = this.getSqlOrThrow();
+    const max = Math.max(1, Math.min(500, params?.max ?? 100));
+    const rows = await sql<
+      Array<{ id: string; cloudinary_public_id: string; media_type: string }>
+    >`
+      SELECT id, cloudinary_public_id, media_type
+      FROM posts
+      WHERE
+        media_type IN ('PHOTO', 'VIDEO')
+        AND cloudinary_public_id IS NOT NULL
+        AND (media_width IS NULL OR media_height IS NULL)
+      ORDER BY created_at DESC, id DESC
+      LIMIT ${max}
+    `;
+
+    let updated = 0;
+    let unavailable = 0;
+    for (const row of rows) {
+      const resourceType: ResourceType =
+        row.media_type === 'VIDEO' ? 'video' : 'image';
+      const meta = await this.getResourceMetadata(
+        row.cloudinary_public_id,
+        resourceType,
+      );
+      const dimensions = dimensionsFromValues(meta.width, meta.height);
+      if (!dimensions) {
+        unavailable += 1;
+        continue;
+      }
+      await sql`
+        UPDATE posts
+        SET media_width = ${dimensions.width}, media_height = ${dimensions.height}
+        WHERE id = ${row.id}::uuid
+          AND (media_width IS NULL OR media_height IS NULL)
+      `;
+      updated += 1;
+    }
+
+    return {
+      scanned: rows.length,
+      updated,
+      unavailable,
+      hasMore: rows.length === max,
     };
   }
 

@@ -72,6 +72,8 @@ export class PostsController {
       city?: string;
       lat?: number;
       lng?: number;
+      mediaWidth?: number;
+      mediaHeight?: number;
     },
   ) {
     const post = await this.posts.create({
@@ -86,6 +88,8 @@ export class PostsController {
       city: body.city,
       lat: body.lat,
       lng: body.lng,
+      mediaWidth: body.mediaWidth,
+      mediaHeight: body.mediaHeight,
     });
     return { post };
   }

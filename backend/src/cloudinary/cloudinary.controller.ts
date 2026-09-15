@@ -43,4 +43,10 @@ export class CloudinaryController {
       max: body.max,
     });
   }
+
+  @Post('backfill-media-dimensions')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
+  async backfillMediaDimensions(@Body() body: { max?: number }) {
+    return await this.cloud.backfillMediaDimensions({ max: body.max });
+  }
 }

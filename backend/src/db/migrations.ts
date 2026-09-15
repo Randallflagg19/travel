@@ -158,6 +158,24 @@ export async function runMigrations(sql: Sql) {
       ALTER TABLE posts
       ADD COLUMN IF NOT EXISTS layout text NOT NULL DEFAULT 'STANDARD'
     `;
+    await q`ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_width integer`;
+    await q`ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_height integer`;
+    await q`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'posts_media_dimensions_check'
+        ) THEN
+          ALTER TABLE posts
+          ADD CONSTRAINT posts_media_dimensions_check
+          CHECK (
+            (media_width IS NULL AND media_height IS NULL)
+            OR (media_width > 0 AND media_height > 0)
+          );
+        END IF;
+      END $$;
+    `;
     await q`
       DO $$
       BEGIN

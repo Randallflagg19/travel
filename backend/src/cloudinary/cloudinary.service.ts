@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 import { createHash } from 'crypto';
@@ -548,7 +552,10 @@ export class CloudinaryService {
 
   async backfillMediaDimensions(params?: { max?: number }) {
     const sql = this.getSqlOrThrow();
-    const max = Math.max(1, Math.min(500, params?.max ?? 100));
+    // Cloudinary accepts at most 100 public IDs in one Admin API batch.
+    // Keeping one database batch within that limit turns thousands of per-file
+    // requests into a few dozen API calls.
+    const max = Math.max(1, Math.min(100, params?.max ?? 100));
     const rows = await sql<
       Array<{ id: string; cloudinary_public_id: string; media_type: string }>
     >`
@@ -563,16 +570,47 @@ export class CloudinaryService {
       LIMIT ${max}
     `;
 
+    const resourcesByPublicId = new Map<string, CloudinaryResource>();
+    for (const resourceType of ['image', 'video'] as const) {
+      const publicIds = rows
+        .filter((row) =>
+          resourceType === 'video'
+            ? row.media_type === 'VIDEO'
+            : row.media_type === 'PHOTO',
+        )
+        .map((row) => row.cloudinary_public_id);
+      if (publicIds.length === 0) continue;
+
+      let raw: unknown;
+      try {
+        raw = await cloudinary.api.resources_by_ids(publicIds, {
+          resource_type: resourceType,
+          type: 'upload',
+        });
+      } catch (error) {
+        // A rate limit or a transient Admin API failure must not turn hundreds
+        // of healthy files into permanently "unavailable" rows.
+        const message =
+          error instanceof Error ? error.message : 'unknown error';
+        throw new ServiceUnavailableException(
+          `Cloudinary batch lookup failed; no remaining rows were marked (${message})`,
+        );
+      }
+
+      const response = raw as { resources?: CloudinaryResource[] };
+      for (const resource of response.resources ?? []) {
+        resourcesByPublicId.set(resource.public_id, resource);
+      }
+    }
+
     let updated = 0;
     let unavailable = 0;
     for (const row of rows) {
-      const resourceType: ResourceType =
-        row.media_type === 'VIDEO' ? 'video' : 'image';
-      const meta = await this.getResourceMetadata(
-        row.cloudinary_public_id,
-        resourceType,
+      const resource = resourcesByPublicId.get(row.cloudinary_public_id);
+      const dimensions = dimensionsFromValues(
+        resource?.width,
+        resource?.height,
       );
-      const dimensions = dimensionsFromValues(meta.width, meta.height);
       await sql`
         UPDATE posts
         SET
@@ -592,6 +630,20 @@ export class CloudinaryService {
       unavailable,
       hasMore: rows.length === max,
     };
+  }
+
+  async resetMediaDimensionsBackfill() {
+    const sql = this.getSqlOrThrow();
+    const rows = await sql<Array<{ id: string }>>`
+      UPDATE posts
+      SET media_dimensions_checked_at = NULL
+      WHERE
+        media_type IN ('PHOTO', 'VIDEO')
+        AND (media_width IS NULL OR media_height IS NULL)
+        AND media_dimensions_checked_at IS NOT NULL
+      RETURNING id
+    `;
+    return { reset: rows.length };
   }
 
   async probePrefix(params: { prefix: string }) {

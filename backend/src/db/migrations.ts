@@ -161,6 +161,10 @@ export async function runMigrations(sql: Sql) {
     await q`ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_width integer`;
     await q`ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_height integer`;
     await q`
+      ALTER TABLE posts
+      ADD COLUMN IF NOT EXISTS media_dimensions_checked_at timestamptz
+    `;
+    await q`
       DO $$
       BEGIN
         IF NOT EXISTS (

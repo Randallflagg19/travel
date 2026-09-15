@@ -558,6 +558,7 @@ export class CloudinaryService {
         media_type IN ('PHOTO', 'VIDEO')
         AND cloudinary_public_id IS NOT NULL
         AND (media_width IS NULL OR media_height IS NULL)
+        AND media_dimensions_checked_at IS NULL
       ORDER BY created_at DESC, id DESC
       LIMIT ${max}
     `;
@@ -572,17 +573,17 @@ export class CloudinaryService {
         resourceType,
       );
       const dimensions = dimensionsFromValues(meta.width, meta.height);
-      if (!dimensions) {
-        unavailable += 1;
-        continue;
-      }
       await sql`
         UPDATE posts
-        SET media_width = ${dimensions.width}, media_height = ${dimensions.height}
+        SET
+          media_width = COALESCE(${dimensions?.width ?? null}, media_width),
+          media_height = COALESCE(${dimensions?.height ?? null}, media_height),
+          media_dimensions_checked_at = now()
         WHERE id = ${row.id}::uuid
           AND (media_width IS NULL OR media_height IS NULL)
       `;
-      updated += 1;
+      if (dimensions) updated += 1;
+      else unavailable += 1;
     }
 
     return {

@@ -12,7 +12,10 @@ type FeedMasonryItemProps = {
   onElement: (element: HTMLDivElement | null) => void;
 };
 
-const GRID_ROW_HEIGHT = 8;
+// A smaller track makes the reserved card height follow its known aspect ratio
+// more closely. It stays data-driven: unlike DOM measurement it cannot create
+// a resize/scrollbar feedback loop.
+const GRID_ROW_HEIGHT = 4;
 const MOBILE_GRID_GAP = 10;
 const DESKTOP_GRID_GAP = 16;
 

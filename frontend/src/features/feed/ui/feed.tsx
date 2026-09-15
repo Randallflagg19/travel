@@ -385,7 +385,7 @@ export function Feed() {
             ref={setGridRef}
             className={`grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-4 ${
               gridMetrics.columnWidth !== null
-                ? "grid-flow-row-dense auto-rows-[8px]"
+                ? "grid-flow-row-dense auto-rows-[4px]"
                 : "invisible"
             }`}
           >

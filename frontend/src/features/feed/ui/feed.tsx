@@ -52,10 +52,11 @@ export function Feed() {
   const auth = useAuth();
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [editingPost, setEditingPost] = useState<ApiPost | null>(null);
+  const [actionsPostId, setActionsPostId] = useState<string | null>(null);
   const [gridMetrics, setGridMetrics] = useState<{
     columnWidth: number | null;
-    isDesktop: boolean;
-  }>({ columnWidth: null, isDesktop: false });
+    columns: number;
+  }>({ columnWidth: null, columns: 1 });
   const {
     order,
     setOrder,
@@ -236,15 +237,16 @@ export function Feed() {
     if (!grid) return;
 
     const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-    const columns = isDesktop ? 3 : 2;
+    const isTablet = window.matchMedia("(min-width: 640px)").matches;
+    const columns = isDesktop ? 3 : isTablet ? 2 : 1;
     const gap = isDesktop ? 16 : 10;
     const width = Math.round(grid.getBoundingClientRect().width);
     const columnWidth = Math.max(0, (width - gap * (columns - 1)) / columns);
 
     setGridMetrics((current) =>
-      current.isDesktop === isDesktop && current.columnWidth === columnWidth
+      current.columns === columns && current.columnWidth === columnWidth
         ? current
-        : { isDesktop, columnWidth },
+        : { columns, columnWidth },
     );
   }, []);
 
@@ -383,7 +385,7 @@ export function Feed() {
         <>
           <div
             ref={setGridRef}
-            className={`grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-4 ${
+            className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4 ${
               gridMetrics.columnWidth !== null
                 ? "grid-flow-row-dense auto-rows-[4px]"
                 : "invisible"
@@ -394,7 +396,8 @@ export function Feed() {
                 key={p.id}
                 post={p}
                 columnWidth={gridMetrics.columnWidth}
-                isDesktop={gridMetrics.isDesktop}
+                columns={gridMetrics.columns}
+                isCommentsOpen={commentsPostId === p.id}
                 onElement={(el) => {
                   postCardRefs.current[p.id] = el;
                 }}
@@ -407,6 +410,10 @@ export function Feed() {
                   onDelete={handleDeletePost}
                   onEdit={setEditingPost}
                   onToggleFeatured={handleToggleFeatured}
+                  isActionsOpen={actionsPostId === p.id}
+                  onActionsOpenChange={(open) =>
+                    setActionsPostId(open ? p.id : null)
+                  }
                   onOpen={openExpanded}
                   showPlaceInCard={showPlaceInCard}
                   canLike={canLike}

@@ -122,7 +122,9 @@ export function PostCommentsBlock({
   const isStory = variant === "story";
 
   return (
-    <div className={isStory ? "" : "border-t pt-3"}>
+    <div
+      className={`flex h-full min-h-0 flex-col ${isStory ? "" : "border-t pt-3"}`}
+    >
       {onClose ? (
         <div className="mb-2 flex items-center justify-between gap-3">
           <p
@@ -150,7 +152,7 @@ export function PostCommentsBlock({
       ) : null}
       <div
         ref={listRef}
-        className={`max-h-[280px] overflow-y-auto overscroll-contain py-1 ${
+        className={`min-h-0 flex-1 overflow-y-auto overscroll-contain py-1 ${
           isStory ? "" : "rounded-lg bg-muted/30"
         }`}
       >

@@ -20,6 +20,7 @@ import { displayPlaceTitle } from "@/features/places/model/place-labels";
 import { PostMediaPreview } from "./post-media-preview";
 import { usePostLikeToggle } from "../model/use-post-like-toggle";
 import { PostActionsMenu } from "./post-actions-menu";
+import { OPEN_COMMENTS_HEIGHT } from "./feed-masonry-item";
 
 type FeedPostCardProps = {
   post: ApiPost;
@@ -29,6 +30,8 @@ type FeedPostCardProps = {
   onDelete: (postId: string) => void;
   onEdit: (post: ApiPost) => void;
   onToggleFeatured: (post: ApiPost) => void;
+  isActionsOpen: boolean;
+  onActionsOpenChange: (open: boolean) => void;
   onOpen: (postId: string) => void;
   showPlaceInCard: boolean;
   canLike: boolean;
@@ -85,6 +88,8 @@ export const FeedPostCard = memo(function FeedPostCard({
   onDelete,
   onEdit,
   onToggleFeatured,
+  isActionsOpen,
+  onActionsOpenChange,
   onOpen,
   showPlaceInCard,
   canLike,
@@ -151,6 +156,8 @@ export const FeedPostCard = memo(function FeedPostCard({
       </div>
       {!deleteMode && canEdit ? (
         <PostActionsMenu
+          open={isActionsOpen}
+          onOpenChange={onActionsOpenChange}
           onEdit={() => onEdit(post)}
           onDelete={() => onDelete(post.id)}
           isFeatured={post.layout === "FEATURED"}
@@ -219,7 +226,10 @@ export const FeedPostCard = memo(function FeedPostCard({
           </div>
         </CardContent>
         {isCommentsOpen ? (
-          <div className="relative z-20 border-t border-[#796752]/25 bg-[#efe4ce] p-4">
+          <div
+            className="relative z-20 border-t border-[#796752]/25 bg-[#efe4ce] p-4"
+            style={{ height: OPEN_COMMENTS_HEIGHT }}
+          >
             <PostCommentsBlock
               postId={post.id}
               canComment={canComment}
@@ -323,15 +333,18 @@ export const FeedPostCard = memo(function FeedPostCard({
         </div>
 
         {isCommentsOpen ? (
-          <div className="relative z-20 border-t border-white/10 bg-[#081117] p-4">
+          <div
+            className="relative z-20 border-t border-white/10 bg-[#081117] p-4"
+            style={{ height: OPEN_COMMENTS_HEIGHT }}
+          >
             <PostCommentsBlock
               postId={post.id}
               canComment={canComment}
               currentUserId={currentUserId}
-            accessToken={accessToken}
-            onCommentAdded={onCommentAdded}
-            onClose={() => onOpenComments(post.id)}
-          />
+              accessToken={accessToken}
+              onCommentAdded={onCommentAdded}
+              onClose={() => onOpenComments(post.id)}
+            />
           </div>
         ) : null}
       </CardContent>

@@ -7,7 +7,8 @@ type FeedMasonryItemProps = {
   children: ReactNode;
   post: ApiPost;
   columnWidth: number | null;
-  isDesktop: boolean;
+  columns: number;
+  isCommentsOpen: boolean;
   className?: string;
   onElement: (element: HTMLDivElement | null) => void;
 };
@@ -18,6 +19,7 @@ type FeedMasonryItemProps = {
 const GRID_ROW_HEIGHT = 4;
 const MOBILE_GRID_GAP = 10;
 const DESKTOP_GRID_GAP = 16;
+export const OPEN_COMMENTS_HEIGHT = 360;
 
 function mediaAspectRatio(post: ApiPost): number {
   if (post.media_type === "STORY") return 3 / 4;
@@ -41,22 +43,43 @@ function mediaFooterHeight(post: ApiPost, isDesktop: boolean): number {
   return height;
 }
 
+function estimatedCardHeight(
+  post: ApiPost,
+  cardWidth: number,
+  isDesktop: boolean,
+  isCommentsOpen: boolean,
+): number {
+  const mediaHeight = cardWidth / mediaAspectRatio(post);
+  const baseHeight =
+    post.media_type === "STORY"
+      ? Math.max(320, mediaHeight)
+      : mediaHeight + mediaFooterHeight(post, isDesktop);
+
+  return baseHeight + (isCommentsOpen ? OPEN_COMMENTS_HEIGHT + 1 : 0);
+}
+
 export function FeedMasonryItem({
   children,
   post,
   columnWidth,
-  isDesktop,
+  columns,
+  isCommentsOpen,
   className = "",
   onElement,
 }: FeedMasonryItemProps) {
   const featured = post.layout === "FEATURED" && post.media_type !== "STORY";
-  const columnSpan = featured ? 2 : 1;
+  const isDesktop = columns === 3;
+  const columnSpan =
+    (post.media_type === "STORY" && columns === 2) ||
+    (featured && isDesktop)
+      ? 2
+      : 1;
   const gap = isDesktop ? DESKTOP_GRID_GAP : MOBILE_GRID_GAP;
   const cardWidth = columnWidth
     ? columnWidth * columnSpan + gap * (columnSpan - 1)
     : null;
   const estimatedHeight = cardWidth
-    ? cardWidth / mediaAspectRatio(post) + mediaFooterHeight(post, isDesktop)
+    ? estimatedCardHeight(post, cardWidth, isDesktop, isCommentsOpen)
     : null;
   const rowSpan = estimatedHeight
     ? Math.max(1, Math.ceil((estimatedHeight + gap) / (GRID_ROW_HEIGHT + gap)))
@@ -65,7 +88,13 @@ export function FeedMasonryItem({
   return (
     <div
       ref={onElement}
-      className={`min-w-0 ${featured ? "col-span-2" : ""} ${className}`}
+      className={`min-w-0 ${
+        post.media_type === "STORY"
+          ? "sm:col-span-2 lg:col-span-1"
+          : featured
+            ? "lg:col-span-2"
+            : ""
+      } ${className}`}
       style={rowSpan ? { gridRowEnd: `span ${rowSpan}` } : undefined}
     >
       {children}

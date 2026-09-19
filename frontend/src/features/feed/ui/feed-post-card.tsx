@@ -299,7 +299,7 @@ export const FeedPostCard = memo(function FeedPostCard({
           ) : null}
 
           <div className="absolute inset-x-0 bottom-0 px-3 pt-3 pb-1 text-amber-50 lg:relative lg:border-t lg:border-amber-200/10 lg:px-4 lg:pt-2">
-            <div className="pointer-events-none">
+            <div className="feed-media-overlay-text pointer-events-none">
               {post.title ? (
                 <h3 className="line-clamp-1 font-serif text-base font-normal leading-tight lg:line-clamp-2 lg:text-lg">
                   {post.title}

@@ -6,6 +6,8 @@ import {
   Minimize2,
   MoreVertical,
   Pencil,
+  Pin,
+  PinOff,
   Trash2,
 } from "lucide-react";
 
@@ -16,6 +18,8 @@ type PostActionsMenuProps = {
   onDelete: () => void;
   isFeatured?: boolean;
   onToggleFeatured?: () => void;
+  isPinned?: boolean;
+  onTogglePinned?: () => void;
   variant?: "default" | "story";
 };
 
@@ -26,6 +30,8 @@ export function PostActionsMenu({
   onDelete,
   isFeatured = false,
   onToggleFeatured,
+  isPinned = false,
+  onTogglePinned,
   variant = "default",
 }: PostActionsMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -90,6 +96,23 @@ export function PostActionsMenu({
             <Pencil className="size-4" />
             Редактировать
           </button>
+          {onTogglePinned ? (
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/10"
+              onClick={() => {
+                onOpenChange(false);
+                onTogglePinned();
+              }}
+            >
+              {isPinned ? (
+                <PinOff className="size-4" />
+              ) : (
+                <Pin className="size-4" />
+              )}
+              {isPinned ? "Открепить" : "Закрепить"}
+            </button>
+          ) : null}
           {onToggleFeatured ? (
             <button
               type="button"

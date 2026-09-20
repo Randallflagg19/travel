@@ -25,6 +25,7 @@ export type PostRow = {
   city: string | null;
   lat: number | null;
   lng: number | null;
+  pinned_at: string | null;
   created_at: string;
   like_count: number;
   comment_count: number;
@@ -32,6 +33,7 @@ export type PostRow = {
 };
 
 type PostsCursor = {
+  pinned_at: string | null;
   created_at: string;
   id: string;
 };
@@ -56,7 +58,18 @@ function decodeCursor(cursor: string): PostsCursor {
     throw new BadRequestException('Invalid cursor');
   if (typeof obj.id !== 'string')
     throw new BadRequestException('Invalid cursor');
-  return { created_at: obj.created_at, id: obj.id };
+  if (
+    obj.pinned_at !== undefined &&
+    obj.pinned_at !== null &&
+    typeof obj.pinned_at !== 'string'
+  ) {
+    throw new BadRequestException('Invalid cursor');
+  }
+  return {
+    pinned_at: obj.pinned_at ?? null,
+    created_at: obj.created_at,
+    id: obj.id,
+  };
 }
 
 function mediaTypeToCloudinaryResource(
@@ -128,6 +141,7 @@ export class PostsService {
     const city = params?.city?.trim() ? params.city.trim() : undefined;
     const cursorCreatedAt = decoded?.created_at ?? null;
     const cursorId = decoded?.id ?? null;
+    const cursorPinnedAt = decoded?.pinned_at ?? null;
 
     const rows =
       order === 'asc'
@@ -154,15 +168,41 @@ export class PostsService {
                   OR (p.country = ${country ?? null} AND p.city = ${city ?? null})
                 )
                 AND (
-                  ${cursorCreatedAt}::timestamptz IS NULL
-                  OR ${cursorId}::uuid IS NULL
-                  OR p.created_at > ${cursorCreatedAt}::timestamptz
+                  ${cursorId}::uuid IS NULL
                   OR (
-                    p.created_at = ${cursorCreatedAt}::timestamptz
-                    AND p.id > ${cursorId}::uuid
+                    ${cursorPinnedAt}::timestamptz IS NOT NULL
+                    AND (
+                      p.pinned_at IS NULL
+                      OR p.pinned_at < ${cursorPinnedAt}::timestamptz
+                      OR (
+                        p.pinned_at = ${cursorPinnedAt}::timestamptz
+                        AND (
+                          p.created_at > ${cursorCreatedAt}::timestamptz
+                          OR (
+                            p.created_at = ${cursorCreatedAt}::timestamptz
+                            AND p.id > ${cursorId}::uuid
+                          )
+                        )
+                      )
+                    )
+                  )
+                  OR (
+                    ${cursorPinnedAt}::timestamptz IS NULL
+                    AND p.pinned_at IS NULL
+                    AND (
+                      p.created_at > ${cursorCreatedAt}::timestamptz
+                      OR (
+                        p.created_at = ${cursorCreatedAt}::timestamptz
+                        AND p.id > ${cursorId}::uuid
+                      )
+                    )
                   )
                 )
-              ORDER BY p.created_at ASC, p.id ASC
+              ORDER BY
+                (p.pinned_at IS NULL) ASC,
+                p.pinned_at DESC NULLS LAST,
+                p.created_at ASC,
+                p.id ASC
               LIMIT ${limitPlusOne}
             )
             SELECT
@@ -180,7 +220,11 @@ export class PostsService {
               FROM comments
               WHERE comments.post_id = page.id
             ) c ON true
-            ORDER BY page.created_at ASC, page.id ASC
+            ORDER BY
+              (page.pinned_at IS NULL) ASC,
+              page.pinned_at DESC NULLS LAST,
+              page.created_at ASC,
+              page.id ASC
           `
         : await this.db.client<PostRow[]>`
             WITH page AS (
@@ -205,15 +249,41 @@ export class PostsService {
                   OR (p.country = ${country ?? null} AND p.city = ${city ?? null})
                 )
                 AND (
-                  ${cursorCreatedAt}::timestamptz IS NULL
-                  OR ${cursorId}::uuid IS NULL
-                  OR p.created_at < ${cursorCreatedAt}::timestamptz
+                  ${cursorId}::uuid IS NULL
                   OR (
-                    p.created_at = ${cursorCreatedAt}::timestamptz
-                    AND p.id < ${cursorId}::uuid
+                    ${cursorPinnedAt}::timestamptz IS NOT NULL
+                    AND (
+                      p.pinned_at IS NULL
+                      OR p.pinned_at < ${cursorPinnedAt}::timestamptz
+                      OR (
+                        p.pinned_at = ${cursorPinnedAt}::timestamptz
+                        AND (
+                          p.created_at < ${cursorCreatedAt}::timestamptz
+                          OR (
+                            p.created_at = ${cursorCreatedAt}::timestamptz
+                            AND p.id < ${cursorId}::uuid
+                          )
+                        )
+                      )
+                    )
+                  )
+                  OR (
+                    ${cursorPinnedAt}::timestamptz IS NULL
+                    AND p.pinned_at IS NULL
+                    AND (
+                      p.created_at < ${cursorCreatedAt}::timestamptz
+                      OR (
+                        p.created_at = ${cursorCreatedAt}::timestamptz
+                        AND p.id < ${cursorId}::uuid
+                      )
+                    )
                   )
                 )
-              ORDER BY p.created_at DESC, p.id DESC
+              ORDER BY
+                (p.pinned_at IS NULL) ASC,
+                p.pinned_at DESC NULLS LAST,
+                p.created_at DESC,
+                p.id DESC
               LIMIT ${limitPlusOne}
             )
             SELECT
@@ -231,7 +301,11 @@ export class PostsService {
               FROM comments
               WHERE comments.post_id = page.id
             ) c ON true
-            ORDER BY page.created_at DESC, page.id DESC
+            ORDER BY
+              (page.pinned_at IS NULL) ASC,
+              page.pinned_at DESC NULLS LAST,
+              page.created_at DESC,
+              page.id DESC
           `;
 
     const hasMore = rows.length > safeLimit;
@@ -241,7 +315,11 @@ export class PostsService {
     const last = items[items.length - 1];
     const nextCursor =
       hasMore && last
-        ? encodeCursor({ created_at: last.created_at, id: last.id })
+        ? encodeCursor({
+            pinned_at: last.pinned_at,
+            created_at: last.created_at,
+            id: last.id,
+          })
         : null;
 
     if (params?.userId?.trim() && items.length > 0 && this.db.client) {
@@ -422,6 +500,25 @@ export class PostsService {
     }
     const post = rows[0] ? normalizePost(rows[0]) : undefined;
     if (!post) throw new BadRequestException('Post was not found');
+    return post;
+  }
+
+  async setPinned(postId: string, pinned: boolean): Promise<PostRow> {
+    if (!this.db.client) {
+      throw new BadRequestException('Database is not configured');
+    }
+    if (typeof pinned !== 'boolean') {
+      throw new BadRequestException('pinned must be a boolean');
+    }
+
+    const rows = await this.db.client<PostRow[]>`
+      UPDATE posts
+      SET pinned_at = CASE WHEN ${pinned}::boolean THEN now() ELSE NULL END
+      WHERE id = ${postId}::uuid
+      RETURNING *, 0::int AS like_count, 0::int AS comment_count
+    `;
+    const post = rows[0] ? normalizePost(rows[0]) : undefined;
+    if (!post) throw new NotFoundException('Post not found');
     return post;
   }
 

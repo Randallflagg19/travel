@@ -14,6 +14,7 @@ export type ApiPost = {
   city: string | null;
   lat: number | null;
   lng: number | null;
+  pinned_at: string | null;
   created_at: string;
   like_count: number;
   comment_count: number;
@@ -321,6 +322,27 @@ export async function updatePostMetadata(
   if (!res.ok) {
     const text = await readApiError(res);
     throw new Error(`Update post metadata failed (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { post: ApiPost };
+}
+
+export async function setPostPinned(
+  accessToken: string,
+  postId: string,
+  pinned: boolean,
+): Promise<{ post: ApiPost }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/posts/${postId}/pin`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ pinned }),
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Pin post failed (${res.status}): ${text}`);
   }
   return (await res.json()) as { post: ApiPost };
 }

@@ -108,4 +108,14 @@ export class PostsController {
     const post = await this.posts.updateMetadata(id, body);
     return { post };
   }
+
+  @Patch(':id/pin')
+  @AuthRoles('ADMIN', 'SUPERADMIN')
+  async setPinned(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: { pinned?: boolean },
+  ) {
+    const post = await this.posts.setPinned(id, body.pinned as boolean);
+    return { post };
+  }
 }

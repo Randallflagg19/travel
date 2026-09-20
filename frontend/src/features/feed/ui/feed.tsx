@@ -16,6 +16,7 @@ import {
   fetchPostsPage,
   fetchPlaces,
   deletePost,
+  setPostPinned,
   updatePostMetadata,
   type ApiPost,
   type PostsPage,
@@ -46,6 +47,21 @@ type PostsInfiniteData = {
   pages: PostsPage[];
   pageParams: unknown[];
 };
+
+function sortPosts(posts: ApiPost[], order: "asc" | "desc"): ApiPost[] {
+  const direction = order === "asc" ? 1 : -1;
+  return [...posts].sort((left, right) => {
+    if (left.pinned_at && !right.pinned_at) return -1;
+    if (!left.pinned_at && right.pinned_at) return 1;
+    if (left.pinned_at && right.pinned_at) {
+      const byPinnedAt = right.pinned_at.localeCompare(left.pinned_at);
+      if (byPinnedAt !== 0) return byPinnedAt;
+    }
+    const byCreatedAt = left.created_at.localeCompare(right.created_at);
+    if (byCreatedAt !== 0) return byCreatedAt * direction;
+    return left.id.localeCompare(right.id) * direction;
+  });
+}
 
 export function Feed() {
   const queryClient = useQueryClient();
@@ -227,6 +243,58 @@ export function Feed() {
       alert("Не удалось изменить размер карточки. Попробуйте ещё раз.");
     }
   }, [auth.accessToken, canDelete, postsQueryKey, queryClient, updatePostsCache]);
+
+  const handleTogglePinned = useCallback(async (post: ApiPost) => {
+    if (!auth.accessToken || !canDelete) return;
+    const pinned = !post.pinned_at;
+    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
+
+    queryClient.setQueryData<PostsInfiniteData>(postsQueryKey, (old) => {
+      if (!old) return old;
+      const pageSizes = old.pages.map((page) => page.items.length);
+      const sorted = sortPosts(
+        old.pages
+          .flatMap((page) => page.items)
+          .map((cachedPost) =>
+            cachedPost.id === post.id
+              ? {
+                  ...cachedPost,
+                  pinned_at: pinned ? new Date().toISOString() : null,
+                }
+              : cachedPost,
+          ),
+        order,
+      );
+      let offset = 0;
+      return {
+        ...old,
+        pages: old.pages.map((page, index) => {
+          const items = sorted.slice(offset, offset + pageSizes[index]);
+          offset += pageSizes[index];
+          return { ...page, items };
+        }),
+      };
+    });
+
+    try {
+      const { post: savedPost } = await setPostPinned(
+        auth.accessToken,
+        post.id,
+        pinned,
+      );
+      updatePostsCache((cachedPost) =>
+        cachedPost.id === post.id
+          ? { ...cachedPost, pinned_at: savedPost.pinned_at }
+          : cachedPost,
+      );
+    } catch (error) {
+      queryClient.setQueryData(postsQueryKey, previousPosts);
+      console.error("setPostPinned failed", error);
+      alert("Не удалось изменить закрепление. Попробуйте ещё раз.");
+    } finally {
+      void queryClient.invalidateQueries({ queryKey: ["posts"] });
+    }
+  }, [auth.accessToken, canDelete, order, postsQueryKey, queryClient, updatePostsCache]);
 
   const handleLikeSuccess = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -410,6 +478,7 @@ export function Feed() {
                   onDelete={handleDeletePost}
                   onEdit={setEditingPost}
                   onToggleFeatured={handleToggleFeatured}
+                  onTogglePinned={handleTogglePinned}
                   isActionsOpen={actionsPostId === p.id}
                   onActionsOpenChange={(open) =>
                     setActionsPostId(open ? p.id : null)

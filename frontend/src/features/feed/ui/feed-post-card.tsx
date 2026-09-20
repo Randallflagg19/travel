@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   MapPin,
   MessageSquare,
+  Pin,
   Trash2,
 } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
@@ -30,6 +31,7 @@ type FeedPostCardProps = {
   onDelete: (postId: string) => void;
   onEdit: (post: ApiPost) => void;
   onToggleFeatured: (post: ApiPost) => void;
+  onTogglePinned: (post: ApiPost) => void;
   isActionsOpen: boolean;
   onActionsOpenChange: (open: boolean) => void;
   onOpen: (postId: string) => void;
@@ -88,6 +90,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   onDelete,
   onEdit,
   onToggleFeatured,
+  onTogglePinned,
   isActionsOpen,
   onActionsOpenChange,
   onOpen,
@@ -166,6 +169,8 @@ export const FeedPostCard = memo(function FeedPostCard({
               ? undefined
               : () => onToggleFeatured(post)
           }
+          isPinned={Boolean(post.pinned_at)}
+          onTogglePinned={() => onTogglePinned(post)}
           variant={post.media_type === "STORY" ? "story" : "default"}
         />
       ) : null}
@@ -195,9 +200,18 @@ export const FeedPostCard = memo(function FeedPostCard({
           }}
         >
           <div className="relative flex items-center justify-between text-[11px] text-[#594837]">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-[#d5c8ae]/70 px-2.5 py-1.5 font-story-body text-sm font-medium leading-none">
-              <BookMarked className="size-[18px]" strokeWidth={1.8} />
-              История
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-[#d5c8ae]/70 px-2.5 py-1.5 font-story-body text-sm font-medium leading-none">
+                <BookMarked className="size-[18px]" strokeWidth={1.8} />
+                История
+              </span>
+              {post.pinned_at ? (
+                <Pin
+                  className="size-4 text-[#594837]/80"
+                  strokeWidth={1.8}
+                  aria-label="Закреплённая публикация"
+                />
+              ) : null}
             </span>
             {storyPlace ? (
               <span className="inline-flex items-center gap-1.5 font-story-body text-sm font-medium leading-none">
@@ -292,9 +306,21 @@ export const FeedPostCard = memo(function FeedPostCard({
           <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/35 to-transparent" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/90 via-black/45 to-transparent lg:hidden" />
 
-          {post.media_type === "VIDEO" ? (
-            <div className="pointer-events-none absolute left-2.5 top-2.5 rounded-md bg-[#071014]/75 px-2 py-1 text-[10px] font-semibold tracking-[0.03em] text-white ring-1 ring-white/15 backdrop-blur">
-              Видео
+          {post.media_type === "VIDEO" || post.pinned_at ? (
+            <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-2">
+              {post.media_type === "VIDEO" ? (
+                <span className="rounded-md bg-[#071014]/75 px-2 py-1 text-[10px] font-semibold tracking-[0.03em] text-white ring-1 ring-white/15 backdrop-blur">
+                  Видео
+                </span>
+              ) : null}
+              {post.pinned_at ? (
+                <span
+                  className="flex size-6 items-center justify-center rounded-md bg-[#071014]/75 text-amber-50/90 ring-1 ring-white/15 backdrop-blur"
+                  aria-label="Закреплённая публикация"
+                >
+                  <Pin className="size-3.5" strokeWidth={1.8} />
+                </span>
+              ) : null}
             </div>
           ) : null}
 

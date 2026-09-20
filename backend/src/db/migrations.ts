@@ -165,6 +165,15 @@ export async function runMigrations(sql: Sql) {
       ADD COLUMN IF NOT EXISTS media_dimensions_checked_at timestamptz
     `;
     await q`
+      ALTER TABLE posts
+      ADD COLUMN IF NOT EXISTS pinned_at timestamptz
+    `;
+    await q`
+      CREATE INDEX IF NOT EXISTS posts_pinned_at_idx
+      ON posts (pinned_at DESC)
+      WHERE pinned_at IS NOT NULL
+    `;
+    await q`
       DO $$
       BEGIN
         IF NOT EXISTS (

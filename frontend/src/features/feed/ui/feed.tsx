@@ -39,6 +39,7 @@ import { useFeedSelectionState } from "../model/use-feed-selection-state";
 import { useExpandedPostModal } from "../model/use-expanded-post-modal";
 import { useOpenFeedComments } from "../model/use-open-feed-comments";
 import { selectHeroPhoto } from "../model/hero-photo-selection";
+import { selectFeedMediaStats } from "../model/feed-media-stats";
 import { PostMetadataDialog } from "@/features/posts/ui/post-metadata-dialog";
 
 const POSTS_PAGE_LIMIT = 9;
@@ -391,11 +392,19 @@ export function Feed() {
     country: selectedCountry,
     city: selectedCity,
   });
+  const heroMediaStats = selectFeedMediaStats({
+    places: placesQuery.data,
+    all,
+    selectedCountry,
+    selectedCity,
+  });
 
   return (
     <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-4 overflow-x-hidden px-4 py-3 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
       <FeedHero
         title={heroTitle}
+        photosCount={heroMediaStats?.photos ?? null}
+        videosCount={heroMediaStats?.videos ?? null}
         photoSrc={heroPhoto?.src ?? null}
         photoAlt={heroPhoto?.alt}
         photoPosition={heroPhoto?.position}

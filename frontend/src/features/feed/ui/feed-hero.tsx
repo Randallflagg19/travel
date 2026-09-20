@@ -5,8 +5,8 @@ type FeedHeroProps = {
   eyebrow?: string;
   title?: string;
   year?: string;
-  photosCount?: number;
-  videosCount?: number;
+  photosCount?: number | null;
+  videosCount?: number | null;
   photoSrc?: string | null;
   photoAlt?: string;
   photoPosition?: string;
@@ -17,13 +17,18 @@ export function FeedHero({
   eyebrow = "Личный журнал дороги",
   title = "Indonesia: Bali",
   year = "2026",
-  photosCount = 450,
-  videosCount = 9,
+  photosCount = null,
+  videosCount = null,
   photoSrc = "/me-hero.jpg",
   photoAlt = "Фотография из путешествия",
   photoPosition = "center",
   tagline = "Путешествие, к которому хочется возвращаться.",
 }: FeedHeroProps) {
+  const photosLabel =
+    photosCount === null ? "—" : photosCount.toLocaleString("ru-RU");
+  const videosLabel =
+    videosCount === null ? "—" : videosCount.toLocaleString("ru-RU");
+
   return (
     <section className="overflow-hidden rounded-[1.25rem] bg-[#070d10] shadow-[0_28px_90px_rgba(0,0,0,0.45)] ring-1 ring-white/10">
       <div className="relative aspect-[8/5] w-full max-w-[1672px] [container-type:inline-size] lg:aspect-[1672/941]">
@@ -109,11 +114,11 @@ export function FeedHero({
           <div className="mt-auto mb-[2.4%] flex flex-col gap-[0.5cqw] text-left font-sans text-[0.86cqw] leading-none text-[#4f3a2a]">
             <span className="flex items-center gap-[0.45cqw]">
               <Camera className="size-[0.9cqw]" strokeWidth={2.35} />
-              {photosCount} фото
+              {photosLabel} фото
             </span>
             <span className="flex items-center gap-[0.45cqw]">
               <Video className="size-[0.9cqw]" strokeWidth={2.35} />
-              {videosCount} видео
+              {videosLabel} видео
             </span>
           </div>
         </div>
@@ -135,11 +140,11 @@ export function FeedHero({
           <div className="mt-auto mb-[2.4%] flex flex-col gap-[0.5cqw] text-left font-sans text-[0.86cqw] leading-none text-[#4f3a2a]">
             <span className="flex items-center gap-[0.45cqw]">
               <Camera className="size-[0.9cqw]" strokeWidth={2.35} />
-              {photosCount} фото
+              {photosLabel} фото
             </span>
             <span className="flex items-center gap-[0.45cqw]">
               <Video className="size-[0.9cqw]" strokeWidth={2.35} />
-              {videosCount} видео
+              {videosLabel} видео
             </span>
           </div>
         </div>

@@ -20,6 +20,7 @@ const posts = [
     city: "Bali",
     lat: null,
     lng: null,
+    pinned_at: null,
     created_at: "2026-09-15T12:00:00.000Z",
     like_count: 0,
     comment_count: 0,
@@ -41,6 +42,7 @@ const posts = [
     city: "Bali",
     lat: null,
     lng: null,
+    pinned_at: null,
     created_at: "2026-09-15T11:00:00.000Z",
     like_count: 0,
     comment_count: 0,
@@ -62,6 +64,7 @@ const posts = [
     city: "Bali",
     lat: null,
     lng: null,
+    pinned_at: null,
     created_at: "2026-09-15T10:00:00.000Z",
     like_count: 0,
     comment_count: 0,
@@ -91,7 +94,30 @@ async function mockFeed(page: Page) {
       return;
     }
     if (pathname.endsWith("/places")) {
-      await route.fulfill({ json: { countries: [] } });
+      await route.fulfill({
+        json: {
+          countries: [
+            {
+              country: "Indonesia",
+              count: 4,
+              stats: { posts: 4, photos: 2, videos: 1, stories: 1 },
+              cities: [
+                {
+                  city: "Bali",
+                  count: 3,
+                  stats: { posts: 3, photos: 2, videos: 0, stories: 1 },
+                },
+              ],
+            },
+            {
+              country: "Thailand",
+              count: 2,
+              stats: { posts: 2, photos: 1, videos: 1, stories: 0 },
+              cities: [],
+            },
+          ],
+        },
+      });
       return;
     }
     if (pathname.endsWith("/posts")) {
@@ -118,6 +144,8 @@ test("phone uses one column and keeps size actions desktop-only", async ({
   await page.goto("/?all=true");
 
   await expect(page.getByRole("heading", { name: "Тестовая история" })).toBeVisible();
+  await expect(page.locator("span:visible", { hasText: "3 фото" })).toBeVisible();
+  await expect(page.locator("span:visible", { hasText: "2 видео" })).toBeVisible();
   const widths = await Promise.all(
     ["Обычный кадр", "Крупный кадр", "Тестовая история"].map((title) =>
       cardWrapper(page, title).evaluate((element) => element.getBoundingClientRect().width),
@@ -144,6 +172,19 @@ test("phone uses one column and keeps size actions desktop-only", async ({
   await actionButtons.first().click();
   await page.locator("main").first().click({ position: { x: 5, y: 5 } });
   await expect(page.getByRole("button", { name: "Редактировать" })).toHaveCount(0);
+});
+
+test("hero counters follow country and city selection", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockFeed(page);
+
+  await page.goto("/?country=Indonesia");
+  await expect(page.locator("span:visible", { hasText: "2 фото" })).toBeVisible();
+  await expect(page.locator("span:visible", { hasText: "1 видео" })).toBeVisible();
+
+  await page.goto("/?country=Indonesia&city=Bali");
+  await expect(page.locator("span:visible", { hasText: "2 фото" })).toBeVisible();
+  await expect(page.locator("span:visible", { hasText: "0 видео" })).toBeVisible();
 });
 
 test("desktop preserves standard, featured, and story column spans", async ({

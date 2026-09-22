@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Param,
   Post,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthRoles } from '../auth/auth-roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -23,7 +24,7 @@ export class InteractionsController {
   ) {}
 
   @Post(':id/like')
-  @AuthRoles('USER', 'ADMIN', 'SUPERADMIN')
+  @AuthRoles('USER', 'AUTHOR', 'ADMIN', 'SUPERADMIN')
   async like(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
@@ -34,7 +35,7 @@ export class InteractionsController {
   }
 
   @Delete(':id/like')
-  @AuthRoles('USER', 'ADMIN', 'SUPERADMIN')
+  @AuthRoles('USER', 'AUTHOR', 'ADMIN', 'SUPERADMIN')
   async unlike(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
@@ -51,26 +52,29 @@ export class InteractionsController {
   }
 
   @Post(':id/comments')
-  @AuthRoles('ADMIN', 'SUPERADMIN')
+  @AuthRoles('AUTHOR', 'ADMIN', 'SUPERADMIN')
   async addComment(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
     @Body() body: { text?: string },
   ) {
-    await this.posts.getOrThrow(id);
+    const post = await this.posts.getOrThrow(id);
+    if (user.role === 'AUTHOR' && post.user_id !== user.sub) {
+      throw new ForbiddenException('You can only comment on your own post');
+    }
     const comment = await this.comments.create(id, user.sub, body.text ?? '');
     return { comment };
   }
 
   @Delete(':id/comments/:commentId')
-  @AuthRoles('USER', 'ADMIN', 'SUPERADMIN')
+  @AuthRoles('USER', 'AUTHOR', 'ADMIN', 'SUPERADMIN')
   async deleteComment(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('commentId', new ParseUUIDPipe()) commentId: string,
     @CurrentUser() user: JwtUser,
   ) {
     await this.posts.getOrThrow(id);
-    await this.comments.delete(commentId, user.sub);
+    await this.comments.delete(commentId, user.sub, id);
     return { ok: true };
   }
 }

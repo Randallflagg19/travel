@@ -36,6 +36,14 @@ export type PlacesResponse = {
   }>;
 };
 
+export type ApiAuthor = {
+  id: string;
+  username: string;
+  name: string | null;
+};
+
+export type AuthorsResponse = { items: ApiAuthor[] };
+
 export type PostTypeStats = {
   posts: number;
   photos: number;
@@ -55,7 +63,7 @@ export type AuthUser = {
   id: string;
   username: string;
   email: string | null;
-  role: "USER" | "ADMIN" | "SUPERADMIN";
+  role: "USER" | "AUTHOR" | "ADMIN" | "SUPERADMIN";
   name: string | null;
   created_at: string;
 };
@@ -102,6 +110,7 @@ export async function fetchPostsPage(
     order?: "asc" | "desc";
     country?: string;
     city?: string;
+    authorId?: string;
   },
   accessToken?: string | null,
 ): Promise<PostsPage> {
@@ -112,6 +121,7 @@ export async function fetchPostsPage(
   if (params.order) search.set("order", params.order);
   if (params.country) search.set("country", params.country);
   if (params.city) search.set("city", params.city);
+  if (params.authorId) search.set("authorId", params.authorId);
 
   const headers: HeadersInit = { "Content-Type": "application/json" };
   if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
@@ -159,14 +169,59 @@ export async function unlikePost(
   return (await res.json()) as { ok: boolean };
 }
 
-export async function fetchPlaces(): Promise<PlacesResponse> {
+export async function fetchPlaces(authorId?: string): Promise<PlacesResponse> {
   const api = getApiBaseUrl();
-  const res = await fetch(`${api}/places`, { cache: "no-store" });
+  const search = new URLSearchParams();
+  if (authorId) search.set("authorId", authorId);
+  const res = await fetch(`${api}/places${search.size ? `?${search}` : ""}`, { cache: "no-store" });
   if (!res.ok) {
     const text = await readApiError(res);
     throw new Error(`Failed to load places (${res.status}): ${text}`);
   }
   return (await res.json()) as PlacesResponse;
+}
+
+export async function fetchAuthors(): Promise<AuthorsResponse> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/authors`, { cache: "no-store" });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Failed to load authors (${res.status}): ${text}`);
+  }
+  return (await res.json()) as AuthorsResponse;
+}
+
+export async function fetchAuthorCandidates(accessToken: string): Promise<AuthorsResponse> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/authors/candidates`, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Failed to load author candidates (${res.status}): ${text}`);
+  }
+  return (await res.json()) as AuthorsResponse;
+}
+
+export async function grantAuthorRole(
+  accessToken: string,
+  userId: string,
+): Promise<{ user: ApiAuthor & { role: "AUTHOR" } }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/authors/${encodeURIComponent(userId)}/role`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ role: "AUTHOR" }),
+  });
+  if (!res.ok) {
+    const text = await readApiError(res);
+    throw new Error(`Failed to grant author role (${res.status}): ${text}`);
+  }
+  return (await res.json()) as { user: ApiAuthor & { role: "AUTHOR" } };
 }
 
 export async function authRegister(params: {

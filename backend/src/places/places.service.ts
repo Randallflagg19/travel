@@ -34,7 +34,7 @@ export type PlacesResponse = {
 export class PlacesService {
   constructor(private readonly db: DbService) {}
 
-  async listPlaces(): Promise<PlacesResponse> {
+  async listPlaces(authorId?: string): Promise<PlacesResponse> {
     if (!this.db.client) return { countries: [] };
 
     const rows = await this.db.client<PlaceRow[]>`
@@ -46,6 +46,7 @@ export class PlacesService {
         COUNT(*) FILTER (WHERE media_type = 'VIDEO')::int AS videos,
         COUNT(*) FILTER (WHERE media_type = 'STORY')::int AS stories
       FROM posts
+      WHERE (${authorId ?? null}::uuid IS NULL OR user_id = ${authorId ?? null}::uuid)
       GROUP BY 1, 2
       ORDER BY 1 NULLS LAST, 2 NULLS LAST
     `;

@@ -19,7 +19,7 @@ const RegisterSchema = z.object({
     .trim()
     .optional()
     .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Неверный email"),
-  password: z.string().min(3, "Пароль: минимум 3 символа"),
+  password: z.string().min(8, "Пароль: минимум 8 символов"),
 });
 
 export default function RegisterPage() {
@@ -110,7 +110,7 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="минимум 3 символа"
+                placeholder="минимум 8 символов"
                 required
               />
             </div>
@@ -133,4 +133,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-

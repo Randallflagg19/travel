@@ -47,8 +47,8 @@ export class AuthController {
         'invalid username (3..32, letters/digits and . _ - only)',
       );
     }
-    if (typeof password !== 'string' || password.length < 3) {
-      throw new BadRequestException('password must be at least 3 characters');
+    if (typeof password !== 'string' || password.length < 8) {
+      throw new BadRequestException('password must be at least 8 characters');
     }
     if (email && !isValidEmail(email)) {
       throw new BadRequestException('invalid email');

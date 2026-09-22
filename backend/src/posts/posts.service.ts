@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { DbService } from '../db/db.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import type { JwtUser } from '../auth/jwt-user.type';
 
 export type MediaType = 'PHOTO' | 'VIDEO' | 'AUDIO' | 'STORY';
 export type PostLayout = 'STANDARD' | 'FEATURED';
@@ -124,6 +126,7 @@ export class PostsService {
     unknown?: boolean;
     order?: 'asc' | 'desc';
     userId?: string;
+    authorId?: string;
   }): Promise<{
     items: PostRow[];
     nextCursor: string | null;
@@ -150,6 +153,8 @@ export class PostsService {
               SELECT p.*
               FROM posts p
               WHERE
+                (${params?.authorId ?? null}::uuid IS NULL OR p.user_id = ${params?.authorId ?? null}::uuid)
+                AND
                 (
                   ${wantUnknown}::boolean = false
                   OR p.country IS NULL
@@ -231,6 +236,8 @@ export class PostsService {
               SELECT p.*
               FROM posts p
               WHERE
+                (${params?.authorId ?? null}::uuid IS NULL OR p.user_id = ${params?.authorId ?? null}::uuid)
+                AND
                 (
                   ${wantUnknown}::boolean = false
                   OR p.country IS NULL
@@ -344,6 +351,7 @@ export class PostsService {
 
   async create(input: {
     userId: string;
+    actorRole?: JwtUser['role'];
     mediaType: MediaType;
     mediaUrl?: string;
     cloudinaryPublicId?: string;
@@ -362,6 +370,19 @@ export class PostsService {
     }
     if (!['PHOTO', 'VIDEO', 'AUDIO', 'STORY'].includes(input.mediaType)) {
       throw new BadRequestException('Invalid mediaType');
+    }
+    if (input.actorRole === 'AUTHOR' && input.mediaType !== 'STORY') {
+      throw new ForbiddenException(
+        'Media upload is not available for authors yet',
+      );
+    }
+    if (
+      input.actorRole === 'AUTHOR' &&
+      (input.mediaUrl || input.cloudinaryPublicId || input.folder)
+    ) {
+      throw new ForbiddenException(
+        'Cloudinary is not connected for authors yet',
+      );
     }
     if (input.mediaType === 'STORY') {
       if (!input.title?.trim()) throw new BadRequestException('title required');
@@ -423,6 +444,7 @@ export class PostsService {
       text?: string | null;
       layout?: PostLayout;
     },
+    actor?: JwtUser,
   ): Promise<PostRow> {
     if (!this.db.client) {
       throw new BadRequestException('Database is not configured');
@@ -450,14 +472,22 @@ export class PostsService {
       throw new BadRequestException('text is too long');
 
     const existingRows = await this.db.client<
-      { media_type: string; title: string | null; text: string | null }[]
+      {
+        user_id: string;
+        media_type: string;
+        title: string | null;
+        text: string | null;
+      }[]
     >`
-      SELECT media_type, title, text
+      SELECT user_id, media_type, title, text
       FROM posts
       WHERE id = ${postId}::uuid
     `;
     const existing = existingRows[0];
     if (!existing) throw new BadRequestException('Post was not found');
+    if (actor?.role === 'AUTHOR' && existing.user_id !== actor.sub) {
+      throw new ForbiddenException('You can only change your own post');
+    }
 
     const nextTitle = updatesTitle ? title : existing.title;
     const nextText = updatesText ? text : existing.text;
@@ -474,6 +504,7 @@ export class PostsService {
         UPDATE posts
         SET layout = ${layout}
         WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
+          AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
         RETURNING *, 0::int as like_count, 0::int as comment_count
       `;
     } else if (updatesTitle && updatesText) {
@@ -481,6 +512,7 @@ export class PostsService {
         UPDATE posts
         SET title = ${title}, text = ${text}
         WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
+          AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
         RETURNING *, 0::int as like_count, 0::int as comment_count
       `;
     } else if (updatesTitle) {
@@ -488,6 +520,7 @@ export class PostsService {
         UPDATE posts
         SET title = ${title}
         WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
+          AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
         RETURNING *, 0::int as like_count, 0::int as comment_count
       `;
     } else {
@@ -495,6 +528,7 @@ export class PostsService {
         UPDATE posts
         SET text = ${text}
         WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
+          AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
         RETURNING *, 0::int as like_count, 0::int as comment_count
       `;
     }
@@ -503,7 +537,11 @@ export class PostsService {
     return post;
   }
 
-  async setPinned(postId: string, pinned: boolean): Promise<PostRow> {
+  async setPinned(
+    postId: string,
+    pinned: boolean,
+    actor?: JwtUser,
+  ): Promise<PostRow> {
     if (!this.db.client) {
       throw new BadRequestException('Database is not configured');
     }
@@ -515,6 +553,7 @@ export class PostsService {
       UPDATE posts
       SET pinned_at = CASE WHEN ${pinned}::boolean THEN now() ELSE NULL END
       WHERE id = ${postId}::uuid
+        AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
       RETURNING *, 0::int AS like_count, 0::int AS comment_count
     `;
     const post = rows[0] ? normalizePost(rows[0]) : undefined;
@@ -585,9 +624,12 @@ export class PostsService {
     return post;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, actor?: JwtUser): Promise<void> {
     if (!this.db.client) throw new NotFoundException();
     const post = await this.getOrThrow(id);
+    if (actor?.role === 'AUTHOR' && post.user_id !== actor.sub) {
+      throw new ForbiddenException('You can only delete your own post');
+    }
     if (post.cloudinary_public_id?.trim()) {
       try {
         await this.cloud.destroy(
@@ -600,6 +642,7 @@ export class PostsService {
     }
     const deleted = await this.db.client`
       DELETE FROM posts WHERE id = ${id}::uuid
+        AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
     `;
     if (deleted.count === 0) throw new NotFoundException('Post not found');
   }

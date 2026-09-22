@@ -1,7 +1,12 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DbService } from '../db/db.service';
 
-export type UserRole = 'USER' | 'ADMIN' | 'SUPERADMIN';
+export type UserRole = 'USER' | 'AUTHOR' | 'ADMIN' | 'SUPERADMIN';
 
 export type UserRow = {
   id: string;
@@ -50,6 +55,51 @@ export class UsersService {
       LIMIT 1
     `;
     return rows[0] ?? null;
+  }
+
+  async listAuthors(): Promise<
+    { id: string; username: string; name: string | null }[]
+  > {
+    if (!this.db.client) return [];
+    return await this.db.client<
+      { id: string; username: string; name: string | null }[]
+    >`
+      SELECT id, username, name FROM users
+      WHERE role IN ('AUTHOR', 'ADMIN', 'SUPERADMIN')
+      ORDER BY created_at ASC, id ASC
+    `;
+  }
+
+  async listAuthorCandidates(): Promise<
+    { id: string; username: string; name: string | null }[]
+  > {
+    if (!this.db.client) return [];
+    return await this.db.client<
+      { id: string; username: string; name: string | null }[]
+    >`
+      SELECT id, username, name FROM users
+      WHERE role = 'USER'
+      ORDER BY created_at ASC, id ASC
+    `;
+  }
+
+  async setAuthorRole(id: string, role: 'AUTHOR' | 'USER') {
+    if (!this.db.client)
+      throw new BadRequestException('Database is not configured');
+    if (role !== 'AUTHOR' && role !== 'USER') {
+      throw new BadRequestException('role must be AUTHOR or USER');
+    }
+    const rows = await this.db.client<
+      Pick<UserRow, 'id' | 'username' | 'name' | 'role'>[]
+    >`
+      UPDATE users SET role = ${role}
+      WHERE id = ${id}::uuid AND role IN ('USER', 'AUTHOR')
+      RETURNING id, username, name, role
+    `;
+    if (rows[0]) return rows[0];
+    const target = await this.findById(id);
+    if (!target) throw new NotFoundException('User not found');
+    throw new BadRequestException('Cannot change administrator role here');
   }
 
   async createUser(input: {

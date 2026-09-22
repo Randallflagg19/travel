@@ -7,16 +7,18 @@ import { BookOpen, X } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { createPost } from "@/shared/api/api";
+import { useSelectedAuthor } from "@/features/feed/model/use-selected-author";
 
 export function StoryCreateButton({ iconOnly = false, className }: { iconOnly?: boolean; className?: string }) {
   const auth = useAuth();
+  const { author, isReady: isAuthorReady } = useSelectedAuthor();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
-  const canCreate = Boolean(auth.accessToken && (auth.user?.role === "ADMIN" || auth.user?.role === "SUPERADMIN"));
+  const canCreate = Boolean(auth.accessToken && isAuthorReady && author?.id === auth.user?.id && (auth.user?.role === "AUTHOR" || auth.user?.role === "ADMIN" || auth.user?.role === "SUPERADMIN"));
 
   async function save() {
     if (!auth.accessToken || !title.trim() || !text.trim()) return;

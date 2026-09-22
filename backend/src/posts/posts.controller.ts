@@ -32,6 +32,7 @@ export class PostsController {
     @Query('city') city?: string,
     @Query('unknown') unknown?: string,
     @Query('order') order?: 'asc' | 'desc',
+    @Query('authorId', new ParseUUIDPipe({ optional: true })) authorId?: string,
   ) {
     return await this.posts.listPage({
       limit,
@@ -41,6 +42,7 @@ export class PostsController {
       unknown: unknown === 'true',
       order,
       userId: user?.sub,
+      authorId,
     });
   }
 
@@ -50,14 +52,17 @@ export class PostsController {
   }
 
   @Delete(':id')
-  @AuthRoles('ADMIN', 'SUPERADMIN')
-  async delete(@Param('id', new ParseUUIDPipe()) id: string) {
-    await this.posts.delete(id);
+  @AuthRoles('AUTHOR', 'ADMIN', 'SUPERADMIN')
+  async delete(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    await this.posts.delete(id, user);
     return { ok: true };
   }
 
   @Post()
-  @AuthRoles('ADMIN', 'SUPERADMIN')
+  @AuthRoles('AUTHOR', 'ADMIN', 'SUPERADMIN')
   async create(
     @CurrentUser() user: JwtUser,
     @Body()
@@ -78,6 +83,7 @@ export class PostsController {
   ) {
     const post = await this.posts.create({
       userId: user.sub,
+      actorRole: user.role,
       mediaType: body.mediaType,
       mediaUrl: body.mediaUrl,
       cloudinaryPublicId: body.cloudinaryPublicId,
@@ -95,9 +101,10 @@ export class PostsController {
   }
 
   @Patch(':id')
-  @AuthRoles('ADMIN', 'SUPERADMIN')
+  @AuthRoles('AUTHOR', 'ADMIN', 'SUPERADMIN')
   async updateMetadata(
     @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: JwtUser,
     @Body()
     body: {
       title?: string | null;
@@ -105,17 +112,18 @@ export class PostsController {
       layout?: PostLayout;
     },
   ) {
-    const post = await this.posts.updateMetadata(id, body);
+    const post = await this.posts.updateMetadata(id, body, user);
     return { post };
   }
 
   @Patch(':id/pin')
-  @AuthRoles('ADMIN', 'SUPERADMIN')
+  @AuthRoles('AUTHOR', 'ADMIN', 'SUPERADMIN')
   async setPinned(
     @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: JwtUser,
     @Body() body: { pinned?: boolean },
   ) {
-    const post = await this.posts.setPinned(id, body.pinned as boolean);
+    const post = await this.posts.setPinned(id, body.pinned as boolean, user);
     return { post };
   }
 }

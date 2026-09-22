@@ -73,11 +73,35 @@ const posts = [
 ];
 
 async function mockFeed(page: Page) {
+  let visitorPromoted = false;
   await page.addInitScript(() => {
     localStorage.setItem("travel_access_token", "responsive-test-token");
   });
   await page.route("**/api-proxy/**", async (route) => {
-    const pathname = new URL(route.request().url()).pathname;
+    const requestUrl = new URL(route.request().url());
+    const pathname = requestUrl.pathname;
+    if (pathname.endsWith("/authors/candidates")) {
+      await route.fulfill({ json: { items: visitorPromoted ? [] : [{ id: "visitor", username: "visitor", name: "Гость" }] } });
+      return;
+    }
+    if (pathname.endsWith("/authors/visitor/role")) {
+      expect(route.request().postDataJSON()).toEqual({ role: "AUTHOR" });
+      visitorPromoted = true;
+      await route.fulfill({ json: { user: { id: "visitor", username: "visitor", name: "Гость", role: "AUTHOR" } } });
+      return;
+    }
+    if (pathname.endsWith("/authors")) {
+      await route.fulfill({
+        json: {
+          items: [
+            { id: "admin", username: "tapir", name: "Tapir" },
+            { id: "friend", username: "friend", name: "Друг" },
+            ...(visitorPromoted ? [{ id: "visitor", username: "visitor", name: "Гость" }] : []),
+          ],
+        },
+      });
+      return;
+    }
     if (pathname.endsWith("/auth/me")) {
       await route.fulfill({
         json: {
@@ -94,6 +118,19 @@ async function mockFeed(page: Page) {
       return;
     }
     if (pathname.endsWith("/places")) {
+      if (requestUrl.searchParams.get("authorId") === "friend") {
+        await route.fulfill({
+          json: {
+            countries: [{
+              country: "China",
+              count: 1,
+              stats: { posts: 1, photos: 1, videos: 0, stories: 0 },
+              cities: [{ city: "Beijing", count: 1, stats: { posts: 1, photos: 1, videos: 0, stories: 0 } }],
+            }],
+          },
+        });
+        return;
+      }
       await route.fulfill({
         json: {
           countries: [
@@ -121,6 +158,10 @@ async function mockFeed(page: Page) {
       return;
     }
     if (pathname.endsWith("/posts")) {
+      if (requestUrl.searchParams.get("authorId") === "friend") {
+        await route.fulfill({ json: { items: [], nextCursor: null, hasMore: false } });
+        return;
+      }
       await route.fulfill({
         json: { items: posts, nextCursor: null, hasMore: false },
       });
@@ -129,6 +170,36 @@ async function mockFeed(page: Page) {
     await route.fulfill({ status: 404, json: { message: "Not mocked" } });
   });
 }
+
+test("superadmin explicitly grants an author role", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockFeed(page);
+  await page.goto("/?all=true");
+  await page.getByRole("button", { name: "Управление авторами" }).click();
+  await expect(page.getByRole("dialog", { name: "Управление авторами" })).toBeVisible();
+  await expect(page.getByText("@visitor")).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Сделать автором" }).click();
+  await expect(page.getByText("Пока нет пользователей, ожидающих доступа.")).toBeVisible();
+  await page.getByRole("button", { name: "Закрыть" }).click();
+  await expect(page.getByRole("navigation", { name: "Авторы" }).getByRole("button", { name: "Гость" })).toBeVisible();
+});
+
+test("switching authors isolates feed and places", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockFeed(page);
+  await page.goto("/?all=true");
+
+  await expect(page.getByRole("heading", { name: "Тестовая история" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Авторы" }).getByRole("button", { name: "Друг" }).click();
+  await expect(page).toHaveURL(/author=friend/);
+  await expect(page.getByRole("heading", { name: "Тестовая история" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /China/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Indonesia/ })).toHaveCount(0);
+
+  await page.getByRole("navigation", { name: "Авторы" }).getByRole("button", { name: "Tapir" }).click();
+  await expect(page.getByRole("heading", { name: "Тестовая история" })).toBeVisible();
+});
 
 function cardWrapper(page: Page, title: string) {
   return page

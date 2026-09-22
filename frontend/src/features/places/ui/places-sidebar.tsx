@@ -12,6 +12,9 @@ import { Separator } from "@/shared/ui/separator";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Button } from "@/shared/ui/button";
 import { readPlaceSelection } from "@/features/places/model/place-selection";
+import { useSelectedAuthor } from "@/features/feed/model/use-selected-author";
+import { AuthorSelector } from "@/features/feed/ui/author-selector";
+import { AuthorGrantButton } from "@/features/feed/ui/author-grant-button";
 import {
   displayCountryImage,
   displayCountryName,
@@ -30,17 +33,21 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const auth = useAuth();
+  const { author, authors, selectAuthor, isReady: isAuthorReady } = useSelectedAuthor();
   const deleteMode = searchParams.get("delete") === "1";
   const canDelete = Boolean(
     auth.user &&
-    (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
+    (auth.user.role === "ADMIN" ||
+      auth.user.role === "SUPERADMIN" ||
+      (auth.user.role === "AUTHOR" && auth.user.id === author?.id)),
   );
 
   const { selectedCountry, selectedCity, all } = readPlaceSelection(searchParams);
 
   const placesQuery = useQuery({
-    queryKey: ["places"],
-    queryFn: fetchPlaces,
+    queryKey: ["places", author?.id],
+    queryFn: () => fetchPlaces(author?.id),
+    enabled: isAuthorReady,
   });
 
   const initialOpen = useMemo(() => {
@@ -78,7 +85,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   function selectHome() {
-    router.push("/");
+    router.push(author ? `/?author=${encodeURIComponent(author.id)}` : "/");
     onNavigate?.();
   }
 
@@ -121,6 +128,12 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="space-y-2 px-4">
+        <p className="px-2 text-[0.68rem] uppercase tracking-[0.18em] text-white/45">Авторы</p>
+        <AuthorSelector authors={authors} selectedId={author?.id ?? null} onSelect={(id) => { selectAuthor(id); onNavigate?.(); }} />
+        <AuthorGrantButton />
+      </div>
+
+      <div className="space-y-2 px-4">
         {canDelete ? (
           <Button
             variant={deleteMode ? "destructive" : "ghost"}
@@ -149,7 +162,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <Separator className="bg-white/10" />
 
       <ScrollArea className="min-h-0 flex-1 px-3 lg:flex-none">
-        {placesQuery.isLoading ? (
+        {!isAuthorReady || placesQuery.isLoading ? (
           <div className="space-y-3 px-1">
             <Skeleton className="h-28 w-full rounded-[1.35rem] bg-white/10" />
             <Skeleton className="h-28 w-full rounded-[1.35rem] bg-white/10" />
@@ -249,7 +262,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="px-4">
         <div className="rounded-[1.35rem] border border-amber-100/10 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
-          <p className="text-sm leading-6 text-amber-50/78">{SIDEBAR_NOTE}</p>
+          <p className="text-sm leading-6 text-amber-50/78">{author?.username.toLowerCase() === "tapir" ? SIDEBAR_NOTE : "Путешествия этого автора: фотографии, видео и истории по странам и городам."}</p>
         </div>
       </div>
     </aside>

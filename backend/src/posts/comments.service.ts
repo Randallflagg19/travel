@@ -47,18 +47,26 @@ export class CommentsService {
     return rows[0];
   }
 
-  async delete(commentId: string, userId: string): Promise<void> {
+  async delete(
+    commentId: string,
+    userId: string,
+    postId: string,
+  ): Promise<void> {
     if (!this.db.client)
       throw new BadRequestException('Database is not configured');
-    const rows = await this.db.client<CommentRow[]>`
-      SELECT user_id FROM comments WHERE id = ${commentId}::uuid
+    const rows = await this.db.client<
+      Pick<CommentRow, 'user_id' | 'post_id'>[]
+    >`
+      SELECT user_id, post_id FROM comments WHERE id = ${commentId}::uuid
     `;
     const comment = rows[0];
     if (!comment) throw new BadRequestException('Comment not found');
+    if (comment.post_id !== postId)
+      throw new BadRequestException('Comment not found on this post');
     if (comment.user_id !== userId)
       throw new ForbiddenException('You can only delete your own comment');
     await this.db.client`
-      DELETE FROM comments WHERE id = ${commentId}::uuid
+      DELETE FROM comments WHERE id = ${commentId}::uuid AND post_id = ${postId}::uuid AND user_id = ${userId}::uuid
     `;
   }
 }

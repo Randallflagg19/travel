@@ -16,12 +16,13 @@ export function useFeedPermissions(user: AuthUser | null): FeedPermissions {
   const canLike = Boolean(
     user &&
       (user.role === "USER" ||
+        user.role === "AUTHOR" ||
         user.role === "ADMIN" ||
         user.role === "SUPERADMIN"),
   );
 
   const canComment = Boolean(
-    user && (user.role === "ADMIN" || user.role === "SUPERADMIN"),
+    user && (user.role === "AUTHOR" || user.role === "ADMIN" || user.role === "SUPERADMIN"),
   );
 
   return { canDelete, canLike, canComment };

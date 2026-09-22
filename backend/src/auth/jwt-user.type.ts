@@ -4,5 +4,5 @@ export type JwtUser = {
   username?: string;
   // `email` is optional and may be null/absent
   email?: string | null;
-  role: 'USER' | 'ADMIN' | 'SUPERADMIN';
+  role: 'USER' | 'AUTHOR' | 'ADMIN' | 'SUPERADMIN';
 };

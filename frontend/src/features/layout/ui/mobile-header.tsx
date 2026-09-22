@@ -8,9 +8,12 @@ import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { CloudinaryUploadButton } from "@/features/upload/ui/cloudinary-upload-button";
 import { StoryCreateButton } from "@/features/upload/ui/story-create-button";
+import { AuthorGrantButton } from "@/features/feed/ui/author-grant-button";
+import { useSelectedAuthor } from "@/features/feed/model/use-selected-author";
 
 export function MobileHeader() {
   const auth = useAuth();
+  const { author } = useSelectedAuthor();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -18,7 +21,9 @@ export function MobileHeader() {
   const canDelete = Boolean(
     pathname === "/" &&
       auth.user &&
-      (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
+      (auth.user.role === "ADMIN" ||
+        auth.user.role === "SUPERADMIN" ||
+        (auth.user.role === "AUTHOR" && auth.user.id === author?.id)),
   );
 
   function toggleDeleteMode() {
@@ -47,7 +52,7 @@ export function MobileHeader() {
       </div>
 
       <Link
-        href="/"
+        href={searchParams.get("author") ? `/?author=${encodeURIComponent(searchParams.get("author") as string)}` : "/"}
         className="relative size-12 overflow-hidden rounded-2xl"
         aria-label="Tapir Travel"
       >
@@ -64,6 +69,7 @@ export function MobileHeader() {
       <div className="flex items-center gap-1.5 justify-self-end">
         {auth.user ? (
           <>
+            <AuthorGrantButton iconOnly />
             <CloudinaryUploadButton
               size="icon"
               variant="ghost"

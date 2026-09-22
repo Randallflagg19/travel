@@ -30,6 +30,8 @@ import { FeedMasonryItem } from "./feed-masonry-item";
 import { FeedExpandedModal } from "./feed-expanded-modal";
 import { useFeedParams } from "../model/use-feed-params";
 import { useFeedPermissions } from "../model/use-feed-permissions";
+import { useSelectedAuthor } from "../model/use-selected-author";
+import { AuthorSelector } from "./author-selector";
 import { FeedHero } from "./feed-hero";
 import { MobileChapters } from "./mobile-chapters";
 import { CitySelection } from "./city-selection";
@@ -85,13 +87,23 @@ export function Feed() {
     isSelectionReady,
   } = useFeedParams();
   const permissions = useFeedPermissions(auth.user);
+  const { author, authors, authorsQuery, selectAuthor, isReady: isAuthorReady } = useSelectedAuthor({ canonicalize: true });
 
-  const { canDelete, canLike, canComment } = permissions;
+  const { canLike, canComment } = permissions;
+
+  const canManagePost = useCallback((post: ApiPost) => Boolean(
+    auth.user && (
+      auth.user.role === "SUPERADMIN" ||
+      auth.user.role === "ADMIN" ||
+      (auth.user.role === "AUTHOR" && auth.user.id === post.user_id)
+    )
+  ), [auth.user]);
 
   const { commentsPostId, postCardRefs, openComments } = useOpenFeedComments();
   const placesQuery = useQuery({
-    queryKey: ["places"],
-    queryFn: fetchPlaces,
+    queryKey: ["places", author?.id],
+    queryFn: () => fetchPlaces(author?.id),
+    enabled: isAuthorReady,
   });
 
   const { isCitySelection, isCountryFeed, canLoadPosts } =
@@ -111,10 +123,11 @@ export function Feed() {
         country: selectedCountry,
         city: selectedCity,
         all,
+        authorId: author?.id,
         accessToken: auth.accessToken ?? null,
       },
     ],
-    [order, selectedCountry, selectedCity, all, auth.accessToken],
+    [order, selectedCountry, selectedCity, all, author?.id, auth.accessToken],
   );
 
   const postsQuery = useInfiniteQuery({
@@ -125,6 +138,7 @@ export function Feed() {
           limit: POSTS_PAGE_LIMIT,
           cursor: typeof pageParam === "string" ? pageParam : undefined,
           order,
+          authorId: author?.id,
           ...buildPostsCountryCityFilter({
             all,
             selectedCountry,
@@ -134,7 +148,7 @@ export function Feed() {
         },
         auth.accessToken ?? undefined,
       ),
-    enabled: Boolean(canLoadPosts && auth.hydrated),
+    enabled: Boolean(canLoadPosts && auth.hydrated && isAuthorReady),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
@@ -187,7 +201,8 @@ export function Feed() {
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleDeletePost = useCallback(async (postId: string) => {
-    if (!auth.accessToken || !canDelete) return;
+    const targetPost = items.find((post) => post.id === postId);
+    if (!auth.accessToken || !targetPost || !canManagePost(targetPost)) return;
     if (!confirm("Удалить пост? Файл будет удалён из Cloudinary и из ленты."))
       return;
     const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
@@ -199,10 +214,10 @@ export function Feed() {
       queryClient.setQueryData(postsQueryKey, previousPosts);
       alert(e instanceof Error ? e.message : "Не удалось удалить");
     }
-  }, [auth.accessToken, canDelete, postsQueryKey, queryClient, updatePostsCache]);
+  }, [auth.accessToken, items, canManagePost, postsQueryKey, queryClient, updatePostsCache]);
 
   async function handleMetadataSave(value: { title: string; text: string }) {
-    if (!editingPost || !auth.accessToken || !canDelete) return;
+    if (!editingPost || !auth.accessToken || !canManagePost(editingPost)) return;
     const postId = editingPost.id;
     const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
     updatePostsCache((post) =>
@@ -225,7 +240,7 @@ export function Feed() {
   }
 
   const handleToggleFeatured = useCallback(async (post: ApiPost) => {
-    if (!auth.accessToken || !canDelete) return;
+    if (!auth.accessToken || !canManagePost(post)) return;
     const layout = post.layout === "FEATURED" ? "STANDARD" : "FEATURED";
     const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
     updatePostsCache((cachedPost) =>
@@ -243,10 +258,10 @@ export function Feed() {
       console.error("update post layout failed", error);
       alert("Не удалось изменить размер карточки. Попробуйте ещё раз.");
     }
-  }, [auth.accessToken, canDelete, postsQueryKey, queryClient, updatePostsCache]);
+  }, [auth.accessToken, canManagePost, postsQueryKey, queryClient, updatePostsCache]);
 
   const handleTogglePinned = useCallback(async (post: ApiPost) => {
-    if (!auth.accessToken || !canDelete) return;
+    if (!auth.accessToken || !canManagePost(post)) return;
     const pinned = !post.pinned_at;
     const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
 
@@ -295,7 +310,7 @@ export function Feed() {
     } finally {
       void queryClient.invalidateQueries({ queryKey: ["posts"] });
     }
-  }, [auth.accessToken, canDelete, order, postsQueryKey, queryClient, updatePostsCache]);
+  }, [auth.accessToken, canManagePost, order, postsQueryKey, queryClient, updatePostsCache]);
 
   const handleLikeSuccess = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -386,12 +401,16 @@ export function Feed() {
   const heroTitle =
     isSelectionReady && !all
       ? headerTitle.replace(" / ", ": ")
-      : "Tapir Travel";
-  const heroPhoto = selectHeroPhoto({
-    all,
-    country: selectedCountry,
-    city: selectedCity,
-  });
+      : author?.username.toLowerCase() === "tapir"
+        ? "Tapir Travel"
+        : author?.name?.trim() || author?.username || "Travel";
+  const heroPhoto = author?.username.toLowerCase() === "tapir"
+    ? selectHeroPhoto({
+        all,
+        country: selectedCountry,
+        city: selectedCity,
+      })
+    : null;
   const heroMediaStats = selectFeedMediaStats({
     places: placesQuery.data,
     all,
@@ -401,6 +420,14 @@ export function Feed() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-4 overflow-x-hidden px-4 py-3 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
+      <div className="lg:hidden">
+        <AuthorSelector authors={authors} selectedId={author?.id ?? null} onSelect={selectAuthor} compact />
+      </div>
+      {authorsQuery.isError ? (
+        <p role="alert" className="rounded-xl border border-red-300/20 bg-red-950/20 p-3 text-sm text-red-100">
+          Не удалось загрузить авторов. Обнови страницу и попробуй снова.
+        </p>
+      ) : null}
       <FeedHero
         title={heroTitle}
         photosCount={heroMediaStats?.photos ?? null}
@@ -411,7 +438,7 @@ export function Feed() {
       />
 
       <FeedServerLoadingNotice
-        isPlacesLoading={placesQuery.isLoading}
+        isPlacesLoading={authorsQuery.isLoading || placesQuery.isLoading}
         isPostsLoading={isInitialPostsLoading}
       />
 
@@ -454,7 +481,7 @@ export function Feed() {
           <CardHeader>
             <CardTitle className="text-white">Пока пусто</CardTitle>
             <CardDescription className="text-white/55">
-              Для этого места постов нет.
+              {all ? "У этого автора пока нет публикаций." : "Для этого места постов нет."}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -482,8 +509,8 @@ export function Feed() {
                 <FeedPostCard
                   post={p}
                   deleteMode={deleteMode}
-                  canDelete={canDelete}
-                  canEdit={canDelete}
+                  canDelete={canManagePost(p)}
+                  canEdit={canManagePost(p)}
                   onDelete={handleDeletePost}
                   onEdit={setEditingPost}
                   onToggleFeatured={handleToggleFeatured}
@@ -495,7 +522,7 @@ export function Feed() {
                   onOpen={openExpanded}
                   showPlaceInCard={showPlaceInCard}
                   canLike={canLike}
-                  canComment={canComment}
+                  canComment={canComment && (auth.user?.role !== "AUTHOR" || auth.user.id === p.user_id)}
                   isCommentsOpen={commentsPostId === p.id}
                   currentUserId={auth.user?.id ?? null}
                   accessToken={auth.accessToken}

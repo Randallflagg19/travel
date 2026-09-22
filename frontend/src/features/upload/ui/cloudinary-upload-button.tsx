@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
+import { useSelectedAuthor } from "@/features/feed/model/use-selected-author";
 import {
   adminCloudinaryConfig,
   adminCloudinarySignUpload,
@@ -78,6 +79,7 @@ export function CloudinaryUploadButton(props: {
   className?: string;
 }) {
   const auth = useAuth();
+  const { author, isReady: isAuthorReady } = useSelectedAuthor();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
@@ -95,6 +97,8 @@ export function CloudinaryUploadButton(props: {
   const canUpload = Boolean(
     auth.user &&
     auth.accessToken &&
+    isAuthorReady &&
+    author?.id === auth.user.id &&
     (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
   );
 

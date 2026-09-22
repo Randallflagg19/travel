@@ -1,6 +1,10 @@
 /// <reference types="jest" />
 
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { DbService } from '../db/db.service';
 import { PostRow, PostsService } from './posts.service';
@@ -183,5 +187,88 @@ describe('PostsService pinned pagination', () => {
       service.listPage({ cursor: oldCursor, order: 'desc' }),
     ).resolves.toBeDefined();
     expect(calls[0]?.values).toContain(null);
+  });
+});
+
+describe('PostsService author isolation', () => {
+  const authorId = '00000000-0000-4000-8000-000000000010';
+  const otherId = '00000000-0000-4000-8000-000000000011';
+  const author = { sub: authorId, role: 'AUTHOR' as const };
+
+  it.each(['asc', 'desc'] as const)(
+    'filters %s pages by author before pagination',
+    async (order) => {
+      const { service, calls } = createService([[]]);
+      await service.listPage({ authorId, order, country: 'Thailand' });
+      expect(calls[0]?.text).toContain('p.user_id = ?::uuid');
+      expect(calls[0]?.values).toContain(authorId);
+    },
+  );
+
+  it('prevents an author from editing another author’s post', async () => {
+    const { service, calls } = createService([
+      [
+        {
+          user_id: otherId,
+          media_type: 'STORY',
+          title: 'A',
+          text: 'B',
+        } as PostRow,
+      ],
+    ]);
+    await expect(
+      service.updateMetadata(makePost().id, { title: 'New' }, author),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('restricts pin updates to the author’s posts at SQL level', async () => {
+    const { service, calls } = createService([[]]);
+    await expect(
+      service.setPinned(makePost().id, true, author),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(calls[0]?.text).toContain('user_id = ?::uuid');
+    expect(calls[0]?.values).toContain(authorId);
+  });
+
+  it('refuses another author’s deletion before touching Cloudinary', async () => {
+    const { service, calls } = createService([
+      [makePost({ user_id: otherId })],
+    ]);
+    await expect(service.delete(makePost().id, author)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(calls).toHaveLength(1);
+  });
+
+  it.each(['PHOTO', 'VIDEO'] as const)(
+    'blocks shared-Cloudinary %s creation for an author',
+    async (mediaType) => {
+      const { service, calls } = createService([]);
+      await expect(
+        service.create({
+          userId: authorId,
+          actorRole: 'AUTHOR',
+          mediaType,
+          mediaUrl: 'https://example.com/1.jpg',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it('blocks authors from attaching a shared-Cloudinary asset to a story', async () => {
+    const { service, calls } = createService([]);
+    await expect(
+      service.create({
+        userId: authorId,
+        actorRole: 'AUTHOR',
+        mediaType: 'STORY',
+        title: 'Trip',
+        text: 'Story',
+        cloudinaryPublicId: 'tapir/private-photo',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(calls).toHaveLength(0);
   });
 });

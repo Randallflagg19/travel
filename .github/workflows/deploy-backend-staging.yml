@@ -24,7 +24,7 @@ jobs:
           ref: ${{ inputs.ref }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: yarn
           cache-dependency-path: backend/yarn.lock
       - run: yarn install --frozen-lockfile
@@ -47,8 +47,8 @@ jobs:
           echo "id=$release_id" >> "$GITHUB_OUTPUT"
       - name: Configure SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.TRAVEL_VPS_SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.TRAVEL_VPS_KNOWN_HOSTS }}
+          SSH_PRIVATE_KEY: ${{ secrets.TRAVEL_STAGING_VPS_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.TRAVEL_STAGING_VPS_KNOWN_HOSTS }}
         run: |
           install -d -m 700 ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
@@ -58,8 +58,8 @@ jobs:
       - name: Upload and activate release
         env:
           RELEASE_ID: ${{ steps.release.outputs.id }}
-          VPS_HOST: ${{ secrets.TRAVEL_VPS_HOST }}
-          VPS_USER: ${{ secrets.TRAVEL_VPS_USER }}
+          VPS_HOST: ${{ secrets.TRAVEL_STAGING_VPS_HOST }}
+          VPS_USER: ${{ secrets.TRAVEL_STAGING_VPS_USER }}
         run: |
           ssh "$VPS_USER@$VPS_HOST" 'mkdir -p ~/travel-backend-staging/incoming ~/travel-backend-staging/releases'
           scp "$RUNNER_TEMP/$RELEASE_ID.tar.gz" "$VPS_USER@$VPS_HOST:~/travel-backend-staging/incoming/$RELEASE_ID.tar.gz"

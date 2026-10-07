@@ -25,6 +25,7 @@ jobs:
       contents: read
     env:
       NEXT_PUBLIC_API_URL: ${{ inputs.api_url }}
+      NEXT_PUBLIC_SITE_URL: https://staging.tapir.su
 
     steps:
       - name: Check out selected revision

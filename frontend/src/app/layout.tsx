@@ -35,7 +35,9 @@ const storyBody = Lora({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://travel-coral-five-50.vercel.app"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://www.tapir.su",
+  ),
   title: "Tapir Travel",
   description: "Личный журнал путешествий, фото и историй.",
   icons: {
@@ -47,25 +49,11 @@ export const metadata: Metadata = {
     url: "/",
     siteName: "Tapir Travel",
     type: "website",
-    images: [
-      {
-        url: "/opengraph-image.png",
-        width: 1419,
-        height: 1109,
-        alt: "Tapir Travel mascot",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Tapir Travel",
     description: "Личный журнал путешествий, фото и историй.",
-    images: [
-      {
-        url: "/twitter-image.png",
-        alt: "Tapir Travel mascot",
-      },
-    ],
   },
 };
 

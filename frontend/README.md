@@ -26,7 +26,7 @@ Tests 1–4 run without auth. Test 5 (like persists after refresh) requires env 
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to load its fonts.
 
 ## Learn More
 
@@ -35,10 +35,21 @@ To learn more about Next.js, take a look at the following resources:
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy to VPS
 
-## Deploy on Vercel
+GitHub Actions builds the standalone frontend and deploys it to the VPS:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Production: `.github/workflows/deploy-frontend-production.yml`, site `https://www.tapir.su`.
+- Staging: `.github/workflows/deploy-frontend-staging.yml`, site `https://staging.tapir.su`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Both workflows set `NEXT_PUBLIC_SITE_URL` at build time. This is the base URL
+for Open Graph and Twitter metadata, including the image routes in `src/app`.
+Local builds default to `https://www.tapir.su`; set `NEXT_PUBLIC_SITE_URL` to
+build for another origin. Changing the variable requires rebuilding the frontend.
+
+The preview images are `src/app/opengraph-image.png` and
+`src/app/twitter-image.png` (1734 × 907 PNG). Next.js derives image URLs,
+types and dimensions from these files; accompanying `.alt.txt` files supply
+the descriptions. Keep image metadata in these files rather than duplicating
+it in `layout.tsx`. Verify the generated HTML and the image URLs
+after deployment, then check a real link preview in Telegram.

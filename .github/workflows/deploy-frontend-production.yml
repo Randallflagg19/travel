@@ -20,6 +20,7 @@ jobs:
       contents: read
     env:
       NEXT_PUBLIC_API_URL: https://api.tapir.su/api
+      NEXT_PUBLIC_SITE_URL: https://www.tapir.su
     steps:
       - uses: actions/checkout@v4
         with:

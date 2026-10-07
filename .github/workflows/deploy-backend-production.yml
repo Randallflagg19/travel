@@ -24,7 +24,7 @@ jobs:
           ref: ${{ inputs.ref }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: yarn
           cache-dependency-path: backend/yarn.lock
       - run: yarn install --frozen-lockfile

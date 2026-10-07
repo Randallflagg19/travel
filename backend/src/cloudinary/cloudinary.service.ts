@@ -385,10 +385,7 @@ export class CloudinaryService {
           (meta.OffsetTimeOriginal as string) ??
           (meta.OffsetTimeDigitized as string) ??
           (meta.OffsetTime as string);
-        const shot = parseShotDate(
-          dateStr as string | undefined,
-          offset as string | undefined,
-        );
+        const shot = parseShotDate(dateStr, offset);
         if (shot) out.shotAt = shot;
       }
     } else if (resourceType === 'video') {

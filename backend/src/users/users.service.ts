@@ -137,8 +137,8 @@ export class UsersService {
         typeof e === 'object' &&
         e !== null &&
         'code' in e &&
-        typeof (e as { code: unknown }).code === 'string' &&
-        (e as { code: string }).code === '23505'
+        typeof e.code === 'string' &&
+        e.code === '23505'
       ) {
         throw new ConflictException('Username or email already exists');
       }

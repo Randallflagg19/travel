@@ -47,9 +47,13 @@ for Open Graph and Twitter metadata, including the image routes in `src/app`.
 Local builds default to `https://www.tapir.su`; set `NEXT_PUBLIC_SITE_URL` to
 build for another origin. Changing the variable requires rebuilding the frontend.
 
-The preview images are `src/app/opengraph-image.png` and
-`src/app/twitter-image.png` (1734 × 907 PNG). Next.js derives image URLs,
+The preview images are `src/app/opengraph-image.jpg` and
+`src/app/twitter-image.jpg` (1200 × 630 JPEG, 88,775 bytes each). Next.js derives image URLs,
 types and dimensions from these files; accompanying `.alt.txt` files supply
 the descriptions. Keep image metadata in these files rather than duplicating
 it in `layout.tsx`. Verify the generated HTML and the image URLs
 after deployment, then check a real link preview in Telegram.
+
+The previous PNG images remain in `public/opengraph-image.png` and
+`public/twitter-image.png` so previously shared image URLs still work.
+Only the JPEG files in `src/app` define the current social image metadata.

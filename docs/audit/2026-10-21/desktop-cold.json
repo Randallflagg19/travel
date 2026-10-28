@@ -1,0 +1,1207 @@
+{
+  "name": "desktop-cold",
+  "status": 200,
+  "cardsMs": 2913,
+  "errors": [],
+  "dom": {
+    "url": "https://www.tapir.su/?author=2cbda5c8-160c-49e8-a4ab-f407fdcf3210&all=true",
+    "nav": {
+      "name": "https://www.tapir.su/",
+      "entryType": "navigation",
+      "startTime": 0,
+      "duration": 2799.5,
+      "navigationId": 9637,
+      "initiatorType": "navigation",
+      "deliveryType": "",
+      "nextHopProtocol": "h2",
+      "renderBlockingStatus": "non-blocking",
+      "contentType": "text/html",
+      "contentEncoding": "gzip",
+      "workerStart": 0,
+      "workerRouterEvaluationStart": 0,
+      "workerCacheLookupStart": 0,
+      "workerMatchedSourceType": "",
+      "workerFinalSourceType": "",
+      "redirectStart": 0,
+      "redirectEnd": 0,
+      "fetchStart": 0.2000000011175871,
+      "domainLookupStart": 5.400000000372529,
+      "domainLookupEnd": 389,
+      "connectStart": 389,
+      "secureConnectionStart": 390.6000000014901,
+      "connectEnd": 451.6000000014901,
+      "requestStart": 451.90000000037253,
+      "responseStart": 476.6000000014901,
+      "firstInterimResponseStart": 0,
+      "finalResponseHeadersStart": 476.6000000014901,
+      "responseEnd": 478.7000000011176,
+      "transferSize": 3905,
+      "encodedBodySize": 3605,
+      "decodedBodySize": 14848,
+      "responseStatus": 200,
+      "serverTiming": [],
+      "unloadEventStart": 0,
+      "unloadEventEnd": 0,
+      "domInteractive": 566.5,
+      "domContentLoadedEventStart": 566.5,
+      "domContentLoadedEventEnd": 566.5,
+      "domComplete": 2799.5,
+      "loadEventStart": 2799.5,
+      "loadEventEnd": 2799.5,
+      "type": "navigate",
+      "redirectCount": 0,
+      "activationStart": 0,
+      "criticalCHRestart": 0,
+      "notRestoredReasons": null,
+      "confidence": {
+        "randomizedTriggerRate": 0.4994798,
+        "value": "high"
+      }
+    },
+    "paint": [
+      {
+        "name": "first-paint",
+        "entryType": "paint",
+        "startTime": 664,
+        "duration": 0,
+        "navigationId": 9637,
+        "paintTime": 645.8000000007451,
+        "presentationTime": 664
+      },
+      {
+        "name": "first-contentful-paint",
+        "entryType": "paint",
+        "startTime": 664,
+        "duration": 0,
+        "navigationId": 9637,
+        "paintTime": 645.8000000007451,
+        "presentationTime": 664
+      }
+    ],
+    "observed": {
+      "lcp": [
+        {
+          "time": 664,
+          "size": 1224,
+          "url": "",
+          "tag": "DIV"
+        },
+        {
+          "time": 812,
+          "size": 14495,
+          "url": "",
+          "tag": "P"
+        },
+        {
+          "time": 1828,
+          "size": 609879,
+          "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=3840&q=75",
+          "tag": "IMG"
+        }
+      ],
+      "cls": 0.038282250192901233
+    },
+    "images": [
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=96&q=75",
+        "width": 96,
+        "naturalWidth": 48,
+        "top": 0,
+        "height": 75,
+        "complete": true,
+        "visible": false,
+        "loading": "auto",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=128&q=75",
+        "width": 64,
+        "naturalWidth": 64,
+        "top": 30,
+        "height": 64,
+        "complete": true,
+        "visible": true,
+        "loading": "auto",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=48&q=75",
+        "width": 24,
+        "naturalWidth": 24,
+        "top": 154,
+        "height": 24,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Fcountry-china-bright.png&w=640&q=75",
+        "width": 285,
+        "naturalWidth": 279,
+        "top": 274,
+        "height": 110,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Fcountry-egypt-bright.png&w=640&q=75",
+        "width": 285,
+        "naturalWidth": 279,
+        "top": 398,
+        "height": 110,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Fcountry-indonesia-bright.png&w=640&q=75",
+        "width": 285,
+        "naturalWidth": 279,
+        "top": 522,
+        "height": 110,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Fcountry-thailand-bright.png&w=640&q=75",
+        "width": 285,
+        "naturalWidth": 279,
+        "top": 646,
+        "height": 110,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=48&q=75",
+        "width": 48,
+        "naturalWidth": 24,
+        "top": 0,
+        "height": 38,
+        "complete": false,
+        "visible": false,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=1920&q=75",
+        "width": 1440,
+        "naturalWidth": 690,
+        "top": 0,
+        "height": 900,
+        "complete": true,
+        "visible": false,
+        "loading": "auto",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=3840&q=75",
+        "width": 1041,
+        "naturalWidth": 468,
+        "top": 20,
+        "height": 586,
+        "complete": true,
+        "visible": true,
+        "loading": "auto",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/me-hero.jpg",
+        "width": 900,
+        "naturalWidth": 900,
+        "top": 0,
+        "height": 1200,
+        "complete": true,
+        "visible": false,
+        "loading": "auto",
+        "priority": "auto"
+      },
+      {
+        "src": "https://www.tapir.su/me-hero.jpg",
+        "width": 260,
+        "naturalWidth": 900,
+        "top": 108,
+        "height": 288,
+        "complete": true,
+        "visible": true,
+        "loading": "auto",
+        "priority": "auto"
+      },
+      {
+        "src": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1769536344/IMG_5386_gja1n4.heic",
+        "width": 687,
+        "naturalWidth": 600,
+        "top": 685,
+        "height": 916,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1785614631/IMG_0894_h3b69q.jpg",
+        "width": 334,
+        "naturalWidth": 600,
+        "top": 1165,
+        "height": 251,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1789372714/Tapir/China/Beinjin/IMG_5772_rzdxkf_dlgu7a.jpg",
+        "width": 334,
+        "naturalWidth": 600,
+        "top": 1525,
+        "height": 251,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1789372701/Tapir/China/Beinjin/IMG_E3481_ctfbwx_y2fipo.jpg",
+        "width": 334,
+        "naturalWidth": 600,
+        "top": 1705,
+        "height": 251,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1789372646/Tapir/China/Beinjin/IMG_E3472_rmn2f5_xmukz6.jpg",
+        "width": 334,
+        "naturalWidth": 600,
+        "top": 1705,
+        "height": 251,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1789369651/Tapir/Indonesia/Bali/IMG_E4594_vx4jop_c5fink.jpg",
+        "width": 334,
+        "naturalWidth": 600,
+        "top": 1965,
+        "height": 251,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1785614954/IMG_1150_l6h5gn.jpg",
+        "width": 334,
+        "naturalWidth": 600,
+        "top": 2065,
+        "height": 595,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      },
+      {
+        "src": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1785614952/IMG_1149_cl9mcr.jpg",
+        "width": 334,
+        "naturalWidth": 600,
+        "top": 2065,
+        "height": 595,
+        "complete": true,
+        "visible": true,
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "preloads": [
+      {
+        "as": "font",
+        "href": "https://www.tapir.su/_next/static/media/0086f8992871c45b-s.p.woff2",
+        "srcset": "",
+        "media": ""
+      },
+      {
+        "as": "font",
+        "href": "https://www.tapir.su/_next/static/media/22a5144ee8d83bca-s.p.woff2",
+        "srcset": "",
+        "media": ""
+      },
+      {
+        "as": "font",
+        "href": "https://www.tapir.su/_next/static/media/5c0c2bcbaa4149ca-s.p.woff2",
+        "srcset": "",
+        "media": ""
+      },
+      {
+        "as": "font",
+        "href": "https://www.tapir.su/_next/static/media/7b89a4fd5e90ede0-s.p.woff2",
+        "srcset": "",
+        "media": ""
+      },
+      {
+        "as": "font",
+        "href": "https://www.tapir.su/_next/static/media/7d4881bb7e1bf84d-s.p.woff2",
+        "srcset": "",
+        "media": ""
+      },
+      {
+        "as": "font",
+        "href": "https://www.tapir.su/_next/static/media/8715d2ed531152f4-s.p.woff2",
+        "srcset": "",
+        "media": ""
+      },
+      {
+        "as": "script",
+        "href": "https://www.tapir.su/_next/static/chunks/webpack-fb92bf7e93a6ff47.js",
+        "srcset": "",
+        "media": ""
+      },
+      {
+        "as": "image",
+        "href": "",
+        "srcset": "/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=32&q=75 32w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=48&q=75 48w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=64&q=75 64w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=96&q=75 96w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=128&q=75 128w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=256&q=75 256w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=384&q=75 384w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=640&q=75 640w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=750&q=75 750w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=828&q=75 828w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=1080&q=75 1080w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=1200&q=75 1200w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=1920&q=75 1920w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=2048&q=75 2048w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=3840&q=75 3840w",
+        "media": ""
+      },
+      {
+        "as": "image",
+        "href": "",
+        "srcset": "/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=32&q=75 32w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=48&q=75 48w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=64&q=75 64w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=96&q=75 96w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=128&q=75 128w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=256&q=75 256w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=384&q=75 384w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=640&q=75 640w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=750&q=75 750w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=828&q=75 828w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=1080&q=75 1080w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=1200&q=75 1200w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=1920&q=75 1920w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=2048&q=75 2048w, /_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=3840&q=75 3840w",
+        "media": ""
+      },
+      {
+        "as": "image",
+        "href": "",
+        "srcset": "/_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=32&q=75 32w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=48&q=75 48w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=64&q=75 64w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=96&q=75 96w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=128&q=75 128w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=256&q=75 256w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=384&q=75 384w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=640&q=75 640w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=750&q=75 750w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=828&q=75 828w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=1080&q=75 1080w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=1200&q=75 1200w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=1920&q=75 1920w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=2048&q=75 2048w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=3840&q=75 3840w",
+        "media": ""
+      },
+      {
+        "as": "image",
+        "href": "",
+        "srcset": "/_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=32&q=75 32w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=48&q=75 48w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=64&q=75 64w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=96&q=75 96w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=128&q=75 128w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=256&q=75 256w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=384&q=75 384w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=640&q=75 640w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=750&q=75 750w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=828&q=75 828w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=1080&q=75 1080w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=1200&q=75 1200w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=1920&q=75 1920w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=2048&q=75 2048w, /_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=3840&q=75 3840w",
+        "media": ""
+      },
+      {
+        "as": "image",
+        "href": "https://www.tapir.su/me-hero.jpg",
+        "srcset": "",
+        "media": ""
+      }
+    ],
+    "cards": 9,
+    "mainCount": 2,
+    "h1Count": 0
+  },
+  "requests": [
+    {
+      "url": "https://www.tapir.su/",
+      "method": "GET",
+      "start": 11411.752029,
+      "type": "Document",
+      "status": 200,
+      "cache": false,
+      "mime": "text/html",
+      "headers": {
+        "cache-control": "s-maxage=31536000",
+        "content-encoding": "gzip",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"
+      },
+      "ms": 478,
+      "bytes": 3930
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/media/0086f8992871c45b-s.p.woff2",
+      "method": "GET",
+      "start": 11412.241678,
+      "type": "Font",
+      "status": 200,
+      "cache": false,
+      "mime": "font/woff2",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "21252"
+      },
+      "ms": 31,
+      "bytes": 21467
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/media/22a5144ee8d83bca-s.p.woff2",
+      "method": "GET",
+      "start": 11412.243591,
+      "type": "Font",
+      "status": 200,
+      "cache": false,
+      "mime": "font/woff2",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "29288"
+      },
+      "ms": 51,
+      "bytes": 29512
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/media/5c0c2bcbaa4149ca-s.p.woff2",
+      "method": "GET",
+      "start": 11412.243627,
+      "type": "Font",
+      "status": 200,
+      "cache": false,
+      "mime": "font/woff2",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "37792"
+      },
+      "ms": 68,
+      "bytes": 38025
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/media/7b89a4fd5e90ede0-s.p.woff2",
+      "method": "GET",
+      "start": 11412.244073,
+      "type": "Font",
+      "status": 200,
+      "cache": false,
+      "mime": "font/woff2",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "37776"
+      },
+      "ms": 72,
+      "bytes": 38009
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/media/7d4881bb7e1bf84d-s.p.woff2",
+      "method": "GET",
+      "start": 11412.244108,
+      "type": "Font",
+      "status": 200,
+      "cache": false,
+      "mime": "font/woff2",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "23108"
+      },
+      "ms": 121,
+      "bytes": 23323
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/media/8715d2ed531152f4-s.p.woff2",
+      "method": "GET",
+      "start": 11412.244139,
+      "type": "Font",
+      "status": 200,
+      "cache": false,
+      "mime": "font/woff2",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "21132"
+      },
+      "ms": 142,
+      "bytes": 21347
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/css/601424fe4bbf0050.css",
+      "method": "GET",
+      "start": 11412.244209,
+      "type": "Stylesheet",
+      "status": 200,
+      "cache": false,
+      "mime": "text/css",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 69,
+      "bytes": 2507
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/css/50265d82da902bf1.css",
+      "method": "GET",
+      "start": 11412.244227,
+      "type": "Stylesheet",
+      "status": 200,
+      "cache": false,
+      "mime": "text/css",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 70,
+      "bytes": 14759
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/webpack-fb92bf7e93a6ff47.js",
+      "method": "GET",
+      "start": 11412.244419,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 142,
+      "bytes": 1932
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/4bd1b696-92152b0f5947070d.js",
+      "method": "GET",
+      "start": 11412.244445,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 175,
+      "bytes": 63634
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/794-000a715ce19c7a17.js",
+      "method": "GET",
+      "start": 11412.244459,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 225,
+      "bytes": 66053
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/main-app-2d5554c052c7ef27.js",
+      "method": "GET",
+      "start": 11412.244472,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "513",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 142,
+      "bytes": 735
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/264-001fcf754a0f9c70.js",
+      "method": "GET",
+      "start": 11412.244487,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 166,
+      "bytes": 18433
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/500-721f8650806d0f40.js",
+      "method": "GET",
+      "start": 11412.244498,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 143,
+      "bytes": 3666
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/717-214dc3d36004bea0.js",
+      "method": "GET",
+      "start": 11412.244513,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 171,
+      "bytes": 20065
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/157-951c5f65410180c4.js",
+      "method": "GET",
+      "start": 11412.244529,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 166,
+      "bytes": 7766
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/229-a8248adb84ff0a58.js",
+      "method": "GET",
+      "start": 11412.244544,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 166,
+      "bytes": 5398
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/app/layout-2f2a9eefd2e09cf8.js",
+      "method": "GET",
+      "start": 11412.244554,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 167,
+      "bytes": 7513
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/508-cf29e7d9e511227e.js",
+      "method": "GET",
+      "start": 11412.244564,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 167,
+      "bytes": 2907
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/app/page-ce23ebb45e158ac2.js",
+      "method": "GET",
+      "start": 11412.244576,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 174,
+      "bytes": 15829
+    },
+    {
+      "url": "https://www.tapir.su/first-screen/bg-desk-dark.png",
+      "method": "GET",
+      "start": 11412.327429,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/png",
+      "headers": {
+        "cache-control": "public, max-age=0",
+        "content-length": "2437882"
+      },
+      "ms": 1922,
+      "bytes": 2440760
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=96&q=75",
+      "method": "GET",
+      "start": 11412.514104,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "854",
+        "vary": "Accept"
+      },
+      "ms": 917,
+      "bytes": 1145
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=128&q=75",
+      "method": "GET",
+      "start": 11412.518776,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "1152",
+        "vary": "Accept"
+      },
+      "ms": 912,
+      "bytes": 1445
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fjournal-template-mobile.png&w=1920&q=75",
+      "method": "GET",
+      "start": 11412.520715,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "81056",
+        "vary": "Accept"
+      },
+      "ms": 945,
+      "bytes": 81442
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fjournal-template-clean.png&w=3840&q=75",
+      "method": "GET",
+      "start": 11412.521608,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "125050",
+        "vary": "Accept"
+      },
+      "ms": 1019,
+      "bytes": 125482
+    },
+    {
+      "url": "https://api.tapir.su/api/authors",
+      "method": "GET",
+      "start": 11412.527472,
+      "type": "Fetch",
+      "status": 200,
+      "cache": false,
+      "mime": "application/json",
+      "headers": {
+        "content-length": "91",
+        "vary": "Origin"
+      },
+      "ms": 786,
+      "bytes": 284
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/media/9766a7e9e2e0ad5a-s.woff2",
+      "method": "GET",
+      "start": 11412.539628,
+      "type": "Font",
+      "status": 200,
+      "cache": false,
+      "mime": "font/woff2",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "14900"
+      },
+      "ms": 890,
+      "bytes": 15106
+    },
+    {
+      "url": "https://www.tapir.su/login?_rsc=5CB68i4pnAekjehf",
+      "method": "GET",
+      "start": 11412.565782,
+      "type": "Fetch",
+      "status": 200,
+      "cache": false,
+      "mime": "text/x-component",
+      "headers": {
+        "cache-control": "s-maxage=31536000",
+        "content-encoding": "gzip",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"
+      },
+      "ms": 907,
+      "bytes": 589
+    },
+    {
+      "url": "https://www.tapir.su/me-hero.jpg",
+      "method": "GET",
+      "start": 11413.316722,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/jpeg",
+      "headers": {
+        "cache-control": "public, max-age=0",
+        "content-length": "426038"
+      },
+      "ms": 667,
+      "bytes": 426683
+    },
+    {
+      "url": "https://www.tapir.su/?author=2cbda5c8-160c-49e8-a4ab-f407fdcf3210&all=true&_rsc=QLBdCDjfpGkLRHBX",
+      "method": "GET",
+      "start": 11413.318792,
+      "type": "Fetch",
+      "status": 200,
+      "cache": false,
+      "mime": "text/x-component",
+      "headers": {
+        "cache-control": "s-maxage=31536000",
+        "content-encoding": "gzip",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"
+      },
+      "ms": 222,
+      "bytes": 2612
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Ftapir-mascot-dark-bg.png&w=48&q=75",
+      "method": "GET",
+      "start": 11413.327611,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "398",
+        "vary": "Accept"
+      },
+      "ms": 232,
+      "bytes": 690
+    },
+    {
+      "url": "https://www.tapir.su/login?_rsc=lw_4HufM6eb2NBvR",
+      "method": "GET",
+      "start": 11413.474282,
+      "type": "Fetch",
+      "status": 200,
+      "cache": false,
+      "mime": "text/x-component",
+      "headers": {
+        "cache-control": "s-maxage=31536000",
+        "content-encoding": "gzip",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"
+      },
+      "ms": 218,
+      "bytes": 2528
+    },
+    {
+      "url": "https://api.tapir.su/api/posts?limit=9&order=desc&authorId=2cbda5c8-160c-49e8-a4ab-f407fdcf3210",
+      "method": "OPTIONS",
+      "start": 11413.546631,
+      "type": "Other",
+      "status": 204,
+      "cache": false,
+      "mime": "",
+      "headers": {
+        "vary": "Origin, Access-Control-Request-Headers"
+      },
+      "ms": 16,
+      "bytes": 0
+    },
+    {
+      "url": "https://api.tapir.su/api/places?authorId=2cbda5c8-160c-49e8-a4ab-f407fdcf3210",
+      "method": "GET",
+      "start": 11413.545515,
+      "type": "Fetch",
+      "status": 200,
+      "cache": false,
+      "mime": "application/json",
+      "headers": {
+        "content-length": "873",
+        "vary": "Origin"
+      },
+      "ms": 22,
+      "bytes": 1066
+    },
+    {
+      "url": "https://api.tapir.su/api/posts?limit=9&order=desc&authorId=2cbda5c8-160c-49e8-a4ab-f407fdcf3210",
+      "method": "GET",
+      "start": 11413.546036,
+      "type": "Fetch",
+      "status": 200,
+      "cache": false,
+      "mime": "application/json",
+      "headers": {
+        "content-length": "7541",
+        "vary": "Origin"
+      },
+      "ms": 41,
+      "bytes": 7745
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Fcountry-china-bright.png&w=640&q=75",
+      "method": "GET",
+      "start": 11413.585248,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "25092",
+        "vary": "Accept"
+      },
+      "ms": 227,
+      "bytes": 25421
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Fcountry-egypt-bright.png&w=640&q=75",
+      "method": "GET",
+      "start": 11413.585293,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "20562",
+        "vary": "Accept"
+      },
+      "ms": 229,
+      "bytes": 20885
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Fcountry-indonesia-bright.png&w=640&q=75",
+      "method": "GET",
+      "start": 11413.585314,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "22560",
+        "vary": "Accept"
+      },
+      "ms": 233,
+      "bytes": 22883
+    },
+    {
+      "url": "https://www.tapir.su/_next/image?url=%2Ffirst-screen%2Fsidebar%2Fcountry-thailand-bright.png&w=640&q=75",
+      "method": "GET",
+      "start": 11413.585329,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=14400, must-revalidate",
+        "content-length": "23918",
+        "vary": "Accept"
+      },
+      "ms": 246,
+      "bytes": 24243
+    },
+    {
+      "url": "https://www.tapir.su/images/stories/story-bg.webp",
+      "method": "GET",
+      "start": 11413.590083,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "cache-control": "public, max-age=0",
+        "content-length": "114280"
+      },
+      "ms": 337,
+      "bytes": 114574
+    },
+    {
+      "url": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1769536344/IMG_5386_gja1n4.heic",
+      "method": "GET",
+      "start": 11413.595531,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/jpeg",
+      "headers": {
+        "vary": "Accept,User-Agent,Save-Data",
+        "cache-control": "private, no-transform, immutable, max-age=2592000",
+        "content-length": "118416"
+      },
+      "ms": 920,
+      "bytes": 119072
+    },
+    {
+      "url": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1785614631/IMG_0894_h3b69q.jpg",
+      "method": "GET",
+      "start": 11413.595612,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "vary": "Accept,User-Agent,Save-Data",
+        "cache-control": "private, no-transform, immutable, max-age=2592000",
+        "content-length": "30022"
+      },
+      "ms": 754,
+      "bytes": 30444
+    },
+    {
+      "url": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1789372714/Tapir/China/Beinjin/IMG_5772_rzdxkf_dlgu7a.jpg",
+      "method": "GET",
+      "start": 11413.595632,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/jpeg",
+      "headers": {
+        "vary": "Accept,User-Agent,Save-Data",
+        "cache-control": "private, no-transform, immutable, max-age=2592000",
+        "content-length": "78467"
+      },
+      "ms": 766,
+      "bytes": 78986
+    },
+    {
+      "url": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1789372701/Tapir/China/Beinjin/IMG_E3481_ctfbwx_y2fipo.jpg",
+      "method": "GET",
+      "start": 11413.595649,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "vary": "Accept,User-Agent,Save-Data",
+        "cache-control": "private, no-transform, immutable, max-age=2592000",
+        "content-length": "35358"
+      },
+      "ms": 677,
+      "bytes": 35794
+    },
+    {
+      "url": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1789372646/Tapir/China/Beinjin/IMG_E3472_rmn2f5_xmukz6.jpg",
+      "method": "GET",
+      "start": 11413.595664,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "vary": "Accept,User-Agent,Save-Data",
+        "cache-control": "private, no-transform, immutable, max-age=2592000",
+        "content-length": "47014"
+      },
+      "ms": 741,
+      "bytes": 47469
+    },
+    {
+      "url": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1789369651/Tapir/Indonesia/Bali/IMG_E4594_vx4jop_c5fink.jpg",
+      "method": "GET",
+      "start": 11413.595679,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "vary": "Accept,User-Agent,Save-Data",
+        "cache-control": "private, no-transform, immutable, max-age=2592000",
+        "content-length": "34138"
+      },
+      "ms": 637,
+      "bytes": 34841
+    },
+    {
+      "url": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1785614954/IMG_1150_l6h5gn.jpg",
+      "method": "GET",
+      "start": 11413.595697,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/webp",
+      "headers": {
+        "vary": "Accept,User-Agent,Save-Data",
+        "cache-control": "private, no-transform, immutable, max-age=2592000",
+        "content-length": "133340"
+      },
+      "ms": 901,
+      "bytes": 133953
+    },
+    {
+      "url": "https://res.cloudinary.com/do4fcxeou/image/upload/f_auto,q_auto,w_600,c_limit/v1785614952/IMG_1149_cl9mcr.jpg",
+      "method": "GET",
+      "start": 11413.59571,
+      "type": "Image",
+      "status": 200,
+      "cache": false,
+      "mime": "image/jpeg",
+      "headers": {
+        "vary": "Accept,User-Agent,Save-Data",
+        "cache-control": "private, no-transform, immutable, max-age=2592000",
+        "content-length": "162527"
+      },
+      "ms": 955,
+      "bytes": 163107
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/64-114e2fc3e9e82f4c.js",
+      "method": "GET",
+      "start": 11413.693645,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 234,
+      "bytes": 24203
+    },
+    {
+      "url": "https://www.tapir.su/_next/static/chunks/app/login/page-aa672fbbec27bc7e.js",
+      "method": "GET",
+      "start": 11413.693778,
+      "type": "Script",
+      "status": 200,
+      "cache": false,
+      "mime": "application/javascript",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-encoding": "gzip",
+        "vary": "Accept-Encoding"
+      },
+      "ms": 234,
+      "bytes": 4174
+    }
+  ]
+}

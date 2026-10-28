@@ -1,0 +1,50 @@
+[
+  {
+    "original": "ROADMAP.md",
+    "archive": "docs/archive/2026-10-21/ROADMAP.md",
+    "bytes": 81678,
+    "sha256": "ae5a7f3c6cb4bdf61b28dfeb8f370fe303549604478475708917a098d21c400c"
+  },
+  {
+    "original": "FIRST_SCREEN_ROADMAP.md",
+    "archive": "docs/archive/2026-10-21/FIRST_SCREEN_ROADMAP.md",
+    "bytes": 3575,
+    "sha256": "569ec993685f3298c503517a3e3fa6c7298acd44ec8d00cab91fe44d5490a9fd"
+  },
+  {
+    "original": "PRE_RELEASE_REVIEW.md",
+    "archive": "docs/archive/2026-10-21/PRE_RELEASE_REVIEW.md",
+    "bytes": 14887,
+    "sha256": "49df04ba09f4fc1a97f4885571962e853b78fb27e23c821ef24e43f2ae6ed80f"
+  },
+  {
+    "original": "REVIEW_LEARNING_ROADMAP.md",
+    "archive": "docs/archive/2026-10-21/REVIEW_LEARNING_ROADMAP.md",
+    "bytes": 20810,
+    "sha256": "22d8b9a48fa1fcd0cf8b3a066ceec4254cafbbbb7acb7546a6434b082bb29546"
+  },
+  {
+    "original": "SOCIAL_MEDIA_PRESENCE.md",
+    "archive": "docs/archive/2026-10-21/SOCIAL_MEDIA_PRESENCE.md",
+    "bytes": 8560,
+    "sha256": "97ba20eb64052c44b1aff820a0c29e1cf9f9bd7b994f4fa8617431c2f4e4b3ec"
+  },
+  {
+    "original": "VPS_BACKEND_MIGRATION_ROADMAP.md",
+    "archive": "docs/archive/2026-10-21/VPS_BACKEND_MIGRATION_ROADMAP.md",
+    "bytes": 9584,
+    "sha256": "f01c45956305e28157d2d78f6463e449fa06765469e47928169916cdf4a2fc88"
+  },
+  {
+    "original": "VPS_FRONTEND_MIGRATION_ROADMAP.md",
+    "archive": "docs/archive/2026-10-21/VPS_FRONTEND_MIGRATION_ROADMAP.md",
+    "bytes": 38327,
+    "sha256": "077817b49604b46b93962bef1751be49c3240b92668efaea65e6459550746e83"
+  },
+  {
+    "original": "VPS_TRAVEL_MIGRATION_ROADMAP.md",
+    "archive": "docs/archive/2026-10-21/VPS_TRAVEL_MIGRATION_ROADMAP.md",
+    "bytes": 92065,
+    "sha256": "a4064f71815ec6b1151e0fc2b59445e9dead1895d863b8bc3d1b6031da446bf3"
+  }
+]

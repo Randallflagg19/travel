@@ -1,0 +1,51 @@
+[
+  {
+    "case": "metadata overwrites reactions",
+    "before": {
+      "liked": 1,
+      "likeText": "3"
+    },
+    "after": {
+      "liked": 0,
+      "likeText": "0"
+    }
+  },
+  {
+    "case": "rollback A erases successful B",
+    "before": 336.328125,
+    "afterSuccess": 688.65625,
+    "afterRollback": 336.328125,
+    "backendB": "FEATURED",
+    "patchLog": [
+      {
+        "id": "a",
+        "data": {
+          "layout": "FEATURED"
+        }
+      },
+      {
+        "id": "b",
+        "data": {
+          "layout": "FEATURED"
+        }
+      }
+    ]
+  },
+  {
+    "case": "back to another author while photo is open",
+    "opened": {
+      "bodyPosition": "fixed",
+      "focusInsideDialog": false
+    },
+    "afterBack": {
+      "url": "http://127.0.0.1:3000/?author=friend&all=true",
+      "dialogs": 0,
+      "bodyPosition": "fixed"
+    }
+  },
+  {
+    "case": "direct country URL with one city",
+    "cards": 0,
+    "url": "http://127.0.0.1:3000/?author=admin&country=Indonesia"
+  }
+]

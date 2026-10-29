@@ -435,6 +435,7 @@ export function Feed() {
         photoSrc={heroPhoto?.src ?? null}
         photoAlt={heroPhoto?.alt}
         photoPosition={heroPhoto?.position}
+        photoUnoptimized={heroPhoto?.unoptimized}
       />
 
       <FeedServerLoadingNotice

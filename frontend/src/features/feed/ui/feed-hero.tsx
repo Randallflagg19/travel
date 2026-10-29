@@ -10,8 +10,14 @@ type FeedHeroProps = {
   photoSrc?: string | null;
   photoAlt?: string;
   photoPosition?: string;
+  photoUnoptimized?: boolean;
   tagline?: string;
 };
+
+// Both photo windows use the visible window's size, so they request the same file.
+// Account for the sidebar, feed padding, and the 1720px feed width limit.
+const HERO_PHOTO_SIZES =
+  "(min-width: 2040px) 414px, (min-width: 1024px) calc((100vw - 384px) / 4), (min-width: 640px) calc((100vw - 48px) * 0.290278), calc((100vw - 32px) * 0.290278)";
 
 export function FeedHero({
   eyebrow = "Личный журнал дороги",
@@ -22,6 +28,7 @@ export function FeedHero({
   photoSrc = "/me-hero.jpg",
   photoAlt = "Фотография из путешествия",
   photoPosition = "center",
+  photoUnoptimized = false,
   tagline = "Путешествие, к которому хочется возвращаться.",
 }: FeedHeroProps) {
   const photosLabel =
@@ -66,10 +73,11 @@ export function FeedHero({
                 alt={photoAlt}
                 fill
                 priority
-                unoptimized
+                unoptimized={photoUnoptimized}
+                quality={90}
                 className="object-cover"
                 style={{ objectPosition: photoPosition }}
-                sizes="(max-width: 1023px) 31vw, 25vw"
+                sizes={HERO_PHOTO_SIZES}
               />
             </div>
 
@@ -88,10 +96,11 @@ export function FeedHero({
                 alt={photoAlt}
                 fill
                 priority
-                unoptimized
+                unoptimized={photoUnoptimized}
+                quality={90}
                 className="object-cover"
                 style={{ objectPosition: photoPosition }}
-                sizes="25vw"
+                sizes={HERO_PHOTO_SIZES}
               />
             </div>
           </>

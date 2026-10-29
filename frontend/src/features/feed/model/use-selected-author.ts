@@ -49,6 +49,8 @@ export function useSelectedAuthor({ canonicalize = false }: { canonicalize?: boo
     authors,
     authorsQuery,
     selectAuthor,
-    isReady: Boolean(author && requestedId === author.id),
+    // The default author can load while its URL is being canonicalized.
+    // An invalid author must still wait for its place filters to be cleared.
+    isReady: Boolean(author && (!requestedId || requestedId === author.id)),
   };
 }

@@ -5,6 +5,8 @@ import { useExpandedModalBehavior } from "./use-expanded-modal-behavior";
 export function useExpandedPostModal(items: ApiPost[]) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedVideoSrc, setExpandedVideoSrc] = useState<string | null>(null);
+  const [expandedPreviewSrc, setExpandedPreviewSrc] = useState<string | null>(null);
+  const photoPreviewsRef = useRef(new Map<string, string>());
   const itemsRef = useRef(items);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -26,11 +28,16 @@ export function useExpandedPostModal(items: ApiPost[]) {
     ? mediaItems.findIndex((post) => post.id === expandedPost.id)
     : -1;
 
+  const rememberPhotoPreview = useCallback((originalUrl: string, previewSrc: string) => {
+    photoPreviewsRef.current.set(originalUrl, previewSrc);
+  }, []);
+
   const openExpanded = useCallback(
     (postId: string) => {
       const post = itemsRef.current.find((item) => item.id === postId);
 
       setExpandedId(postId);
+      setExpandedPreviewSrc(photoPreviewsRef.current.get(post?.media_url ?? "") ?? null);
 
       if (post?.media_type === "VIDEO") {
         setExpandedVideoSrc(post.media_url);
@@ -48,6 +55,7 @@ export function useExpandedPostModal(items: ApiPost[]) {
     videoRef.current?.pause();
     setExpandedId(null);
     setExpandedVideoSrc(null);
+    setExpandedPreviewSrc(null);
     shouldAutoPlayRef.current = false;
   }, []);
 
@@ -56,6 +64,7 @@ export function useExpandedPostModal(items: ApiPost[]) {
     const next = (expandedMediaIndex + direction + mediaItems.length) % mediaItems.length;
     const post = mediaItems[next];
     setExpandedId(post.id);
+    setExpandedPreviewSrc(photoPreviewsRef.current.get(post.media_url ?? "") ?? null);
     setExpandedVideoSrc(post.media_type === "VIDEO" ? post.media_url : null);
     shouldAutoPlayRef.current = post.media_type === "VIDEO";
   }, [expandedMediaIndex, mediaItems]);
@@ -65,6 +74,8 @@ export function useExpandedPostModal(items: ApiPost[]) {
   return {
     expandedPost,
     expandedVideoSrc,
+    expandedPreviewSrc,
+    rememberPhotoPreview,
     videoRef,
     shouldAutoPlayRef,
     openExpanded,

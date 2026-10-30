@@ -57,14 +57,18 @@ export function cloudinaryThumbUrl(
 
 const PHOTO_WIDTHS = [320, 384, 480, 640, 768, 960, 1152, 1440, 1920, 2560, 3840];
 
-/** Responsive versions of an original Cloudinary photo; no local copies needed. */
-export function cloudinaryPhotoSources(url: string, originalWidth: number | null) {
+/** Shared photo variants; targetWidth is the viewer's required width in physical pixels. */
+export function cloudinaryPhotoSources(
+  url: string,
+  originalWidth: number | null,
+  targetWidth?: number,
+) {
   const src = forceHttps(safeUrl(url));
   // Leave external, signed, and already transformed sources intact.
   const asset = src.match(/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/(.+)$/)?.[1];
   if (!asset || /^(?:s--|[a-z]{1,3}_[^/]+\/)/.test(asset)) return { src };
 
-  const largestWidth = PHOTO_WIDTHS[PHOTO_WIDTHS.length - 1];
+  const largestWidth = Math.max(PHOTO_WIDTHS[PHOTO_WIDTHS.length - 1], Math.ceil(targetWidth ?? 0));
   const sourceWidth = Math.floor(originalWidth ?? 0);
   const maxWidth = Number.isFinite(sourceWidth) && sourceWidth > 0
     ? Math.min(sourceWidth, largestWidth)
@@ -73,27 +77,11 @@ export function cloudinaryPhotoSources(url: string, originalWidth: number | null
   const resized = (width: number) => injectUploadTransform(src, `f_auto,q_auto,w_${width},c_limit`);
 
   return {
-    src: resized(Math.min(600, maxWidth)),
+    src: resized(targetWidth === undefined
+      ? Math.min(600, maxWidth)
+      : (widths.find((width) => width >= targetWidth) ?? maxWidth)),
     srcSet: widths.map((width) => `${resized(width)} ${width}w`).join(", "),
   };
-}
-
-/** Раскрытие/модалка: полный размер для просмотра. */
-export function cloudinaryFullUrl(
-  url: string,
-  mediaType: "PHOTO" | "VIDEO" | "AUDIO",
-): string {
-  let u = safeUrl(url);
-  if (!u) return u;
-  u = forceHttps(u);
-
-  if (mediaType === "VIDEO") return u;
-
-  if (mediaType === "PHOTO") {
-    return injectUploadTransform(u, "f_auto,q_auto:good,w_1600,c_limit");
-  }
-
-  return u;
 }
 
 // Use Cloudinary "poster" frame for videos (best-effort).

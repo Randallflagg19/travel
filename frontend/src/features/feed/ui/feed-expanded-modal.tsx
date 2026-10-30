@@ -1,18 +1,16 @@
 "use client";
 
 import { type RefObject, useEffect } from "react";
-import Image from "next/image";
 import { BookMarked, ChevronLeft, ChevronRight, MapPin, X } from "lucide-react";
 import type { ApiPost } from "@/shared/api/api";
-import {
-  cloudinaryFullUrl,
-  cloudinaryVideoPosterUrl,
-} from "@/shared/lib/cloudinary";
+import { cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
+import { ExpandedPhoto } from "./expanded-photo";
 
 type FeedExpandedModalProps = {
   post: ApiPost;
   onClose: () => void;
   expandedVideoSrc: string | null;
+  previewSrc: string | null;
   videoRef: RefObject<HTMLVideoElement | null>;
   shouldAutoPlayRef: RefObject<boolean>;
   onMove: (direction: -1 | 1) => void;
@@ -23,6 +21,7 @@ export function FeedExpandedModal({
   post: expandedPost,
   onClose,
   expandedVideoSrc,
+  previewSrc,
   videoRef,
   shouldAutoPlayRef,
   onMove,
@@ -170,25 +169,12 @@ export function FeedExpandedModal({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            className="relative h-full w-full cursor-zoom-out overflow-hidden rounded-lg"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
-            <Image
-              alt={expandedPost.title ?? expandedPost.text ?? "travel media"}
-              src={cloudinaryFullUrl(
-                expandedPost.media_url ?? "",
-                expandedPost.media_type,
-              )}
-              fill
-              sizes="100vw"
-              className="object-contain"
-              unoptimized
-              priority
-            />
-          </button>
+          <ExpandedPhoto
+            key={`${expandedPost.id}:${expandedPost.media_url}`}
+            post={expandedPost}
+            previewSrc={previewSrc}
+            onClose={onClose}
+          />
         )}
         {expandedPost.media_type !== "STORY" &&
         (expandedPost.title || expandedPost.text) ? (

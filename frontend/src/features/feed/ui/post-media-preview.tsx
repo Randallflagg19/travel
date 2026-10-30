@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ApiPost } from "@/shared/api/api";
 import {
-  cloudinaryFullUrl,
   cloudinaryPhotoSources,
   cloudinaryThumbUrl,
   cloudinaryVideoPosterUrl,
@@ -13,14 +12,8 @@ import { LoaderCircle, Play } from "lucide-react";
 type PostMediaPreviewProps = {
   post: ApiPost;
   onOpen: (postId: string) => void;
+  onPhotoPreviewReady: (originalUrl: string, previewSrc: string) => void;
 };
-
-function preloadExpandedMedia(post: ApiPost) {
-  if (post.media_type !== "PHOTO" || !post.media_url) return;
-  if (typeof window === "undefined") return;
-  const img = new window.Image();
-  img.src = cloudinaryFullUrl(post.media_url, post.media_type);
-}
 
 // Match the feed's sidebar, padding, column gaps, and maximum width.
 const PHOTO_SIZES = {
@@ -28,16 +21,13 @@ const PHOTO_SIZES = {
   FEATURED: "(min-width: 2040px) 1099px, (min-width: 1024px) calc((100vw - 392px) * 2 / 3), (min-width: 640px) calc((100vw - 58px) / 2), calc(100vw - 32px)",
 };
 
-function PhotoPreview({ post, onOpen }: PostMediaPreviewProps) {
+function PhotoPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const hasDimensions = Boolean(post.media_width && post.media_height);
   const sources = cloudinaryPhotoSources(post.media_url ?? "", post.media_width);
-  const preload = () => {
-    if (status === "loaded") preloadExpandedMedia(post);
-  };
 
   useEffect(() => {
     const node = containerRef.current;
@@ -63,9 +53,6 @@ function PhotoPreview({ post, onOpen }: PostMediaPreviewProps) {
         type="button"
         className={`block w-full cursor-pointer overflow-hidden ${hasDimensions ? "" : "absolute inset-0 h-full"}`}
         onClick={() => onOpen(post.id)}
-        onFocus={preload}
-        onPointerEnter={preload}
-        onPointerDown={preload}
       >
         <img
           key={attempt}
@@ -78,7 +65,10 @@ function PhotoPreview({ post, onOpen }: PostMediaPreviewProps) {
           src={shouldLoad ? sources.src : undefined}
           loading="lazy"
           decoding="async"
-          onLoad={() => setStatus("loaded")}
+          onLoad={(event) => {
+            setStatus("loaded");
+            onPhotoPreviewReady(post.media_url ?? "", event.currentTarget.currentSrc);
+          }}
           onError={() => setStatus("error")}
         />
       </button>
@@ -110,7 +100,7 @@ function PhotoPreview({ post, onOpen }: PostMediaPreviewProps) {
   );
 }
 
-export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
+export function PostMediaPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewProps) {
   if (post.media_type === "STORY") return null;
   const mediaUrl = post.media_url ?? "";
 
@@ -149,5 +139,5 @@ export function PostMediaPreview({ post, onOpen }: PostMediaPreviewProps) {
         </div>
       </div>
     </button>
-  ) : <PhotoPreview key={mediaUrl} post={post} onOpen={onOpen} />;
+  ) : <PhotoPreview key={mediaUrl} post={post} onOpen={onOpen} onPhotoPreviewReady={onPhotoPreviewReady} />;
 }

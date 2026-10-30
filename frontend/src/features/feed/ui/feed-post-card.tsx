@@ -30,6 +30,7 @@ type FeedPostCardProps = {
   isActionsOpen: boolean;
   onActionsOpenChange: (open: boolean) => void;
   onOpen: (postId: string) => void;
+  onPhotoPreviewReady: (originalUrl: string, previewSrc: string) => void;
   showPlaceInCard: boolean;
   canLike: boolean;
   canComment: boolean;
@@ -54,6 +55,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   isActionsOpen,
   onActionsOpenChange,
   onOpen,
+  onPhotoPreviewReady,
   showPlaceInCard,
   canLike,
   canComment,
@@ -235,7 +237,7 @@ export const FeedPostCard = memo(function FeedPostCard({
       ) : null}
       <CardContent className="p-0">
         <div className="relative">
-          <PostMediaPreview post={post} onOpen={onOpen} />
+          <PostMediaPreview post={post} onOpen={onOpen} onPhotoPreviewReady={onPhotoPreviewReady} />
 
           <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/35 to-transparent" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/90 via-black/45 to-transparent lg:hidden" />

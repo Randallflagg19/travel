@@ -181,6 +181,8 @@ export function Feed() {
   const {
     expandedPost,
     expandedVideoSrc,
+    expandedPreviewSrc,
+    rememberPhotoPreview,
     videoRef,
     shouldAutoPlayRef,
     openExpanded,
@@ -521,6 +523,7 @@ export function Feed() {
                     setActionsPostId(open ? p.id : null)
                   }
                   onOpen={openExpanded}
+                  onPhotoPreviewReady={rememberPhotoPreview}
                   showPlaceInCard={showPlaceInCard}
                   canLike={canLike}
                   canComment={canComment && (auth.user?.role !== "AUTHOR" || auth.user.id === p.user_id)}
@@ -578,6 +581,7 @@ export function Feed() {
           post={expandedPost}
           onClose={closeExpanded}
           expandedVideoSrc={expandedVideoSrc}
+          previewSrc={expandedPreviewSrc}
           videoRef={videoRef}
           shouldAutoPlayRef={shouldAutoPlayRef}
           onMove={moveExpanded}

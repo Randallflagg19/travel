@@ -55,6 +55,29 @@ export function cloudinaryThumbUrl(
   return u;
 }
 
+const PHOTO_WIDTHS = [320, 384, 480, 640, 768, 960, 1152, 1440, 1920, 2560, 3840];
+
+/** Responsive versions of an original Cloudinary photo; no local copies needed. */
+export function cloudinaryPhotoSources(url: string, originalWidth: number | null) {
+  const src = forceHttps(safeUrl(url));
+  // Leave external, signed, and already transformed sources intact.
+  const asset = src.match(/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/(.+)$/)?.[1];
+  if (!asset || /^(?:s--|[a-z]{1,3}_[^/]+\/)/.test(asset)) return { src };
+
+  const largestWidth = PHOTO_WIDTHS[PHOTO_WIDTHS.length - 1];
+  const sourceWidth = Math.floor(originalWidth ?? 0);
+  const maxWidth = Number.isFinite(sourceWidth) && sourceWidth > 0
+    ? Math.min(sourceWidth, largestWidth)
+    : largestWidth;
+  const widths = [...PHOTO_WIDTHS.filter((width) => width < maxWidth), maxWidth];
+  const resized = (width: number) => injectUploadTransform(src, `f_auto,q_auto,w_${width},c_limit`);
+
+  return {
+    src: resized(Math.min(600, maxWidth)),
+    srcSet: widths.map((width) => `${resized(width)} ${width}w`).join(", "),
+  };
+}
+
 /** Раскрытие/модалка: полный размер для просмотра. */
 export function cloudinaryFullUrl(
   url: string,

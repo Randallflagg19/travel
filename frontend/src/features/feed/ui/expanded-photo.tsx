@@ -83,7 +83,7 @@ export function ExpandedPhoto({ post, previewSrc, onClose }: ExpandedPhotoProps)
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden rounded-lg" aria-busy={status === "loading"}>
-      <button type="button" className="relative h-full w-full cursor-zoom-out" onClick={onClose} aria-label="Закрыть">
+      <button type="button" data-media-surface className="relative h-full w-full cursor-zoom-out" onClick={onClose} aria-label="Закрыть">
         {src ? (
           <Image
             alt={post.title ?? post.text ?? "travel media"}

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApiPost } from "@/shared/api/api";
-import { useExpandedModalBehavior } from "./use-expanded-modal-behavior";
 
 export function useExpandedPostModal(items: ApiPost[]) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -63,13 +62,12 @@ export function useExpandedPostModal(items: ApiPost[]) {
     if (expandedMediaIndex < 0 || mediaItems.length < 2) return;
     const next = (expandedMediaIndex + direction + mediaItems.length) % mediaItems.length;
     const post = mediaItems[next];
+    videoRef.current?.pause();
     setExpandedId(post.id);
     setExpandedPreviewSrc(photoPreviewsRef.current.get(post.media_url ?? "") ?? null);
     setExpandedVideoSrc(post.media_type === "VIDEO" ? post.media_url : null);
     shouldAutoPlayRef.current = post.media_type === "VIDEO";
   }, [expandedMediaIndex, mediaItems]);
-
-  useExpandedModalBehavior(Boolean(expandedId), closeExpanded);
 
   return {
     expandedPost,

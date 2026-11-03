@@ -1,81 +1,31 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import {
-  fetchPostsPage,
-  fetchPlaces,
-  deletePost,
-  setPostPinned,
-  updatePostMetadata,
-  type ApiPost,
-  type PostsPage,
-} from "@/shared/api/api";
+import { useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchPlaces } from "@/shared/api/api";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { useAuth } from "@/entities/session/model/auth";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
-import { FeedHeader } from "./feed-header";
-import { FeedPostCard } from "./feed-post-card";
-import { FeedMasonryItem } from "./feed-masonry-item";
-import { FeedExpandedModal } from "./feed-expanded-modal";
+import { PostMetadataDialog } from "@/features/posts/ui/post-metadata-dialog";
 import { useFeedParams } from "../model/use-feed-params";
-import { useFeedPermissions } from "../model/use-feed-permissions";
+import { useFeedPosts } from "../model/use-feed-posts";
+import { useFeedPostActions } from "../model/use-feed-post-actions";
 import { useSelectedAuthor } from "../model/use-selected-author";
+import { useFeedSelectionState } from "../model/use-feed-selection-state";
+import { useExpandedPostModal } from "../model/use-expanded-post-modal";
+import { selectHeroPhoto } from "../model/hero-photo-selection";
+import { selectFeedMediaStats } from "../model/feed-media-stats";
+import { FeedHeader } from "./feed-header";
+import { FeedPostGrid } from "./feed-post-grid";
+import { FeedExpandedModal } from "./feed-expanded-modal";
 import { AuthorSelector } from "./author-selector";
 import { FeedHero } from "./feed-hero";
 import { MobileChapters } from "./mobile-chapters";
 import { CitySelection } from "./city-selection";
 import { FeedServerLoadingNotice } from "./feed-server-loading-notice";
-import { buildPostsCountryCityFilter } from "../model/posts-query-params";
-import { useFeedSelectionState } from "../model/use-feed-selection-state";
-import { useExpandedPostModal } from "../model/use-expanded-post-modal";
-import { useOpenFeedComments } from "../model/use-open-feed-comments";
-import { selectHeroPhoto } from "../model/hero-photo-selection";
-import { selectFeedMediaStats } from "../model/feed-media-stats";
-import { PostMetadataDialog } from "@/features/posts/ui/post-metadata-dialog";
-
-const POSTS_PAGE_LIMIT = 9;
-
-type PostsInfiniteData = {
-  pages: PostsPage[];
-  pageParams: unknown[];
-};
-
-function sortPosts(posts: ApiPost[], order: "asc" | "desc"): ApiPost[] {
-  const direction = order === "asc" ? 1 : -1;
-  return [...posts].sort((left, right) => {
-    if (left.pinned_at && !right.pinned_at) return -1;
-    if (!left.pinned_at && right.pinned_at) return 1;
-    if (left.pinned_at && right.pinned_at) {
-      const byPinnedAt = right.pinned_at.localeCompare(left.pinned_at);
-      if (byPinnedAt !== 0) return byPinnedAt;
-    }
-    const byCreatedAt = left.created_at.localeCompare(right.created_at);
-    if (byCreatedAt !== 0) return byCreatedAt * direction;
-    return left.id.localeCompare(right.id) * direction;
-  });
-}
 
 export function Feed() {
-  const queryClient = useQueryClient();
   const auth = useAuth();
-  const gridRef = useRef<HTMLDivElement | null>(null);
-  const [editingPost, setEditingPost] = useState<ApiPost | null>(null);
-  const [actionsPostId, setActionsPostId] = useState<string | null>(null);
-  const [gridMetrics, setGridMetrics] = useState<{
-    columnWidth: number | null;
-    columns: number;
-  }>({ columnWidth: null, columns: 1 });
   const {
     order,
     setOrder,
@@ -86,20 +36,8 @@ export function Feed() {
     headerTitle,
     isSelectionReady,
   } = useFeedParams();
-  const permissions = useFeedPermissions(auth.user);
   const { author, authors, authorsQuery, selectAuthor, isReady: isAuthorReady } = useSelectedAuthor({ canonicalize: true });
 
-  const { canLike, canComment } = permissions;
-
-  const canManagePost = useCallback((post: ApiPost) => Boolean(
-    auth.user && (
-      auth.user.role === "SUPERADMIN" ||
-      auth.user.role === "ADMIN" ||
-      (auth.user.role === "AUTHOR" && auth.user.id === post.user_id)
-    )
-  ), [auth.user]);
-
-  const { commentsPostId, postCardRefs, openComments } = useOpenFeedComments();
   const placesQuery = useQuery({
     queryKey: ["places", author?.id],
     queryFn: () => fetchPlaces(author?.id),
@@ -114,69 +52,16 @@ export function Feed() {
       all,
     });
 
-  const postsQueryKey = useMemo(
-    () => [
-      "posts",
-      {
-        POSTS_PAGE_LIMIT,
-        order,
-        country: selectedCountry,
-        city: selectedCity,
-        all,
-        authorId: author?.id,
-        accessToken: auth.accessToken ?? null,
-      },
-    ],
-    [order, selectedCountry, selectedCity, all, author?.id, auth.accessToken],
-  );
-
-  const postsQuery = useInfiniteQuery({
-    queryKey: postsQueryKey,
-    queryFn: ({ pageParam }) =>
-      fetchPostsPage(
-        {
-          limit: POSTS_PAGE_LIMIT,
-          cursor: typeof pageParam === "string" ? pageParam : undefined,
-          order,
-          authorId: author?.id,
-          ...buildPostsCountryCityFilter({
-            all,
-            selectedCountry,
-            selectedCity,
-            isCountryFeed,
-          }),
-        },
-        auth.accessToken ?? undefined,
-      ),
+  const { postsQueryKey, postsQuery, items, loadMorePosts } = useFeedPosts({
+    order, selectedCountry, selectedCity, all, isCountryFeed,
+    authorId: author?.id,
+    accessToken: auth.accessToken,
     enabled: Boolean(canLoadPosts && auth.hydrated && isAuthorReady),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
   });
-
-  const items = useMemo(
-    () => postsQuery.data?.pages.flatMap((p) => p.items) ?? [],
-    [postsQuery.data],
-  );
-
-  const updatePostsCache = useCallback(
-    (update: (post: ApiPost) => ApiPost | null) => {
-      queryClient.setQueryData<PostsInfiniteData>(postsQueryKey, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            items: page.items.flatMap((post) => {
-              const nextPost = update(post);
-              return nextPost ? [nextPost] : [];
-            }),
-          })),
-        };
-      });
-    },
-    [postsQueryKey, queryClient],
-  );
+  const { editingPost, setEditingPost, saveMetadata, postActions } = useFeedPostActions({
+    items, postsQueryKey, order, user: auth.user, accessToken: auth.accessToken,
+  });
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = postsQuery;
 
   const {
     expandedPost,
@@ -188,217 +73,31 @@ export function Feed() {
     openExpanded,
     closeExpanded,
     moveExpanded,
-    canMoveExpanded,
-  } = useExpandedPostModal(items);
+    cancelPendingNavigation,
+    canMoveBackward,
+    canMoveForward,
+    navigationStatus,
+    retryLoadMore,
+  } = useExpandedPostModal(items, {
+    hasMore: Boolean(hasNextPage),
+    loadMore: loadMorePosts,
+    loadMoreFailed: isFetchNextPageError && !isFetchingNextPage,
+  });
 
   const inViewOptions = useMemo(() => ({ rootMargin: "300px" }), []);
   const { ref: sentinelRef, inView } = useInView<HTMLDivElement>(inViewOptions);
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = postsQuery;
 
   useEffect(() => {
+    if (expandedPost) return;
     if (!inView) return;
     if (!hasNextPage) return;
     if (isFetchingNextPage) return;
+    if (isFetchNextPageError) return;
     void fetchNextPage();
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  const handleDeletePost = useCallback(async (postId: string) => {
-    const targetPost = items.find((post) => post.id === postId);
-    if (!auth.accessToken || !targetPost || !canManagePost(targetPost)) return;
-    if (!confirm("Удалить пост? Файл будет удалён из Cloudinary и из ленты."))
-      return;
-    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
-    updatePostsCache((post) => (post.id === postId ? null : post));
-    try {
-      await deletePost(auth.accessToken, postId);
-      await queryClient.invalidateQueries({ queryKey: ["places"] });
-    } catch (e) {
-      queryClient.setQueryData(postsQueryKey, previousPosts);
-      alert(e instanceof Error ? e.message : "Не удалось удалить");
-    }
-  }, [auth.accessToken, items, canManagePost, postsQueryKey, queryClient, updatePostsCache]);
-
-  async function handleMetadataSave(value: { title: string; text: string }) {
-    if (!editingPost || !auth.accessToken || !canManagePost(editingPost)) return;
-    const postId = editingPost.id;
-    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
-    updatePostsCache((post) =>
-      post.id === postId
-        ? { ...post, title: value.title || null, text: value.text || null }
-        : post,
-    );
-    setEditingPost(null);
-    try {
-      const { post: savedPost } = await updatePostMetadata(auth.accessToken, postId, {
-        title: value.title || null,
-        text: value.text || null,
-      });
-      updatePostsCache((post) => (post.id === postId ? savedPost : post));
-    } catch (error) {
-      queryClient.setQueryData(postsQueryKey, previousPosts);
-      console.error("updatePostMetadata failed", error);
-      alert("Не удалось сохранить изменения. Попробуйте ещё раз.");
-    }
-  }
-
-  const handleToggleFeatured = useCallback(async (post: ApiPost) => {
-    if (!auth.accessToken || !canManagePost(post)) return;
-    const layout = post.layout === "FEATURED" ? "STANDARD" : "FEATURED";
-    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
-    updatePostsCache((cachedPost) =>
-      cachedPost.id === post.id ? { ...cachedPost, layout } : cachedPost,
-    );
-    try {
-      const { post: savedPost } = await updatePostMetadata(auth.accessToken, post.id, {
-        layout,
-      });
-      updatePostsCache((cachedPost) =>
-        cachedPost.id === post.id ? savedPost : cachedPost,
-      );
-    } catch (error) {
-      queryClient.setQueryData(postsQueryKey, previousPosts);
-      console.error("update post layout failed", error);
-      alert("Не удалось изменить размер карточки. Попробуйте ещё раз.");
-    }
-  }, [auth.accessToken, canManagePost, postsQueryKey, queryClient, updatePostsCache]);
-
-  const handleTogglePinned = useCallback(async (post: ApiPost) => {
-    if (!auth.accessToken || !canManagePost(post)) return;
-    const pinned = !post.pinned_at;
-    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
-
-    queryClient.setQueryData<PostsInfiniteData>(postsQueryKey, (old) => {
-      if (!old) return old;
-      const pageSizes = old.pages.map((page) => page.items.length);
-      const sorted = sortPosts(
-        old.pages
-          .flatMap((page) => page.items)
-          .map((cachedPost) =>
-            cachedPost.id === post.id
-              ? {
-                  ...cachedPost,
-                  pinned_at: pinned ? new Date().toISOString() : null,
-                }
-              : cachedPost,
-          ),
-        order,
-      );
-      let offset = 0;
-      return {
-        ...old,
-        pages: old.pages.map((page, index) => {
-          const items = sorted.slice(offset, offset + pageSizes[index]);
-          offset += pageSizes[index];
-          return { ...page, items };
-        }),
-      };
-    });
-
-    try {
-      const { post: savedPost } = await setPostPinned(
-        auth.accessToken,
-        post.id,
-        pinned,
-      );
-      updatePostsCache((cachedPost) =>
-        cachedPost.id === post.id
-          ? { ...cachedPost, pinned_at: savedPost.pinned_at }
-          : cachedPost,
-      );
-    } catch (error) {
-      queryClient.setQueryData(postsQueryKey, previousPosts);
-      console.error("setPostPinned failed", error);
-      alert("Не удалось изменить закрепление. Попробуйте ещё раз.");
-    } finally {
-      void queryClient.invalidateQueries({ queryKey: ["posts"] });
-    }
-  }, [auth.accessToken, canManagePost, order, postsQueryKey, queryClient, updatePostsCache]);
-
-  const handleLikeSuccess = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ["posts"] });
-  }, [queryClient]);
-
-  const updateGridMetrics = useCallback((element?: HTMLDivElement | null) => {
-    const grid = element ?? gridRef.current;
-    if (!grid) return;
-
-    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-    const isTablet = window.matchMedia("(min-width: 640px)").matches;
-    const columns = isDesktop ? 3 : isTablet ? 2 : 1;
-    const gap = isDesktop ? 16 : 10;
-    const width = Math.round(grid.getBoundingClientRect().width);
-    const columnWidth = Math.max(0, (width - gap * (columns - 1)) / columns);
-
-    setGridMetrics((current) =>
-      current.columns === columns && current.columnWidth === columnWidth
-        ? current
-        : { columns, columnWidth },
-    );
-  }, []);
-
-  const setGridRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      gridRef.current = element;
-      // Card heights come from saved media proportions. This callback runs
-      // when the Grid itself enters the DOM, so no collapsed 8px-row state is
-      // painted while asynchronous posts are still loading.
-      if (element) updateGridMetrics(element);
-    },
-    [updateGridMetrics],
-  );
-
-  const handleWindowResize = useCallback(() => {
-    updateGridMetrics();
-  }, [updateGridMetrics]);
-
-  useEffect(() => {
-    window.addEventListener("resize", handleWindowResize);
-    return () => window.removeEventListener("resize", handleWindowResize);
-  }, [handleWindowResize]);
-
-  const handleCommentAdded = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ["posts"] });
-  }, [queryClient]);
-
-  const updatePostLike = useCallback(
-    (postId: string, liked: boolean, deltaCount: number) => {
-      queryClient.setQueryData(
-        postsQueryKey,
-        (
-          old:
-            | {
-                pages: {
-                  items: ApiPost[];
-                  nextCursor: string | null;
-                  hasMore: boolean;
-                }[];
-                pageParams: unknown[];
-              }
-            | undefined,
-        ) => {
-          if (!old) return old;
-          return {
-            ...old,
-            pages: old.pages.map((page) => ({
-              ...page,
-              items: page.items.map((p) =>
-                p.id === postId
-                  ? {
-                      ...p,
-                      liked_by_me: liked,
-                      like_count: Math.max(0, p.like_count + deltaCount),
-                    }
-                  : p,
-              ),
-            })),
-          };
-        },
-      );
-    },
-    [queryClient, postsQueryKey],
-  );
+  }, [expandedPost, inView, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 
   const showPlaceInCard = Boolean(!all && !(selectedCountry && selectedCity));
+  const showPosts = canLoadPosts && items.length > 0;
   const isInitialPostsLoading = Boolean(canLoadPosts && postsQuery.isLoading);
   const heroTitle =
     isSelectionReady && !all
@@ -468,7 +167,7 @@ export function Feed() {
         />
       ) : null}
 
-      {!canLoadPosts ? null : postsQuery.isLoading ? null : postsQuery.isError ? (
+      {!canLoadPosts ? null : postsQuery.isLoading ? null : postsQuery.isError && items.length === 0 ? (
         <Card className="travel-glass border-white/10 bg-white/[0.055]">
           <CardHeader>
             <CardTitle className="text-white">Ошибка</CardTitle>
@@ -488,63 +187,37 @@ export function Feed() {
             </CardDescription>
           </CardHeader>
         </Card>
-      ) : (
+      ) : null}
+      <FeedPostGrid
+        visible={showPosts}
+        items={items}
+        deleteMode={deleteMode}
+        showPlaceInCard={showPlaceInCard}
+        user={auth.user}
+        accessToken={auth.accessToken}
+        actions={postActions}
+        onOpen={openExpanded}
+        onPhotoPreviewReady={rememberPhotoPreview}
+      />
+      {showPosts ? (
         <>
-          <div
-            ref={setGridRef}
-            className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4 ${
-              gridMetrics.columnWidth !== null
-                ? "grid-flow-row-dense auto-rows-[4px]"
-                : "invisible"
-            }`}
-          >
-            {items.map((p) => (
-              <FeedMasonryItem
-                key={p.id}
-                post={p}
-                columnWidth={gridMetrics.columnWidth}
-                columns={gridMetrics.columns}
-                isCommentsOpen={commentsPostId === p.id}
-                onElement={(el) => {
-                  postCardRefs.current[p.id] = el;
-                }}
-              >
-                <FeedPostCard
-                  post={p}
-                  deleteMode={deleteMode}
-                  canDelete={canManagePost(p)}
-                  canEdit={canManagePost(p)}
-                  onDelete={handleDeletePost}
-                  onEdit={setEditingPost}
-                  onToggleFeatured={handleToggleFeatured}
-                  onTogglePinned={handleTogglePinned}
-                  isActionsOpen={actionsPostId === p.id}
-                  onActionsOpenChange={(open) =>
-                    setActionsPostId(open ? p.id : null)
-                  }
-                  onOpen={openExpanded}
-                  onPhotoPreviewReady={rememberPhotoPreview}
-                  showPlaceInCard={showPlaceInCard}
-                  canLike={canLike}
-                  canComment={canComment && (auth.user?.role !== "AUTHOR" || auth.user.id === p.user_id)}
-                  isCommentsOpen={commentsPostId === p.id}
-                  currentUserId={auth.user?.id ?? null}
-                  accessToken={auth.accessToken}
-                  onLikeToggled={updatePostLike}
-                  onLikeSuccess={handleLikeSuccess}
-                  onOpenComments={openComments}
-                  onCommentAdded={handleCommentAdded}
-                />
-              </FeedMasonryItem>
-            ))}
-          </div>
-
           <div ref={sentinelRef} className="h-10" />
 
           {postsQuery.isFetchingNextPage ? (
             <p className="text-center text-sm text-white/50">
               Загружаю ещё…
             </p>
+          ) : isFetchNextPageError ? (
+            <div className="flex flex-wrap items-center justify-center gap-3 text-center text-sm text-white/70" role="status">
+              <span>Не удалось загрузить следующие посты.</span>
+              <button
+                type="button"
+                className="min-h-11 cursor-pointer rounded-lg px-3 text-[#83c8b6] outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[#83c8b6]"
+                onClick={() => { void fetchNextPage({ cancelRefetch: false }); }}
+              >
+                Повторить
+              </button>
+            </div>
           ) : postsQuery.hasNextPage ? (
             <p className="text-center text-sm text-white/50">
               Прокрути ниже — подгружу ещё.
@@ -555,7 +228,7 @@ export function Feed() {
             </p>
           )}
         </>
-      )}
+      ) : null}
       <PostMetadataDialog
         open={editingPost !== null}
         initialValue={{
@@ -573,7 +246,7 @@ export function Feed() {
         onOpenChange={(open) => {
           if (!open) setEditingPost(null);
         }}
-        onSubmit={handleMetadataSave}
+        onSubmit={saveMetadata}
       />
 
       {expandedPost ? (
@@ -585,7 +258,11 @@ export function Feed() {
           videoRef={videoRef}
           shouldAutoPlayRef={shouldAutoPlayRef}
           onMove={moveExpanded}
-          canMove={canMoveExpanded}
+          onCancelPendingNavigation={cancelPendingNavigation}
+          canMoveBackward={canMoveBackward}
+          canMoveForward={canMoveForward}
+          navigationStatus={navigationStatus}
+          onRetryLoadMore={retryLoadMore}
         />
       ) : null}
     </main>

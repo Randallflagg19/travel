@@ -6,8 +6,11 @@ import { BookMarked, ChevronLeft, ChevronRight, MapPin, PanelRightClose, PanelRi
 import type { ApiPost } from "@/shared/api/api";
 import { cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
 import { useExpandedModalBehavior } from "../model/use-expanded-modal-behavior";
+import type { ExpandedNavigationStatus } from "../model/use-expanded-post-modal";
+import { exitVideoFullscreen, isVideoFullscreen } from "../model/video-element";
 import { ExpandedPhoto } from "./expanded-photo";
 import { ExpandedPostDescription } from "./expanded-post-description";
+import { ExpandedVideo } from "./expanded-video";
 
 type FeedExpandedModalProps = {
   post: ApiPost;
@@ -17,7 +20,11 @@ type FeedExpandedModalProps = {
   videoRef: RefObject<HTMLVideoElement | null>;
   shouldAutoPlayRef: RefObject<boolean>;
   onMove: (direction: -1 | 1) => void;
-  canMove: boolean;
+  onCancelPendingNavigation: () => void;
+  canMoveBackward: boolean;
+  canMoveForward: boolean;
+  navigationStatus: ExpandedNavigationStatus;
+  onRetryLoadMore: () => void;
 };
 
 export function FeedExpandedModal({
@@ -28,7 +35,11 @@ export function FeedExpandedModal({
   videoRef,
   shouldAutoPlayRef,
   onMove,
-  canMove,
+  onCancelPendingNavigation,
+  canMoveBackward,
+  canMoveForward,
+  navigationStatus,
+  onRetryLoadMore,
 }: FeedExpandedModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -38,6 +49,7 @@ export function FeedExpandedModal({
   const isStory = expandedPost.media_type === "STORY";
   const isVideo = expandedPost.media_type === "VIDEO";
   const hasDescription = Boolean(expandedPost.title || expandedPost.text);
+  const canMove = canMoveBackward || canMoveForward;
 
   useExpandedModalBehavior({
     shortcutsEnabled: !isStory && !descriptionOpen,
@@ -78,6 +90,15 @@ export function FeedExpandedModal({
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             openerRef.current?.focus({ preventScroll: true });
+          }}
+          onEscapeKeyDown={(event) => {
+            if (descriptionOpen) {
+              event.preventDefault();
+              onDescriptionOpenChange(false);
+            } else if (isVideoFullscreen(videoRef.current)) {
+              event.preventDefault();
+              void exitVideoFullscreen(videoRef.current).catch(() => {});
+            }
           }}
         >
           <Dialog.Title className="sr-only">Просмотр медиа</Dialog.Title>
@@ -151,11 +172,9 @@ export function FeedExpandedModal({
                   className="relative min-h-0 min-w-0 flex-1"
                   onTouchStart={(event) => {
                     touchStartRef.current = null;
-                    if (!canMove || event.touches.length !== 1) return;
-                    if (event.target instanceof Element && event.target.closest("button:not([data-media-surface])")) return;
+                    if (!canMove || isVideoFullscreen(videoRef.current) || event.touches.length !== 1) return;
+                    if (event.target instanceof Element && event.target.closest("[data-video-controls], button:not([data-media-surface])")) return;
                     const touch = event.touches[0];
-                    // Native controls retarget touch events to <video>; reserve their lower area.
-                    if (isVideo && touch.clientY > event.currentTarget.getBoundingClientRect().bottom - 96) return;
                     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
                   }}
                   onTouchMove={(event) => {
@@ -165,7 +184,7 @@ export function FeedExpandedModal({
                   onTouchEnd={(event) => {
                     const start = touchStartRef.current;
                     touchStartRef.current = null;
-                    if (!start || event.changedTouches.length !== 1) return;
+                    if (!start || isVideoFullscreen(videoRef.current) || event.changedTouches.length !== 1) return;
                     const touch = event.changedTouches[0];
                     const dx = touch.clientX - start.x;
                     const dy = touch.clientY - start.y;
@@ -176,23 +195,15 @@ export function FeedExpandedModal({
                   }}
                 >
                   {isVideo ? (
-                    <video
+                    <ExpandedVideo
                       key={expandedPost.id}
-                      ref={videoRef}
-                      className="h-full w-full rounded-lg bg-black object-contain outline-none"
-                      controls
-                      playsInline
-                      preload="auto"
-                      src={expandedVideoSrc || undefined}
+                      videoRef={videoRef}
+                      shouldAutoPlayRef={shouldAutoPlayRef}
+                      onCancelPendingNavigation={onCancelPendingNavigation}
+                      src={expandedVideoSrc}
                       poster={expandedPost.cloudinary_public_id
                         ? (cloudinaryVideoPosterUrl(expandedPost.media_url ?? "", expandedPost.cloudinary_public_id, { width: 1200 }) ?? undefined)
                         : undefined}
-                      onCanPlay={() => {
-                        if (shouldAutoPlayRef.current) {
-                          shouldAutoPlayRef.current = false;
-                          void videoRef.current?.play().catch(() => {});
-                        }
-                      }}
                     />
                   ) : (
                     <ExpandedPhoto
@@ -209,7 +220,8 @@ export function FeedExpandedModal({
                         aria-label="Предыдущее фото или видео"
                         title="Предыдущий пост"
                         aria-keyshortcuts="ArrowLeft"
-                        className="absolute top-1/2 left-1 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white sm:left-3"
+                        disabled={!canMoveBackward}
+                        className="absolute top-1/2 left-1 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white disabled:cursor-default disabled:opacity-25 sm:left-3"
                         onClick={() => onMove(-1)}
                       >
                         <ChevronLeft />
@@ -219,7 +231,8 @@ export function FeedExpandedModal({
                         aria-label="Следующее фото или видео"
                         title="Следующий пост"
                         aria-keyshortcuts="ArrowRight"
-                        className="absolute top-1/2 right-1 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white sm:right-3"
+                        disabled={!canMoveForward}
+                        className="absolute top-1/2 right-1 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white disabled:cursor-default disabled:opacity-25 sm:right-3"
                         onClick={() => onMove(1)}
                       >
                         <ChevronRight />
@@ -234,10 +247,15 @@ export function FeedExpandedModal({
                   onSheetOpenChange={onDescriptionOpenChange}
                 />
               </div>
-              {isVideo ? (
-                <p className="hidden shrink-0 text-center text-xs leading-relaxed text-amber-50/60 lg:block">
-                  Shift + ← → — перемотка 5 с · Пробел — пауза · ↑ ↓ — громкость · M — звук
-                </p>
+              {navigationStatus !== "ready" ? (
+                <div className="flex min-h-6 shrink-0 flex-wrap items-center justify-center gap-3 text-center text-sm text-amber-50/70" role="status" aria-live="polite">
+                  {navigationStatus === "error" ? (
+                    <>
+                      <span>Не удалось загрузить следующие посты.</span>
+                      <button type="button" onClick={onRetryLoadMore} className="min-h-11 cursor-pointer rounded-lg px-3 text-[#83c8b6] outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[#83c8b6]">Повторить</button>
+                    </>
+                  ) : navigationStatus === "waiting" ? "Загружаем следующие…" : "Конец ленты"}
+                </div>
               ) : null}
             </>
           )}

@@ -8,18 +8,24 @@ export function useInView<T extends Element>(options?: IntersectionObserverInit)
 
   useEffect(() => {
     if (!node) return;
+    let active = true;
     const obs = new IntersectionObserver(
-      ([entry]) => {
-        setInView(Boolean(entry?.isIntersecting));
+      (entries) => {
+        const entry = entries.at(-1);
+        if (active && entry) setInView(entry.isIntersecting);
       },
       { root: options?.root ?? null, rootMargin: options?.rootMargin, threshold: options?.threshold },
     );
     obs.observe(node);
-    return () => obs.disconnect();
+    return () => {
+      active = false;
+      obs.disconnect();
+    };
   }, [node, options?.root, options?.rootMargin, options?.threshold]);
 
   const ref = useCallback((el: T | null) => {
     setNode(el);
+    setInView(false);
   }, []);
 
   return { ref, inView };

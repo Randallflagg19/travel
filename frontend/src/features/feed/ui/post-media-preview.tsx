@@ -33,8 +33,9 @@ function PhotoPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewPro
     const node = containerRef.current;
     if (!node) return;
     // Native lazy loading can fetch several screens ahead. Start only nearby photos.
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) return;
+    const observer = new IntersectionObserver((entries) => {
+      // Several visibility changes for the same photo can arrive together.
+      if (!entries.some((entry) => entry.isIntersecting)) return;
       setShouldLoad(true);
       observer.disconnect();
     }, { rootMargin: "300px" });
@@ -63,7 +64,7 @@ function PhotoPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewPro
           srcSet={shouldLoad ? sources.srcSet : undefined}
           sizes={sources.srcSet ? PHOTO_SIZES[post.layout] : undefined}
           src={shouldLoad ? sources.src : undefined}
-          loading="lazy"
+          loading="eager"
           decoding="async"
           onLoad={(event) => {
             setStatus("loaded");

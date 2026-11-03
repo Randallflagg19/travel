@@ -68,6 +68,7 @@ export function Feed() {
     expandedVideoSrc,
     expandedPreviewSrc,
     rememberPhotoPreview,
+    adjacentMedia,
     videoRef,
     shouldAutoPlayRef,
     openExpanded,
@@ -255,6 +256,7 @@ export function Feed() {
           onClose={closeExpanded}
           expandedVideoSrc={expandedVideoSrc}
           previewSrc={expandedPreviewSrc}
+          adjacentMedia={adjacentMedia}
           videoRef={videoRef}
           shouldAutoPlayRef={shouldAutoPlayRef}
           onMove={moveExpanded}

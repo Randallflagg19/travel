@@ -7,6 +7,7 @@ import type { ApiPost } from "@/shared/api/api";
 import { cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
 import { useExpandedModalBehavior } from "../model/use-expanded-modal-behavior";
 import type { ExpandedNavigationStatus } from "../model/use-expanded-post-modal";
+import { useExpandedMediaImages } from "../model/use-expanded-media-images";
 import { exitVideoFullscreen, isVideoFullscreen } from "../model/video-element";
 import { ExpandedPhoto } from "./expanded-photo";
 import { ExpandedPostDescription } from "./expanded-post-description";
@@ -17,6 +18,7 @@ type FeedExpandedModalProps = {
   onClose: () => void;
   expandedVideoSrc: string | null;
   previewSrc: string | null;
+  adjacentMedia: ApiPost[];
   videoRef: RefObject<HTMLVideoElement | null>;
   shouldAutoPlayRef: RefObject<boolean>;
   onMove: (direction: -1 | 1) => void;
@@ -32,6 +34,7 @@ export function FeedExpandedModal({
   onClose,
   expandedVideoSrc,
   previewSrc,
+  adjacentMedia,
   videoRef,
   shouldAutoPlayRef,
   onMove,
@@ -50,6 +53,7 @@ export function FeedExpandedModal({
   const isVideo = expandedPost.media_type === "VIDEO";
   const hasDescription = Boolean(expandedPost.title || expandedPost.text);
   const canMove = canMoveBackward || canMoveForward;
+  const { mediaRef, photo } = useExpandedMediaImages({ post: expandedPost, previewSrc, adjacentMedia, videoRef });
 
   useExpandedModalBehavior({
     shortcutsEnabled: !isStory && !descriptionOpen,
@@ -168,6 +172,7 @@ export function FeedExpandedModal({
               </header>
               <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row lg:gap-5">
                 <div
+                  ref={mediaRef}
                   aria-label="Медиа"
                   className="relative min-h-0 min-w-0 flex-1"
                   onTouchStart={(event) => {
@@ -209,7 +214,7 @@ export function FeedExpandedModal({
                     <ExpandedPhoto
                       key={`${expandedPost.id}:${expandedPost.media_url}`}
                       post={expandedPost}
-                      previewSrc={previewSrc}
+                      image={photo}
                       onClose={onClose}
                     />
                   )}

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApiPost } from "@/shared/api/api";
-import { cloudinaryPhotoSources, cloudinaryVideoPosterUrl } from "@/shared/lib/cloudinary";
 import { isVideoFullscreen } from "./video-element";
 
 type LoadedPosts = { items: ApiPost[]; hasMore: boolean; nextCursor: string | null };
@@ -26,7 +25,6 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
   const [loadState, setLoadState] = useState<LoadState | null>(null);
   const loadStatus = loadState?.loader === loadMore ? loadState.status : "idle";
   const photoPreviewsRef = useRef(new Map<string, string>());
-  const preloadedRef = useRef(new Set<string>());
   const itemsRef = useRef(items);
   const sessionRef = useRef<ViewerSession | null>(null);
   const requestRef = useRef<{ loader: LoadMore; promise: Promise<LoadedPosts> } | null>(null);
@@ -46,6 +44,22 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
   );
   const mediaItems = useMemo(() => items.filter((post) => post.media_type !== "STORY"), [items]);
   const expandedMediaIndex = mediaItems.findIndex((post) => post.id === expandedId);
+  const adjacentMedia = useMemo(() => {
+    if (expandedMediaIndex < 0) return [];
+    // Videos contribute nearby posters without reducing the two-photo lookahead.
+    const next: ApiPost[] = [];
+    let photos = 0;
+    for (let index = expandedMediaIndex + 1;
+      index < mediaItems.length && (photos < 2 || index <= expandedMediaIndex + 2); index++) {
+      const post = mediaItems[index];
+      if (post.media_type === "PHOTO") { next.push(post); photos++; }
+      else if (post.media_type === "VIDEO" && index <= expandedMediaIndex + 2) next.push(post);
+    }
+    const previousPhoto = mediaItems.slice(0, expandedMediaIndex).findLast((post) => post.media_type === "PHOTO");
+    const previous = mediaItems[expandedMediaIndex - 1];
+    return [...next, previousPhoto, previous?.media_type === "VIDEO" ? previous : undefined]
+      .filter((post): post is ApiPost => Boolean(post));
+  }, [expandedMediaIndex, mediaItems]);
 
   const rememberPhotoPreview = useCallback((originalUrl: string, previewSrc: string) => {
     photoPreviewsRef.current.set(originalUrl, previewSrc);
@@ -151,26 +165,6 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
     void requestMore().catch(() => {});
   }, [expandedMediaIndex, mediaItems.length, hasMore, loadMoreFailed, loadStatus, requestMore]);
 
-  useEffect(() => {
-    if (expandedMediaIndex < 0) return;
-    for (const post of [mediaItems[expandedMediaIndex - 1], mediaItems[expandedMediaIndex + 1]]) {
-      if (!post?.media_url) continue;
-      const src = post.media_type === "PHOTO"
-        ? cloudinaryPhotoSources(post.media_url, post.media_width).src
-        : post.cloudinary_public_id
-          ? cloudinaryVideoPosterUrl(post.media_url, post.cloudinary_public_id, { width: 600 })
-          : null;
-      if (!src || preloadedRef.current.has(src)) continue;
-      preloadedRef.current.add(src);
-      const image = new window.Image();
-      image.fetchPriority = "low";
-      image.src = src;
-      void image.decode().then(() => {
-        if (post.media_type === "PHOTO") rememberPhotoPreview(post.media_url!, src);
-      }).catch(() => { preloadedRef.current.delete(src); });
-    }
-  }, [expandedMediaIndex, mediaItems, rememberPhotoPreview]);
-
   const retryLoadMore = useCallback(() => {
     if (expandedMediaIndex === mediaItems.length - 1) moveExpanded(1);
     else void requestMore().catch(() => {});
@@ -183,7 +177,7 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
     : failed ? "error" : atEnd ? "end" : "ready";
 
   return {
-    expandedPost, expandedVideoSrc, expandedPreviewSrc, rememberPhotoPreview,
+    expandedPost, expandedVideoSrc, expandedPreviewSrc, rememberPhotoPreview, adjacentMedia,
     videoRef, shouldAutoPlayRef, openExpanded, closeExpanded, moveExpanded, cancelPendingNavigation,
     canMoveBackward: expandedMediaIndex > 0,
     canMoveForward: expandedMediaIndex >= 0 && (expandedMediaIndex < mediaItems.length - 1 || hasMore) && loadStatus !== "waiting",

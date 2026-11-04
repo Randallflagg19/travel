@@ -4,7 +4,7 @@ import { cloudinaryPhotoSources, cloudinaryVideoPosterUrl } from "@/shared/lib/c
 import { type ExpandedImageSource, isExpandedImageReady, readyExpandedPhoto, requestExpandedImage } from "./expanded-image-cache";
 
 type MediaSize = { width: number; height: number; pixelRatio: number };
-type MediaVisit = { postId: string };
+type MediaVisit = { postId: string; mediaUrl: string | null };
 type PhotoSource = { src: string; originalUrl: string; targetWidth: number };
 export type ExpandedPhotoImage = {
   src: string | null;
@@ -30,7 +30,7 @@ export function useExpandedMediaImages({ post, previewSrc, adjacentMedia, videoR
   const [mediaNode, setMediaNode] = useState<HTMLDivElement | null>(null);
   const mediaRef = useCallback((node: HTMLDivElement | null) => { setMediaNode(node); }, []);
   // Returning to a video creates a new element that must become ready again.
-  const visit = useMemo<MediaVisit>(() => ({ postId: post.id }), [post.id]);
+  const visit = useMemo<MediaVisit>(() => ({ postId: post.id, mediaUrl: post.media_url }), [post.id, post.media_url]);
   const [size, setSize] = useState<MediaSize>({ width: 0, height: 0, pixelRatio: 1 });
   const [result, setResult] = useState<{ visit: MediaVisit; src: string; failed: boolean } | null>(null);
   const [attempt, setAttempt] = useState(0);

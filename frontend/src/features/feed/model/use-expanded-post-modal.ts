@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApiPost } from "@/shared/api/api";
 import { isVideoFullscreen } from "./video-element";
+import { attachmentFrame, postAttachments } from "./post-attachments";
 
 type LoadedPosts = { items: ApiPost[]; hasMore: boolean; nextCursor: string | null };
 type ExpandedPostPagination = {
@@ -19,7 +20,8 @@ type ViewerSession = {
 };
 
 export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, loadMoreFailed }: ExpandedPostPagination) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<{ postId: string; attachmentId?: string } | null>(null);
+  const expandedId = selection?.postId ?? null;
   const [expandedVideoSrc, setExpandedVideoSrc] = useState<string | null>(null);
   const [expandedPreviewSrc, setExpandedPreviewSrc] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState | null>(null);
@@ -38,13 +40,22 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
     }
   }, [loadMore]);
 
-  const expandedPost = useMemo(
+  const publication = useMemo(
     () => items.find((post) => post.id === expandedId) ?? null,
     [expandedId, items],
   );
+  const attachments = useMemo(() => publication ? postAttachments(publication) : [], [publication]);
+  const attachmentIndex = Math.max(0, attachments.findIndex((media) => media.id === selection?.attachmentId));
+  const expandedPost = useMemo(() => publication && attachments[attachmentIndex]
+    ? attachmentFrame(publication, attachments[attachmentIndex]) : publication, [publication, attachments, attachmentIndex]);
+  const isCarousel = attachments.length > 1;
   const mediaItems = useMemo(() => items.filter((post) => post.media_type !== "STORY"), [items]);
   const expandedMediaIndex = mediaItems.findIndex((post) => post.id === expandedId);
   const adjacentMedia = useMemo(() => {
+    if (isCarousel && publication) {
+      return [attachments[attachmentIndex + 1], attachments[attachmentIndex + 2], attachments[attachmentIndex - 1]]
+        .filter((item) => Boolean(item)).map((item) => attachmentFrame(publication, item));
+    }
     if (expandedMediaIndex < 0) return [];
     // Videos contribute nearby posters without reducing the two-photo lookahead.
     const next: ApiPost[] = [];
@@ -59,7 +70,7 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
     const previous = mediaItems[expandedMediaIndex - 1];
     return [...next, previousPhoto, previous?.media_type === "VIDEO" ? previous : undefined]
       .filter((post): post is ApiPost => Boolean(post));
-  }, [expandedMediaIndex, mediaItems]);
+  }, [expandedMediaIndex, mediaItems, isCarousel, publication, attachments, attachmentIndex]);
 
   const rememberPhotoPreview = useCallback((originalUrl: string, previewSrc: string) => {
     photoPreviewsRef.current.set(originalUrl, previewSrc);
@@ -72,27 +83,30 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
       : current);
   }, []);
 
-  const showPost = useCallback((post: ApiPost) => {
+  const showPost = useCallback((post: ApiPost, attachmentId?: string) => {
     cancelPendingNavigation();
     sessionRef.current = { loader: loadMore, pending: null };
     setLoadState((current) => current?.status === "error" ? null : current);
     videoRef.current?.pause();
-    setExpandedId(post.id);
-    setExpandedPreviewSrc(photoPreviewsRef.current.get(post.media_url ?? "") ?? null);
-    setExpandedVideoSrc(post.media_type === "VIDEO" ? post.media_url : null);
-    shouldAutoPlayRef.current = post.media_type === "VIDEO";
+    const media = postAttachments(post);
+    const selected = media.find((item) => item.id === attachmentId) ?? media[0];
+    const frame = selected ? attachmentFrame(post, selected) : post;
+    setSelection({ postId: post.id, attachmentId: selected?.id });
+    setExpandedPreviewSrc(photoPreviewsRef.current.get(frame.media_url ?? "") ?? null);
+    setExpandedVideoSrc(frame.media_type === "VIDEO" ? frame.media_url : null);
+    shouldAutoPlayRef.current = frame.media_type === "VIDEO";
   }, [cancelPendingNavigation, loadMore]);
 
-  const openExpanded = useCallback((postId: string) => {
+  const openExpanded = useCallback((postId: string, attachmentId?: string) => {
     const post = itemsRef.current.find((item) => item.id === postId);
-    if (post) showPost(post);
+    if (post) showPost(post, attachmentId);
   }, [showPost]);
 
   const closeExpanded = useCallback(() => {
     cancelPendingNavigation();
     sessionRef.current = null;
     videoRef.current?.pause();
-    setExpandedId(null);
+    setSelection(null);
     setExpandedVideoSrc(null);
     setExpandedPreviewSrc(null);
     shouldAutoPlayRef.current = false;
@@ -129,7 +143,7 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
     return promise;
   }, [loadMore]);
 
-  const moveExpanded = useCallback((direction: -1 | 1) => {
+  const movePublication = useCallback((direction: -1 | 1) => {
     if (expandedId === null || expandedMediaIndex < 0 || isVideoFullscreen(videoRef.current)) return;
     if (direction === -1) {
       const previous = mediaItems[expandedMediaIndex - 1];
@@ -159,6 +173,13 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
     });
   }, [expandedMediaIndex, mediaItems, hasMore, expandedId, requestMore, showPost, loadMore, cancelPendingNavigation]);
 
+  const moveExpanded = useCallback((direction: -1 | 1) => {
+    if (!isCarousel) { movePublication(direction); return; }
+    if (!publication || isVideoFullscreen(videoRef.current)) return;
+    const next = attachments[attachmentIndex + direction];
+    if (next) showPost(publication, next.id);
+  }, [isCarousel, movePublication, publication, attachments, attachmentIndex, showPost]);
+
   useEffect(() => {
     if (expandedMediaIndex < 0 || !hasMore || loadMoreFailed || loadStatus !== "idle") return;
     if (mediaItems.length - expandedMediaIndex - 1 > 3) return;
@@ -166,11 +187,12 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
   }, [expandedMediaIndex, mediaItems.length, hasMore, loadMoreFailed, loadStatus, requestMore]);
 
   const retryLoadMore = useCallback(() => {
-    if (expandedMediaIndex === mediaItems.length - 1) moveExpanded(1);
+    if (expandedMediaIndex === mediaItems.length - 1) movePublication(1);
     else void requestMore().catch(() => {});
-  }, [expandedMediaIndex, mediaItems.length, moveExpanded, requestMore]);
+  }, [expandedMediaIndex, mediaItems.length, movePublication, requestMore]);
 
-  const atEnd = expandedMediaIndex >= 0 && expandedMediaIndex === mediaItems.length - 1 && !hasMore;
+  const atEnd = expandedMediaIndex >= 0 && expandedMediaIndex === mediaItems.length - 1 && !hasMore &&
+    (!isCarousel || attachmentIndex === attachments.length - 1);
   const failed = loadStatus === "error" || (loadStatus === "idle" && loadMoreFailed);
   const navigationStatus: ExpandedNavigationStatus = loadStatus === "waiting"
     ? "waiting"
@@ -179,8 +201,11 @@ export function useExpandedPostModal(items: ApiPost[], { hasMore, loadMore, load
   return {
     expandedPost, expandedVideoSrc, expandedPreviewSrc, rememberPhotoPreview, adjacentMedia,
     videoRef, shouldAutoPlayRef, openExpanded, closeExpanded, moveExpanded, cancelPendingNavigation,
-    canMoveBackward: expandedMediaIndex > 0,
-    canMoveForward: expandedMediaIndex >= 0 && (expandedMediaIndex < mediaItems.length - 1 || hasMore) && loadStatus !== "waiting",
+    attachmentIndex, attachmentCount: attachments.length, isCarousel, movePublication,
+    canMoveToPreviousPublication: expandedMediaIndex > 0,
+    canMoveToNextPublication: expandedMediaIndex >= 0 && (expandedMediaIndex < mediaItems.length - 1 || hasMore) && loadStatus !== "waiting",
+    canMoveBackward: isCarousel ? attachmentIndex > 0 : expandedMediaIndex > 0,
+    canMoveForward: isCarousel ? attachmentIndex < attachments.length - 1 : expandedMediaIndex >= 0 && (expandedMediaIndex < mediaItems.length - 1 || hasMore) && loadStatus !== "waiting",
     navigationStatus, retryLoadMore,
   };
 }

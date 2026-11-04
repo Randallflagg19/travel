@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { deletePost, setPostPinned, updatePostMetadata, type ApiPost, type AuthUser } from "@/shared/api/api";
 import type { FeedOrder } from "./use-feed-params";
@@ -32,173 +32,148 @@ function sortPosts(posts: ApiPost[], order: FeedOrder): ApiPost[] {
       if (byPinnedAt !== 0) return byPinnedAt;
     }
     const byCreatedAt = left.created_at.localeCompare(right.created_at);
-    if (byCreatedAt !== 0) return byCreatedAt * direction;
-    return left.id.localeCompare(right.id) * direction;
+    return byCreatedAt !== 0 ? byCreatedAt * direction : left.id.localeCompare(right.id) * direction;
   });
 }
 
 export function useFeedPostActions({ items, postsQueryKey, order, user, accessToken }: FeedPostActionsOptions) {
   const queryClient = useQueryClient();
   const [editingPost, setEditingPost] = useState<ApiPost | null>(null);
+  const [metadataSaving, setMetadataSaving] = useState(false);
+  const [deletingPost, setDeletingPost] = useState<ApiPost | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
+  const deletionInFlight = useRef(false);
+  const pending = useRef(new Set<string>());
 
-  const canManagePost = useCallback((post: ApiPost) => Boolean(
-    user && (
-      user.role === "SUPERADMIN" ||
-      user.role === "ADMIN" ||
-      (user.role === "AUTHOR" && user.id === post.user_id)
-    )
-  ), [user]);
+  const canManagePost = useCallback((post: ApiPost) => Boolean(user && (
+    user.role === "SUPERADMIN" || user.role === "ADMIN" || (user.role === "AUTHOR" && user.id === post.user_id)
+  )), [user]);
 
-  const updatePostsCache = useCallback(
-    (update: (post: ApiPost) => ApiPost | null) => {
-      queryClient.setQueryData<PostsInfiniteData>(postsQueryKey, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            items: page.items.flatMap((post) => {
-              const nextPost = update(post);
-              return nextPost ? [nextPost] : [];
-            }),
-          })),
-        };
-      });
-    },
-    [postsQueryKey, queryClient],
-  );
+  const updatePostsCache = useCallback((update: (post: ApiPost) => ApiPost | null) => {
+    queryClient.setQueryData<PostsInfiniteData>(postsQueryKey, (old) => old ? {
+      ...old,
+      pages: old.pages.map((page) => ({ ...page, items: page.items.flatMap((post) => {
+        const next = update(post);
+        return next ? [next] : [];
+      }) })),
+    } : old);
+  }, [postsQueryKey, queryClient]);
 
-  const handleDeletePost = useCallback(async (postId: string) => {
-    const targetPost = items.find((post) => post.id === postId);
-    if (!accessToken || !targetPost || !canManagePost(targetPost)) return;
-    if (!confirm("Удалить пост? Файл будет удалён из Cloudinary и из ленты."))
+  const handleDeletePost = useCallback((postId: string) => {
+    const target = items.find((post) => post.id === postId);
+    if (!accessToken || !target || !canManagePost(target) || deletionInFlight.current) return;
+    setDeletingPost(target);
+    setDeleteError(null);
+    setDeleteNotice(null);
+  }, [accessToken, items, canManagePost]);
+
+  function closeDeleteDialog() {
+    if (deletionInFlight.current) return;
+    setDeletingPost(null);
+    setDeleteError(null);
+  }
+
+  async function confirmDeletePost() {
+    if (!deletingPost || deletionInFlight.current) return;
+    if (!accessToken || !canManagePost(deletingPost)) {
+      setDeleteError("Недостаточно прав для удаления публикации. Войдите в аккаунт ещё раз.");
       return;
-    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
-    updatePostsCache((post) => (post.id === postId ? null : post));
+    }
+    const postId = deletingPost.id;
+    if (pending.current.has(postId)) {
+      setDeleteError("Дождитесь завершения предыдущего изменения этой публикации.");
+      return;
+    }
+    deletionInFlight.current = true;
+    pending.current.add(postId);
+    setDeleting(true);
+    setDeleteError(null);
     try {
       await deletePost(accessToken, postId);
-      await queryClient.invalidateQueries({ queryKey: ["places"] });
-    } catch (e) {
-      queryClient.setQueryData(postsQueryKey, previousPosts);
-      alert(e instanceof Error ? e.message : "Не удалось удалить");
+      updatePostsCache((post) => post.id === postId ? null : post);
+      void queryClient.invalidateQueries({ queryKey: ["places"] });
+      setDeletingPost(null);
+      setDeleteNotice("Публикация удалена");
+    } catch {
+      setDeleteError("Не удалось удалить публикацию. Попробуйте ещё раз.");
+    } finally {
+      deletionInFlight.current = false;
+      pending.current.delete(postId);
+      setDeleting(false);
     }
-  }, [accessToken, items, canManagePost, postsQueryKey, queryClient, updatePostsCache]);
+  }
 
   async function handleMetadataSave(value: { title: string; text: string }) {
     if (!editingPost || !accessToken || !canManagePost(editingPost)) return;
-    const postId = editingPost.id;
-    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
-    updatePostsCache((post) =>
-      post.id === postId
-        ? { ...post, title: value.title || null, text: value.text || null }
-        : post,
-    );
-    setEditingPost(null);
+    const target = editingPost;
+    if (pending.current.has(target.id)) throw new Error("Дождитесь завершения предыдущего изменения этой публикации.");
+    pending.current.add(target.id);
+    setMetadataSaving(true);
     try {
-      const { post: savedPost } = await updatePostMetadata(accessToken, postId, {
-        title: value.title || null,
-        text: value.text || null,
-      });
-      updatePostsCache((post) => (post.id === postId ? savedPost : post));
-    } catch (error) {
-      queryClient.setQueryData(postsQueryKey, previousPosts);
-      console.error("updatePostMetadata failed", error);
-      alert("Не удалось сохранить изменения. Попробуйте ещё раз.");
+      const { post: saved } = await updatePostMetadata(accessToken, target.id, { title: value.title || null, text: value.text || null });
+      // Merge only this operation's fields into the CURRENT cache, including newer reactions/pages.
+      updatePostsCache((post) => post.id === target.id ? { ...post, title: saved.title, text: saved.text } : post);
+      setEditingPost((current) => current === target ? null : current);
+    } finally {
+      pending.current.delete(target.id);
+      setMetadataSaving(false);
     }
   }
 
   const handleToggleFeatured = useCallback(async (post: ApiPost) => {
-    if (!accessToken || !canManagePost(post)) return;
-    const layout = post.layout === "FEATURED" ? "STANDARD" : "FEATURED";
-    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
-    updatePostsCache((cachedPost) =>
-      cachedPost.id === post.id ? { ...cachedPost, layout } : cachedPost,
-    );
+    if (!accessToken || !canManagePost(post) || pending.current.has(post.id)) return;
+    pending.current.add(post.id);
     try {
-      const { post: savedPost } = await updatePostMetadata(accessToken, post.id, {
-        layout,
-      });
-      updatePostsCache((cachedPost) =>
-        cachedPost.id === post.id ? savedPost : cachedPost,
-      );
-    } catch (error) {
-      queryClient.setQueryData(postsQueryKey, previousPosts);
-      console.error("update post layout failed", error);
+      const layout = post.layout === "FEATURED" ? "STANDARD" : "FEATURED";
+      const { post: saved } = await updatePostMetadata(accessToken, post.id, { layout });
+      updatePostsCache((current) => current.id === post.id ? { ...current, layout: saved.layout } : current);
+    } catch {
       alert("Не удалось изменить размер карточки. Попробуйте ещё раз.");
+    } finally {
+      pending.current.delete(post.id);
     }
-  }, [accessToken, canManagePost, postsQueryKey, queryClient, updatePostsCache]);
+  }, [accessToken, canManagePost, updatePostsCache]);
 
   const handleTogglePinned = useCallback(async (post: ApiPost) => {
-    if (!accessToken || !canManagePost(post)) return;
-    const pinned = !post.pinned_at;
-    const previousPosts = queryClient.getQueryData<PostsInfiniteData>(postsQueryKey);
-
-    queryClient.setQueryData<PostsInfiniteData>(postsQueryKey, (old) => {
-      if (!old) return old;
-      const pageSizes = old.pages.map((page) => page.items.length);
-      const sorted = sortPosts(
-        old.pages
-          .flatMap((page) => page.items)
-          .map((cachedPost) =>
-            cachedPost.id === post.id
-              ? {
-                  ...cachedPost,
-                  pinned_at: pinned ? new Date().toISOString() : null,
-                }
-              : cachedPost,
-          ),
-        order,
-      );
-      let offset = 0;
-      return {
-        ...old,
-        pages: old.pages.map((page, index) => {
-          const items = sorted.slice(offset, offset + pageSizes[index]);
-          offset += pageSizes[index];
-          return { ...page, items };
-        }),
-      };
-    });
-
+    if (!accessToken || !canManagePost(post) || pending.current.has(post.id)) return;
+    pending.current.add(post.id);
     try {
-      const { post: savedPost } = await setPostPinned(
-        accessToken,
-        post.id,
-        pinned,
-      );
-      updatePostsCache((cachedPost) =>
-        cachedPost.id === post.id
-          ? { ...cachedPost, pinned_at: savedPost.pinned_at }
-          : cachedPost,
-      );
-    } catch (error) {
-      queryClient.setQueryData(postsQueryKey, previousPosts);
-      console.error("setPostPinned failed", error);
+      const { post: saved } = await setPostPinned(accessToken, post.id, !post.pinned_at);
+      queryClient.setQueryData<PostsInfiniteData>(postsQueryKey, (old) => {
+        if (!old) return old;
+        const sorted = sortPosts(old.pages.flatMap((page) => page.items).map((current) =>
+          current.id === post.id ? { ...current, pinned_at: saved.pinned_at } : current), order);
+        let offset = 0;
+        return { ...old, pages: old.pages.map((page) => {
+          const items = sorted.slice(offset, offset + page.items.length);
+          offset += page.items.length;
+          return { ...page, items };
+        }) };
+      });
+      void queryClient.invalidateQueries({ queryKey: postsQueryKey });
+    } catch {
       alert("Не удалось изменить закрепление. Попробуйте ещё раз.");
     } finally {
-      void queryClient.invalidateQueries({ queryKey: ["posts"] });
+      pending.current.delete(post.id);
     }
-  }, [accessToken, canManagePost, order, postsQueryKey, queryClient, updatePostsCache]);
+  }, [accessToken, canManagePost, order, postsQueryKey, queryClient]);
 
   const updatePostLike = useCallback((postId: string, liked: boolean, deltaCount: number) => {
     updatePostsCache((post) => post.id === postId
-      ? { ...post, liked_by_me: liked, like_count: Math.max(0, post.like_count + deltaCount) }
-      : post);
+      ? { ...post, liked_by_me: liked, like_count: Math.max(0, post.like_count + deltaCount) } : post);
   }, [updatePostsCache]);
-
-  const onPostsChanged = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ["posts"] });
-  }, [queryClient]);
+  const onPostsChanged = useCallback(() => { void queryClient.invalidateQueries({ queryKey: ["posts"] }); }, [queryClient]);
 
   const postActions: FeedPostActions = {
-    canManagePost,
-    onDelete: handleDeletePost,
-    onEdit: setEditingPost,
-    onToggleFeatured: handleToggleFeatured,
-    onTogglePinned: handleTogglePinned,
-    onLikeToggled: updatePostLike,
-    onPostsChanged,
+    canManagePost, onDelete: handleDeletePost, onEdit: setEditingPost,
+    onToggleFeatured: handleToggleFeatured, onTogglePinned: handleTogglePinned,
+    onLikeToggled: updatePostLike, onPostsChanged,
   };
-
-  return { editingPost, setEditingPost, saveMetadata: handleMetadataSave, postActions };
+  return {
+    editingPost, setEditingPost, metadataSaving, saveMetadata: handleMetadataSave, postActions,
+    deletingPost, deleting, deleteError, confirmDeletePost, closeDeleteDialog,
+    deleteNotice, clearDeleteNotice: () => setDeleteNotice(null),
+  };
 }

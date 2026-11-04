@@ -148,7 +148,8 @@
     min-height: 100dvh;
   }
   ::selection {
-    background: rgba(245, 166, 76, 0.35);
+    background: #315d86;
+    color: #f5f9ff;
   }
 }
 

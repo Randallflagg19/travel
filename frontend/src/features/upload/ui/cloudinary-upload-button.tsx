@@ -1,76 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { useSelectedAuthor } from "@/features/feed/model/use-selected-author";
-import {
-  adminCloudinaryConfig,
-  adminCloudinarySignUpload,
-  createPost,
-} from "@/shared/api/api";
-import {
-  PostMetadataDialog,
-  type PostMetadata,
-} from "@/features/posts/ui/post-metadata-dialog";
-
-declare global {
-  interface Window {
-    cloudinary?: {
-      createUploadWidget: (
-        options: unknown,
-        callback: (error: unknown, result: unknown) => void,
-      ) => {
-        open: () => void;
-      };
-    };
-  }
-}
-
-function loadCloudinaryWidgetScript(): Promise<void> {
-  if (typeof window === "undefined")
-    return Promise.reject(new Error("No window"));
-  if (window.cloudinary?.createUploadWidget) return Promise.resolve();
-
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[data-cloudinary-widget="true"]',
-    );
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () =>
-        reject(new Error("Cloudinary widget failed to load")),
-      );
-      return;
-    }
-
-    const s = document.createElement("script");
-    s.src = "https://widget.cloudinary.com/v2.0/global/all.js";
-    s.async = true;
-    s.defer = true;
-    s.dataset.cloudinaryWidget = "true";
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Cloudinary widget failed to load"));
-    document.head.appendChild(s);
-  });
-}
-
-function pickMediaType(
-  resourceType: string | undefined,
-  format: string | undefined,
-) {
-  if (resourceType === "image") return "PHOTO" as const;
-  if (resourceType === "video") {
-    const fmt = (format ?? "").toLowerCase();
-    const audio = new Set(["mp3", "m4a", "wav", "aac", "ogg", "flac", "opus"]);
-    if (audio.has(fmt)) return "AUDIO" as const;
-    return "VIDEO" as const;
-  }
-  return "PHOTO" as const;
-}
+import { readPlaceSelection } from "@/features/places/model/place-selection";
+import { MediaPostComposer } from "./media-post-composer";
 
 export function CloudinaryUploadButton(props: {
   size?: "sm" | "default" | "icon";
@@ -79,167 +16,23 @@ export function CloudinaryUploadButton(props: {
   className?: string;
 }) {
   const auth = useAuth();
-  const { author, isReady: isAuthorReady } = useSelectedAuthor();
-  const queryClient = useQueryClient();
-  const searchParams = useSearchParams();
-  const [busy, setBusy] = useState(false);
-  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
-  const widgetRef = useRef<{ open: () => void } | null>(null);
-  const widgetFolderRef = useRef<string | null>(null);
-  const metadataRef = useRef<PostMetadata>({ title: "", text: "" });
+  const { author, isReady } = useSelectedAuthor();
+  const search = useSearchParams();
+  const [context, setContext] = useState<{ country: string; city: string } | null>(null);
+  const canUpload = auth.user && auth.accessToken && isReady && author?.id === auth.user.id &&
+    (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN");
+  if (!canUpload || !auth.user || !auth.accessToken) return null;
 
-  const ctx = useMemo(() => {
-    const country = searchParams.get("country") ?? "";
-    const city = searchParams.get("city") ?? "";
-    return { country, city };
-  }, [searchParams]);
-
-  const canUpload = Boolean(
-    auth.user &&
-    auth.accessToken &&
-    isAuthorReady &&
-    author?.id === auth.user.id &&
-    (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN"),
-  );
-
-  async function openCloudinaryWidget(metadata: PostMetadata) {
-    if (!canUpload) return;
-    if (!auth.accessToken) return;
-    if (!auth.user) return;
-
-    metadataRef.current = metadata;
-    setBusy(true);
-    try {
-      const { cloudName, apiKey } = await adminCloudinaryConfig(
-        auth.accessToken,
-      );
-      await loadCloudinaryWidgetScript();
-
-      const root = auth.user.username || "uploads";
-      const folder =
-        ctx.country && ctx.city
-          ? `${root}/${ctx.country}/${ctx.city}`
-          : `${root}/all`;
-
-      if (!widgetRef.current || widgetFolderRef.current !== folder) {
-        const widget = window.cloudinary?.createUploadWidget(
-          {
-            cloudName,
-            apiKey,
-            folder,
-            multiple: false,
-            resourceType: "auto",
-            sources: ["local", "camera", "url"],
-            // Keep Cloudinary filenames (nicer folders). Cloudinary will ensure uniqueness.
-            use_filename: true,
-            unique_filename: true,
-            uploadSignature: async (
-              callback: (signature: string, timestamp: number) => void,
-              params: unknown,
-            ) => {
-              const signed = await adminCloudinarySignUpload(
-                auth.accessToken as string,
-                (params ?? {}) as Record<string, unknown>,
-              );
-              callback(signed.signature, signed.timestamp);
-            },
-          },
-          async (_error: unknown, result: unknown) => {
-            if (_error) {
-              setBusy(false);
-              return;
-            }
-            const r = result as {
-              event?: string;
-              info?: {
-                secure_url?: string;
-                public_id?: string;
-                resource_type?: string;
-                format?: string;
-                folder?: string;
-                width?: number;
-                height?: number;
-              };
-            };
-            if (r.event === "display-changed" || r.event === "close") {
-              setBusy(false);
-            }
-            if (r.event !== "success" || !r.info) return;
-            const info = r.info;
-            const mediaUrl = (info.secure_url ?? "").trim();
-            const publicId = (info.public_id ?? "").trim();
-            if (!mediaUrl) return;
-
-            try {
-              await createPost(auth.accessToken as string, {
-                mediaType: pickMediaType(info.resource_type, info.format),
-                mediaUrl,
-                cloudinaryPublicId: publicId || undefined,
-                folder: info.folder || folder,
-                title: metadataRef.current.title || undefined,
-                text: metadataRef.current.text || undefined,
-                country: ctx.country && ctx.city ? ctx.country : undefined,
-                city: ctx.country && ctx.city ? ctx.city : undefined,
-                mediaWidth: info.width,
-                mediaHeight: info.height,
-              });
-              await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ["posts"] }),
-                queryClient.invalidateQueries({ queryKey: ["places"] }),
-              ]);
-            } catch (e) {
-              console.error("createPost failed", e);
-            }
-          },
-        );
-        widgetRef.current = widget ?? null;
-        widgetFolderRef.current = widget ? folder : null;
-      }
-
-      setMetadataDialogOpen(false);
-      widgetRef.current?.open();
-      if (!widgetRef.current) {
-        setBusy(false);
-      }
-    } catch (e) {
-      console.error("Cloudinary upload widget failed to open", e);
-      setBusy(false);
-    }
-  }
-
-  function onClick() {
-    if (!canUpload) return;
-    setMetadataDialogOpen(true);
-  }
-
-  if (!canUpload) return null;
-
-  return (
-    <>
-      <Button
-        size={props.size ?? "sm"}
-        variant={props.variant ?? "secondary"}
-        className={props.className}
-        onClick={onClick}
-        disabled={busy || auth.isLoading}
-        aria-label={busy ? "Загрузка..." : "Загрузить"}
-      >
-        {props.iconOnly ? (
-          <Upload className="size-4" />
-        ) : busy ? (
-          "Upload…"
-        ) : (
-          "Upload"
-        )}
-      </Button>
-      <PostMetadataDialog
-        open={metadataDialogOpen}
-        title="Новая запись"
-        submitLabel="Выбрать файл"
-        saving={busy}
-        onOpenChange={setMetadataDialogOpen}
-        onSubmit={openCloudinaryWidget}
-      />
-    </>
-  );
+  return <>
+    <Button size={props.size ?? "sm"} variant={props.variant ?? "secondary"} className={props.className}
+      onClick={() => {
+        const { selectedCountry, selectedCity } = readPlaceSelection(search);
+        setContext({ country: selectedCountry, city: selectedCity });
+      }}
+      aria-label="Новая публикация" disabled={auth.isLoading}>
+      {props.iconOnly ? <Upload className="size-4" /> : "Публикация"}
+    </Button>
+    {context ? <MediaPostComposer key={auth.user.id} accessToken={auth.accessToken}
+      initialCountry={context.country} initialCity={context.city} onClose={() => setContext(null)} /> : null}
+  </>;
 }

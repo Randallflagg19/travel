@@ -18,6 +18,7 @@ export function selectFeedMediaStats({
   if (!places) return null;
 
   if (all) {
+    if (places.totals) return { photos: places.totals.photos, videos: places.totals.videos };
     return places.countries.reduce<FeedMediaStats>(
       (total, country) => ({
         photos: total.photos + country.stats.photos,

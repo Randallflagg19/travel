@@ -8,6 +8,7 @@ import { Button } from "@/shared/ui/button";
 import { useAuth } from "@/entities/session/model/auth";
 import { createPost } from "@/shared/api/api";
 import { useSelectedAuthor } from "@/features/feed/model/use-selected-author";
+import { readPlaceSelection } from "@/features/places/model/place-selection";
 
 export function StoryCreateButton({ iconOnly = false, className }: { iconOnly?: boolean; className?: string }) {
   const auth = useAuth();
@@ -22,14 +23,15 @@ export function StoryCreateButton({ iconOnly = false, className }: { iconOnly?: 
 
   async function save() {
     if (!auth.accessToken || !title.trim() || !text.trim()) return;
+    const { selectedCountry, selectedCity } = readPlaceSelection(searchParams);
     setSaving(true);
     try {
       await createPost(auth.accessToken, {
         mediaType: "STORY",
         title: title.trim(),
         text: text.trim(),
-        country: searchParams.get("country") || undefined,
-        city: searchParams.get("city") || undefined,
+        country: selectedCountry || undefined,
+        city: selectedCity || undefined,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["posts"] }),

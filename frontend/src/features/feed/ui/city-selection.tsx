@@ -55,8 +55,8 @@ export function CitySelection({
             {displayCountry}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/55 sm:text-base">
-            Здесь несколько направлений. Сначала выбери город — и откроется его
-            отдельная лента.
+            Ниже лента всей страны. Выбери город, чтобы увидеть публикации только
+            из него.
           </p>
         </div>
         <span className="text-sm text-white/45">

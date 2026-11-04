@@ -12,8 +12,17 @@ import { exitVideoFullscreen, isVideoFullscreen } from "../model/video-element";
 import { ExpandedPhoto } from "./expanded-photo";
 import { ExpandedPostDescription } from "./expanded-post-description";
 import { ExpandedVideo } from "./expanded-video";
+import { PostMediaThumbnails } from "./post-media-thumbnails";
+import { postAttachments } from "../model/post-attachments";
 
 type FeedExpandedModalProps = {
+  attachmentIndex: number;
+  attachmentCount: number;
+  isCarousel: boolean;
+  onSelectAttachment: (attachmentId: string) => void;
+  onMovePublication: (direction: -1 | 1) => void;
+  canMoveToPreviousPublication: boolean;
+  canMoveToNextPublication: boolean;
   post: ApiPost;
   onClose: () => void;
   expandedVideoSrc: string | null;
@@ -43,6 +52,7 @@ export function FeedExpandedModal({
   canMoveForward,
   navigationStatus,
   onRetryLoadMore,
+  attachmentIndex, attachmentCount, isCarousel, onSelectAttachment, onMovePublication, canMoveToPreviousPublication, canMoveToNextPublication,
 }: FeedExpandedModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -149,7 +159,7 @@ export function FeedExpandedModal({
           ) : (
             <>
               <header className="flex min-h-11 shrink-0 items-center justify-between gap-3">
-                <span className="text-sm text-amber-50/65">{isVideo ? "Видео" : "Фото"}</span>
+                <span className="text-sm text-amber-50/65" aria-live="polite">{isVideo ? "Видео" : "Фото"}{isCarousel ? ` · ${attachmentIndex + 1} / ${attachmentCount}` : ""}</span>
                 <div className="flex items-center gap-3">
                   {hasDescription ? (
                     <button
@@ -171,6 +181,7 @@ export function FeedExpandedModal({
                 </div>
               </header>
               <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row lg:gap-5">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
                 <div
                   ref={mediaRef}
                   aria-label="Медиа"
@@ -201,7 +212,7 @@ export function FeedExpandedModal({
                 >
                   {isVideo ? (
                     <ExpandedVideo
-                      key={expandedPost.id}
+                      key={`${expandedPost.id}:${expandedPost.media_url}`}
                       videoRef={videoRef}
                       shouldAutoPlayRef={shouldAutoPlayRef}
                       onCancelPendingNavigation={onCancelPendingNavigation}
@@ -223,7 +234,7 @@ export function FeedExpandedModal({
                       <button
                         type="button"
                         aria-label="Предыдущее фото или видео"
-                        title="Предыдущий пост"
+                        title={isCarousel ? "Предыдущий кадр" : "Предыдущий пост"}
                         aria-keyshortcuts="ArrowLeft"
                         disabled={!canMoveBackward}
                         className="absolute top-1/2 left-1 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white disabled:cursor-default disabled:opacity-25 sm:left-3"
@@ -234,7 +245,7 @@ export function FeedExpandedModal({
                       <button
                         type="button"
                         aria-label="Следующее фото или видео"
-                        title="Следующий пост"
+                        title={isCarousel ? "Следующий кадр" : "Следующий пост"}
                         aria-keyshortcuts="ArrowRight"
                         disabled={!canMoveForward}
                         className="absolute top-1/2 right-1 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white disabled:cursor-default disabled:opacity-25 sm:right-3"
@@ -245,6 +256,9 @@ export function FeedExpandedModal({
                     </>
                   ) : null}
                 </div>
+                <PostMediaThumbnails media={postAttachments(expandedPost)} activeIndex={attachmentIndex} variant="viewer"
+                  onSelect={(id) => { if (!isVideoFullscreen(videoRef.current)) onSelectAttachment(id); }} />
+                </div>
                 <ExpandedPostDescription
                   post={expandedPost}
                   desktopVisible={descriptionVisible}
@@ -252,6 +266,11 @@ export function FeedExpandedModal({
                   onSheetOpenChange={onDescriptionOpenChange}
                 />
               </div>
+              {isCarousel ? <nav aria-label="Переход между публикациями" className="flex shrink-0 flex-wrap items-center justify-center gap-3 text-sm text-amber-50/80">
+                <button type="button" disabled={!canMoveToPreviousPublication} onClick={() => onMovePublication(-1)} className="min-h-11 rounded-lg px-3 hover:bg-white/10 disabled:opacity-30">Предыдущая публикация</button>
+                <span>{attachmentIndex === attachmentCount - 1 ? "Последний кадр публикации" : `${attachmentIndex + 1} / ${attachmentCount}`}</span>
+                <button type="button" disabled={!canMoveToNextPublication} onClick={() => onMovePublication(1)} className="min-h-11 rounded-lg px-3 hover:bg-white/10 disabled:opacity-30">Следующая публикация</button>
+              </nav> : null}
               {navigationStatus !== "ready" ? (
                 <div className="flex min-h-6 shrink-0 flex-wrap items-center justify-center gap-3 text-center text-sm text-amber-50/70" role="status" aria-live="polite">
                   {navigationStatus === "error" ? (

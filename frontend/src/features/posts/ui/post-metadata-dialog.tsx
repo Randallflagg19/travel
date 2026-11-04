@@ -34,7 +34,7 @@ export function PostMetadataDialog({
   onSubmit,
 }: PostMetadataDialogProps) {
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm" />
         {open ? (
@@ -74,10 +74,12 @@ function PostMetadataDialogContent({
       setValidationError("Для истории нужны название и текст.");
       return;
     }
-    await onSubmit({
-      title: metadata.title.trim(),
-      text: metadata.text.trim(),
-    });
+    setValidationError(null);
+    try {
+      await onSubmit({ title: metadata.title.trim(), text: metadata.text.trim() });
+    } catch (error) {
+      setValidationError(error instanceof Error ? error.message : "Не удалось сохранить. Попробуйте ещё раз.");
+    }
   }
 
   return (
@@ -99,6 +101,7 @@ function PostMetadataDialogContent({
                 : "text-amber-50/75 hover:bg-white/10 hover:text-amber-50"
             }`}
             aria-label="Закрыть"
+            disabled={saving}
           >
             <X className="size-5" />
           </button>
@@ -125,6 +128,7 @@ function PostMetadataDialogContent({
           {requireFields ? "Название истории" : "Название"}
           <input
             value={metadata.title}
+            disabled={saving}
             onChange={(event) =>
               setMetadata((current) => ({
                 ...current,
@@ -149,6 +153,7 @@ function PostMetadataDialogContent({
           {requireFields ? "Текст истории" : "Описание"}
           <textarea
             value={metadata.text}
+            disabled={saving}
             onChange={(event) =>
               setMetadata((current) => ({
                 ...current,

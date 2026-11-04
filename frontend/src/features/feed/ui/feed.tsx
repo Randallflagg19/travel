@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { fetchPlaces } from "@/shared/api/api";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { useAuth } from "@/entities/session/model/auth";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 import { PostMetadataDialog } from "@/features/posts/ui/post-metadata-dialog";
+import { PostDeleteDialog } from "@/features/posts/ui/post-delete-dialog";
+import { Button } from "@/shared/ui/button";
 import { useFeedParams } from "../model/use-feed-params";
 import { useFeedPosts } from "../model/use-feed-posts";
 import { useFeedPostActions } from "../model/use-feed-post-actions";
@@ -58,7 +61,11 @@ export function Feed() {
     accessToken: auth.accessToken,
     enabled: Boolean(canLoadPosts && auth.hydrated && isAuthorReady),
   });
-  const { editingPost, setEditingPost, saveMetadata, postActions } = useFeedPostActions({
+  const {
+    editingPost, setEditingPost, metadataSaving, saveMetadata, postActions,
+    deletingPost, deleting, deleteError, confirmDeletePost, closeDeleteDialog,
+    deleteNotice, clearDeleteNotice,
+  } = useFeedPostActions({
     items, postsQueryKey, order, user: auth.user, accessToken: auth.accessToken,
   });
   const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = postsQuery;
@@ -79,6 +86,7 @@ export function Feed() {
     canMoveForward,
     navigationStatus,
     retryLoadMore,
+    attachmentIndex, attachmentCount, isCarousel, movePublication, canMoveToPreviousPublication, canMoveToNextPublication,
   } = useExpandedPostModal(items, {
     hasMore: Boolean(hasNextPage),
     loadMore: loadMorePosts,
@@ -230,6 +238,21 @@ export function Feed() {
           )}
         </>
       ) : null}
+      {deleteNotice ? (
+        <div role="status" className="fixed bottom-4 right-4 z-[80] flex max-w-[calc(100%-2rem)] items-center gap-3 rounded-xl border border-[#83c8b6]/40 bg-[#0b1517] py-2 pl-4 pr-2 text-sm text-amber-50 shadow-xl">
+          <span>{deleteNotice}</span>
+          <Button type="button" size="icon" variant="ghost" onClick={clearDeleteNotice} aria-label="Скрыть уведомление">
+            <X className="size-4" />
+          </Button>
+        </div>
+      ) : null}
+      <PostDeleteDialog
+        post={deletingPost}
+        deleting={deleting}
+        error={deleteError}
+        onClose={closeDeleteDialog}
+        onConfirm={confirmDeletePost}
+      />
       <PostMetadataDialog
         open={editingPost !== null}
         initialValue={{
@@ -242,6 +265,7 @@ export function Feed() {
             : "Редактировать запись"
         }
         submitLabel="Сохранить"
+        saving={metadataSaving}
         variant={editingPost?.media_type === "STORY" ? "story" : "default"}
         requireFields={editingPost?.media_type === "STORY"}
         onOpenChange={(open) => {
@@ -265,6 +289,13 @@ export function Feed() {
           canMoveForward={canMoveForward}
           navigationStatus={navigationStatus}
           onRetryLoadMore={retryLoadMore}
+          attachmentIndex={attachmentIndex}
+          attachmentCount={attachmentCount}
+          isCarousel={isCarousel}
+          onSelectAttachment={(id) => openExpanded(expandedPost.id, id)}
+          onMovePublication={movePublication}
+          canMoveToPreviousPublication={canMoveToPreviousPublication}
+          canMoveToNextPublication={canMoveToNextPublication}
         />
       ) : null}
     </main>

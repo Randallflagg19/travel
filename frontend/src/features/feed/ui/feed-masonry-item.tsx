@@ -50,10 +50,11 @@ function estimatedCardHeight(
   isCommentsOpen: boolean,
 ): number {
   const mediaHeight = cardWidth / mediaAspectRatio(post);
+  const carousel = (post.attachments?.length ?? 0) > 1;
   const baseHeight =
     post.media_type === "STORY"
       ? Math.max(320, mediaHeight)
-      : mediaHeight + mediaFooterHeight(post, isDesktop);
+      : mediaHeight + mediaFooterHeight(post, isDesktop || carousel) + (carousel ? 80 : 0);
 
   return baseHeight + (isCommentsOpen ? OPEN_COMMENTS_HEIGHT + 1 : 0);
 }

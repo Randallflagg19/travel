@@ -1,4 +1,15 @@
+export type ApiPostMedia = {
+  id: string;
+  position: number;
+  media_type: "PHOTO" | "VIDEO" | "AUDIO";
+  media_url: string;
+  cloudinary_public_id: string | null;
+  media_width: number | null;
+  media_height: number | null;
+};
+
 export type ApiPost = {
+  attachments?: ApiPostMedia[];
   id: string;
   user_id: string;
   media_type: "PHOTO" | "VIDEO" | "AUDIO" | "STORY";
@@ -28,6 +39,7 @@ export type PostsPage = {
 };
 
 export type PlacesResponse = {
+  totals?: PostTypeStats;
   countries: Array<{
     country: string;
     count: number;
@@ -73,7 +85,7 @@ export type AuthResponse = {
   user: AuthUser;
 };
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!url) {
     throw new Error(
@@ -83,7 +95,7 @@ function getApiBaseUrl(): string {
   return url.replace(/\/+$/, "");
 }
 
-async function readApiError(res: Response): Promise<string> {
+export async function readApiError(res: Response): Promise<string> {
   try {
     const data = (await res.clone().json()) as unknown;
     if (data && typeof data === "object") {
@@ -405,7 +417,7 @@ export async function setPostPinned(
 export async function deletePost(
   accessToken: string,
   postId: string,
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; pendingMediaDeletions?: number }> {
   const api = getApiBaseUrl();
   const res = await fetch(`${api}/posts/${postId}`, {
     method: "DELETE",
@@ -415,7 +427,7 @@ export async function deletePost(
     const text = await readApiError(res);
     throw new Error(`Delete post failed (${res.status}): ${text}`);
   }
-  return (await res.json()) as { ok: boolean };
+  return (await res.json()) as { ok: boolean; pendingMediaDeletions?: number };
 }
 
 export async function fetchComments(postId: string): Promise<{

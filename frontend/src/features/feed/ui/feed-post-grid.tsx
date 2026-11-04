@@ -16,7 +16,7 @@ type FeedPostGridProps = {
   user: AuthUser | null;
   accessToken: string | null;
   actions: FeedPostActions;
-  onOpen: (postId: string) => void;
+  onOpen: (postId: string, attachmentId?: string) => void;
   onPhotoPreviewReady: (originalUrl: string, previewSrc: string) => void;
 };
 

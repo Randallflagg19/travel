@@ -29,7 +29,7 @@ type FeedPostCardProps = {
   onTogglePinned: (post: ApiPost) => void;
   isActionsOpen: boolean;
   onActionsOpenChange: (open: boolean) => void;
-  onOpen: (postId: string) => void;
+  onOpen: (postId: string, attachmentId?: string) => void;
   onPhotoPreviewReady: (originalUrl: string, previewSrc: string) => void;
   showPlaceInCard: boolean;
   canLike: boolean;
@@ -68,6 +68,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   onCommentAdded,
 }: FeedPostCardProps) {
   const liked = Boolean(post.liked_by_me);
+  const isCarousel = (post.attachments?.length ?? 0) > 1;
   const storyPlace = post.city?.trim() || post.country?.trim() || null;
 
   const { likePending, toggleLike } = usePostLikeToggle({
@@ -240,7 +241,7 @@ export const FeedPostCard = memo(function FeedPostCard({
           <PostMediaPreview post={post} onOpen={onOpen} onPhotoPreviewReady={onPhotoPreviewReady} />
 
           <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/35 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/90 via-black/45 to-transparent lg:hidden" />
+          {!isCarousel ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/90 via-black/45 to-transparent lg:hidden" /> : null}
 
           {post.media_type === "VIDEO" || post.pinned_at ? (
             <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-2">
@@ -260,7 +261,7 @@ export const FeedPostCard = memo(function FeedPostCard({
             </div>
           ) : null}
 
-          <div className="absolute inset-x-0 bottom-0 px-3 pt-3 pb-1 text-amber-50 lg:relative lg:border-t lg:border-amber-200/10 lg:px-4 lg:pt-2">
+          <div className={`${isCarousel ? "relative border-t border-amber-200/10" : "absolute inset-x-0 bottom-0 lg:relative lg:border-t lg:border-amber-200/10"} px-3 pt-3 pb-1 text-amber-50 lg:px-4 lg:pt-2`}>
             <div className="feed-media-overlay-text pointer-events-none">
               {post.title ? (
                 <h3 className="line-clamp-1 font-serif text-base font-normal leading-tight lg:line-clamp-2 lg:text-lg">

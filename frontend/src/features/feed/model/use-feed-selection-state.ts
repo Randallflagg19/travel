@@ -28,9 +28,7 @@ export function useFeedSelectionState({
   );
 
   const isCountryFeed = Boolean(
-    hasCountryOnlySelection &&
-    selectedCountryPlace &&
-    selectedCountryPlace.cities.length === 0,
+    hasCountryOnlySelection && selectedCountryPlace,
   );
 
   const canLoadPosts = Boolean(all || selectedCity || isCountryFeed);

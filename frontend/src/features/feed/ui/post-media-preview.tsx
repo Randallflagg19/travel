@@ -2,17 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ApiPost } from "@/shared/api/api";
+import { attachmentFrame, postAttachments } from "../model/post-attachments";
 import {
   cloudinaryPhotoSources,
   cloudinaryThumbUrl,
   cloudinaryVideoPosterUrl,
 } from "@/shared/lib/cloudinary";
-import { LoaderCircle, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, LoaderCircle, Play } from "lucide-react";
+import { PostMediaThumbnails } from "./post-media-thumbnails";
 
 type PostMediaPreviewProps = {
   post: ApiPost;
-  onOpen: (postId: string) => void;
+  onOpen: (postId: string, attachmentId?: string) => void;
   onPhotoPreviewReady: (originalUrl: string, previewSrc: string) => void;
+  fixedAspect?: number;
 };
 
 // Match the feed's sidebar, padding, column gaps, and maximum width.
@@ -21,12 +24,12 @@ const PHOTO_SIZES = {
   FEATURED: "(min-width: 2040px) 1099px, (min-width: 1024px) calc((100vw - 392px) * 2 / 3), (min-width: 640px) calc((100vw - 58px) / 2), calc(100vw - 32px)",
 };
 
-function PhotoPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewProps) {
+function PhotoPreview({ post, onOpen, onPhotoPreviewReady, fixedAspect }: PostMediaPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
-  const hasDimensions = Boolean(post.media_width && post.media_height);
+  const hasDimensions = Boolean(post.media_width && post.media_height) && !fixedAspect;
   const sources = cloudinaryPhotoSources(post.media_url ?? "", post.media_width);
 
   useEffect(() => {
@@ -47,13 +50,14 @@ function PhotoPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewPro
     <div
       ref={containerRef}
       className="relative overflow-hidden bg-[#071014]"
-      style={{ aspectRatio: hasDimensions ? `${post.media_width} / ${post.media_height}` : "3 / 4" }}
+      style={{ aspectRatio: fixedAspect ?? (hasDimensions ? `${post.media_width} / ${post.media_height}` : "3 / 4") }}
       aria-busy={status === "loading"}
     >
       <button
         type="button"
         className={`block w-full cursor-pointer overflow-hidden ${hasDimensions ? "" : "absolute inset-0 h-full"}`}
         onClick={() => onOpen(post.id)}
+        aria-label="Открыть фото"
       >
         <img
           key={attempt}
@@ -101,7 +105,7 @@ function PhotoPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewPro
   );
 }
 
-export function PostMediaPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewProps) {
+function SingleMediaPreview({ post, onOpen, onPhotoPreviewReady, fixedAspect }: PostMediaPreviewProps) {
   if (post.media_type === "STORY") return null;
   const mediaUrl = post.media_url ?? "";
 
@@ -111,10 +115,11 @@ export function PostMediaPreview({ post, onOpen, onPhotoPreviewReady }: PostMedi
       className="relative block w-full cursor-pointer overflow-hidden"
       onClick={() => onOpen(post.id)}
       aria-label="Открыть видео"
+      style={fixedAspect ? { aspectRatio: fixedAspect } : undefined}
     >
       {post.cloudinary_public_id ? (
         <img
-          className="block h-auto w-full transition duration-500 group-hover:scale-[1.035]"
+          className={`${fixedAspect ? "h-full object-contain" : "h-auto"} block w-full transition duration-500 group-hover:scale-[1.035]`}
           alt={post.title ?? post.text ?? "travel video"}
           width={post.media_width ?? undefined}
           height={post.media_height ?? undefined}
@@ -127,7 +132,7 @@ export function PostMediaPreview({ post, onOpen, onPhotoPreviewReady }: PostMedi
         />
       ) : (
         <video
-          className="pointer-events-none block h-auto w-full"
+          className={`pointer-events-none block w-full ${fixedAspect ? "h-full object-contain" : "h-auto"}`}
           playsInline
           muted
           preload="metadata"
@@ -140,5 +145,47 @@ export function PostMediaPreview({ post, onOpen, onPhotoPreviewReady }: PostMedi
         </div>
       </div>
     </button>
-  ) : <PhotoPreview key={mediaUrl} post={post} onOpen={onOpen} onPhotoPreviewReady={onPhotoPreviewReady} />;
+  ) : <PhotoPreview key={mediaUrl} post={post} onOpen={onOpen} onPhotoPreviewReady={onPhotoPreviewReady} fixedAspect={fixedAspect} />;
+}
+
+export function PostMediaPreview({ post, onOpen, onPhotoPreviewReady }: PostMediaPreviewProps) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const media = postAttachments(post);
+  const index = Math.max(0, media.findIndex((item) => item.id === activeId));
+  const current = media[index];
+  if (!current) return null;
+  const carousel = media.length > 1;
+  const aspect = post.media_width && post.media_height ? post.media_width / post.media_height : post.media_type === "VIDEO" ? 16 / 9 : 3 / 4;
+  function move(direction: -1 | 1) {
+    const next = media[index + direction];
+    if (next) setActiveId(next.id);
+  }
+  return <div data-carousel={carousel || undefined}>
+    <div className="relative"
+    onTouchStart={(event) => {
+      touch.current = null;
+      if (!carousel || event.touches.length !== 1 || (event.target instanceof Element && event.target.closest("button[aria-label*='кадр']"))) return;
+      touch.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    }}
+    onTouchCancel={() => { touch.current = null; }}
+    onTouchMove={(event) => { if (event.touches.length !== 1) touch.current = null; }}
+    onTouchEnd={(event) => {
+      const start = touch.current;
+      touch.current = null;
+      if (!start || event.changedTouches.length !== 1) return;
+      const dx = event.changedTouches[0].clientX - start.x;
+      const dy = event.changedTouches[0].clientY - start.y;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 2) { event.preventDefault(); move(dx < 0 ? 1 : -1); }
+    }}>
+    <SingleMediaPreview post={attachmentFrame(post, current)} onOpen={() => onOpen(post.id, current.id)}
+      onPhotoPreviewReady={onPhotoPreviewReady} fixedAspect={carousel ? aspect : undefined} />
+    {carousel ? <>
+      <span className="pointer-events-none absolute top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-2.5 py-1 text-xs text-white" aria-live="polite" aria-label="Кадр публикации">{index + 1} / {media.length}</span>
+      <button type="button" aria-label="Предыдущий кадр в карточке" disabled={index === 0} onClick={() => move(-1)} className="absolute left-2 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white disabled:opacity-25"><ChevronLeft /></button>
+      <button type="button" aria-label="Следующий кадр в карточке" disabled={index === media.length - 1} onClick={() => move(1)} className="absolute right-2 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white disabled:opacity-25"><ChevronRight /></button>
+    </> : null}
+    </div>
+    <PostMediaThumbnails media={media} activeIndex={index} onSelect={setActiveId} />
+  </div>;
 }

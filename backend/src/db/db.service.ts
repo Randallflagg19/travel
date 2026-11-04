@@ -14,8 +14,8 @@ export class DbService {
     }
 
     this.sql = postgres(databaseUrl, {
-      // Neon requires TLS.
-      ssl: 'require',
+      // Require TLS by default; local PostgreSQL can explicitly disable it.
+      ssl: config.get<string>('DB_SSL') === 'disable' ? false : 'require',
       max: 1,
       // The staging URL uses a transaction pool. Server-side prepared statements
       // can survive a client release there and become invalid after migrations.

@@ -7,11 +7,15 @@ import {
 import { DbService } from '../db/db.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import type { JwtUser } from '../auth/jwt-user.type';
+import { MediaService } from '../cloudinary/media.service';
+import type { PostMediaRow } from '../cloudinary/media-contract';
+import { objectBody } from '../cloudinary/media-contract';
 
 export type MediaType = 'PHOTO' | 'VIDEO' | 'AUDIO' | 'STORY';
 export type PostLayout = 'STANDARD' | 'FEATURED';
 
 export type PostRow = {
+  attachments?: PostMediaRow[];
   id: string;
   user_id: string;
   media_type: MediaType;
@@ -116,6 +120,7 @@ export class PostsService {
   constructor(
     private readonly db: DbService,
     private readonly cloud: CloudinaryService,
+    private readonly media: MediaService,
   ) {}
 
   async listPage(params?: {
@@ -168,7 +173,6 @@ export class PostsService {
                   OR (
                     ${city ?? null}::text IS NULL
                     AND p.country = ${country ?? null}
-                    AND (p.city IS NULL OR TRIM(p.city) = '')
                   )
                   OR (p.country = ${country ?? null} AND p.city = ${city ?? null})
                 )
@@ -251,7 +255,6 @@ export class PostsService {
                   OR (
                     ${city ?? null}::text IS NULL
                     AND p.country = ${country ?? null}
-                    AND (p.city IS NULL OR TRIM(p.city) = '')
                   )
                   OR (p.country = ${country ?? null} AND p.city = ${city ?? null})
                 )
@@ -346,7 +349,62 @@ export class PostsService {
       }
     }
 
+    await this.attachMedia(items);
     return { items, nextCursor, hasMore };
+  }
+
+  private async attachMedia(posts: PostRow[]) {
+    if (!this.db.client || !posts.length) return;
+    const media = await this.db.client<
+      (PostMediaRow & { upload_id: string | null })[]
+    >`
+      SELECT id, post_id, upload_id, position, media_type, media_url, cloudinary_public_id, media_width, media_height
+      FROM post_media WHERE post_id = ANY(${this.db.client.array(posts.map((post) => post.id))}::uuid[])
+      ORDER BY post_id, position
+    `;
+    for (const post of posts) {
+      post.attachments = media
+        .filter((item) => item.post_id === post.id)
+        .map(({ upload_id, ...item }) =>
+          upload_id
+            ? item
+            : {
+                ...item,
+                media_width: post.media_width ?? item.media_width,
+                media_height: post.media_height ?? item.media_height,
+              },
+        );
+      // The previous release/importer can still create a legacy single-media row.
+      if (
+        !post.attachments.length &&
+        post.media_type !== 'STORY' &&
+        post.media_url
+      ) {
+        post.attachments = [
+          {
+            id: post.id,
+            post_id: post.id,
+            position: 0,
+            media_type: post.media_type,
+            media_url: post.media_url,
+            cloudinary_public_id: post.cloudinary_public_id,
+            media_width: post.media_width,
+            media_height: post.media_height,
+          },
+        ];
+      }
+    }
+  }
+
+  private async forViewer(id: string, userId?: string): Promise<PostRow> {
+    const post = await this.getOrThrow(id);
+    const rows =
+      userId && this.db.client
+        ? await this.db.client`
+      SELECT 1 FROM likes WHERE post_id = ${id}::uuid AND user_id = ${userId}::uuid LIMIT 1
+    `
+        : [];
+    return { ...post, liked_by_me: rows.length > 0 };
   }
 
   async create(input: {
@@ -449,6 +507,7 @@ export class PostsService {
     if (!this.db.client) {
       throw new BadRequestException('Database is not configured');
     }
+    objectBody(input);
     const updatesTitle = input.title !== undefined;
     const updatesText = input.text !== undefined;
     const layout = input.layout;
@@ -464,6 +523,12 @@ export class PostsService {
       throw new BadRequestException('layout must be updated separately');
     }
 
+    if (
+      (input.title != null && typeof input.title !== 'string') ||
+      (input.text != null && typeof input.text !== 'string')
+    ) {
+      throw new BadRequestException('title and text must be strings or null');
+    }
     const title = input.title?.trim() || null;
     const text = input.text?.trim() || null;
     if (title && title.length > 140)
@@ -505,7 +570,7 @@ export class PostsService {
         SET layout = ${layout}
         WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO')
           AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
-        RETURNING *, 0::int as like_count, 0::int as comment_count
+        RETURNING *
       `;
     } else if (updatesTitle && updatesText) {
       rows = await this.db.client<PostRow[]>`
@@ -513,7 +578,7 @@ export class PostsService {
         SET title = ${title}, text = ${text}
         WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
           AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
-        RETURNING *, 0::int as like_count, 0::int as comment_count
+        RETURNING *
       `;
     } else if (updatesTitle) {
       rows = await this.db.client<PostRow[]>`
@@ -521,7 +586,7 @@ export class PostsService {
         SET title = ${title}
         WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
           AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
-        RETURNING *, 0::int as like_count, 0::int as comment_count
+        RETURNING *
       `;
     } else {
       rows = await this.db.client<PostRow[]>`
@@ -529,12 +594,12 @@ export class PostsService {
         SET text = ${text}
         WHERE id = ${postId}::uuid AND media_type IN ('PHOTO', 'VIDEO', 'AUDIO', 'STORY')
           AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
-        RETURNING *, 0::int as like_count, 0::int as comment_count
+        RETURNING *
       `;
     }
     const post = rows[0] ? normalizePost(rows[0]) : undefined;
     if (!post) throw new BadRequestException('Post was not found');
-    return post;
+    return this.forViewer(postId, actor?.sub);
   }
 
   async setPinned(
@@ -554,11 +619,11 @@ export class PostsService {
       SET pinned_at = CASE WHEN ${pinned}::boolean THEN now() ELSE NULL END
       WHERE id = ${postId}::uuid
         AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
-      RETURNING *, 0::int AS like_count, 0::int AS comment_count
+      RETURNING *
     `;
     const post = rows[0] ? normalizePost(rows[0]) : undefined;
     if (!post) throw new NotFoundException('Post not found');
-    return post;
+    return this.forViewer(postId, actor?.sub);
   }
 
   /** Фоновая подтяжка метаданных (EXIF) из Cloudinary; не блокирует create(). */
@@ -619,31 +684,13 @@ export class PostsService {
       WHERE p.id = ${id}::uuid
       LIMIT 1
     `;
-    const post = rows[0];
+    const post = rows[0] ? normalizePost(rows[0]) : undefined;
     if (!post) throw new NotFoundException('Post not found');
+    await this.attachMedia([post]);
     return post;
   }
 
-  async delete(id: string, actor?: JwtUser): Promise<void> {
-    if (!this.db.client) throw new NotFoundException();
-    const post = await this.getOrThrow(id);
-    if (actor?.role === 'AUTHOR' && post.user_id !== actor.sub) {
-      throw new ForbiddenException('You can only delete your own post');
-    }
-    if (post.cloudinary_public_id?.trim()) {
-      try {
-        await this.cloud.destroy(
-          post.cloudinary_public_id.trim(),
-          mediaTypeToCloudinaryResource(post.media_type),
-        );
-      } catch {
-        // Proceed to delete from DB even if Cloudinary fails (e.g. already deleted).
-      }
-    }
-    const deleted = await this.db.client`
-      DELETE FROM posts WHERE id = ${id}::uuid
-        AND (${actor?.role !== 'AUTHOR'}::boolean OR user_id = ${actor?.sub ?? null}::uuid)
-    `;
-    if (deleted.count === 0) throw new NotFoundException('Post not found');
+  async delete(id: string, actor?: JwtUser) {
+    return this.media.deletePost(id, actor);
   }
 }

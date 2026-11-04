@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DbService } from './db.service';
-import { runMigrations } from './migrations';
+import { runVersionedMigrations } from './versioned-migrations';
 
 @Injectable()
 export class DbMigrationsService implements OnModuleInit {
@@ -24,7 +24,7 @@ export class DbMigrationsService implements OnModuleInit {
     }
 
     this.logger.log('Running DB migrations...');
-    await runMigrations(this.db.client);
+    await runVersionedMigrations(this.db.client);
     this.logger.log('DB migrations done.');
   }
 }

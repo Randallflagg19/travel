@@ -28,6 +28,7 @@ type CountryPlace = {
 
 export type PlacesResponse = {
   countries: CountryPlace[];
+  totals?: PostTypeStats;
 };
 
 @Injectable()
@@ -39,14 +40,19 @@ export class PlacesService {
 
     const rows = await this.db.client<PlaceRow[]>`
       SELECT
-        NULLIF(TRIM(country), '') AS country,
-        NULLIF(TRIM(city), '') AS city,
+        NULLIF(TRIM(p.country), '') AS country,
+        NULLIF(TRIM(p.city), '') AS city,
         COUNT(*)::int AS count,
-        COUNT(*) FILTER (WHERE media_type = 'PHOTO')::int AS photos,
-        COUNT(*) FILTER (WHERE media_type = 'VIDEO')::int AS videos,
-        COUNT(*) FILTER (WHERE media_type = 'STORY')::int AS stories
-      FROM posts
-      WHERE (${authorId ?? null}::uuid IS NULL OR user_id = ${authorId ?? null}::uuid)
+        SUM(CASE WHEN m.count > 0 THEN m.photos ELSE CASE WHEN p.media_type = 'PHOTO' THEN 1 ELSE 0 END END)::int AS photos,
+        SUM(CASE WHEN m.count > 0 THEN m.videos ELSE CASE WHEN p.media_type = 'VIDEO' THEN 1 ELSE 0 END END)::int AS videos,
+        COUNT(*) FILTER (WHERE p.media_type = 'STORY')::int AS stories
+      FROM posts p
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS count, COUNT(*) FILTER (WHERE media_type = 'PHOTO') AS photos,
+          COUNT(*) FILTER (WHERE media_type = 'VIDEO') AS videos
+        FROM post_media WHERE post_id = p.id
+      ) m ON true
+      WHERE (${authorId ?? null}::uuid IS NULL OR p.user_id = ${authorId ?? null}::uuid)
       GROUP BY 1, 2
       ORDER BY 1 NULLS LAST, 2 NULLS LAST
     `;
@@ -99,8 +105,15 @@ export class PlacesService {
       c.cities.sort((a, b) => a.city.localeCompare(b.city, 'ru'));
     }
 
-    return {
-      countries,
-    };
+    const totals = rows.reduce<PostTypeStats>(
+      (sum, row) => ({
+        posts: sum.posts + row.count,
+        photos: sum.photos + row.photos,
+        videos: sum.videos + row.videos,
+        stories: sum.stories + row.stories,
+      }),
+      { posts: 0, photos: 0, videos: 0, stories: 0 },
+    );
+    return { countries, totals };
   }
 }

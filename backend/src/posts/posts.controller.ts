@@ -57,8 +57,8 @@ export class PostsController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
   ) {
-    await this.posts.delete(id, user);
-    return { ok: true };
+    const result = await this.posts.delete(id, user);
+    return { ok: true, ...result };
   }
 
   @Post()

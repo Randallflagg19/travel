@@ -20,6 +20,7 @@ import { PlacesModule } from './places/places.module';
         PORT: Joi.number().port().default(3000),
         CORS_ORIGIN: Joi.string().allow('').default(''),
         DATABASE_URL: Joi.string().allow('').optional(),
+        DB_SSL: Joi.string().valid('require', 'disable').default('require'),
         DB_MIGRATE_ON_START: Joi.string()
           .valid('true', 'false')
           .default('false'),

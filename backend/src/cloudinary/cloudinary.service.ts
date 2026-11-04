@@ -241,9 +241,46 @@ export class CloudinaryService {
         'Cloudinary is not configured on the server',
       );
     }
-    await cloudinary.uploader.destroy(publicId, {
+    const result: unknown = await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType,
+      invalidate: true,
     });
+    const status = (result as { result?: string })?.result;
+    if (status !== 'ok' && status !== 'not found') {
+      throw new ServiceUnavailableException(
+        'Cloudinary did not confirm deletion',
+      );
+    }
+  }
+
+  async getUploadResource(publicId: string, resourceType: 'image' | 'video') {
+    this.getClientConfig();
+    try {
+      const result: unknown = await cloudinary.api.resource(publicId, {
+        resource_type: resourceType,
+        ...(resourceType === 'video' ? { media_metadata: true } : {}),
+      });
+      return result as {
+        public_id: string;
+        resource_type: string;
+        secure_url: string;
+        format: string;
+        bytes: number;
+        width: number;
+        height: number;
+        duration: number;
+      };
+    } catch (error) {
+      if (
+        (error as { error?: { http_code?: number }; http_code?: number })?.error
+          ?.http_code === 404 ||
+        (error as { http_code?: number })?.http_code === 404
+      )
+        return null;
+      throw new ServiceUnavailableException(
+        'Could not verify the uploaded file; retry',
+      );
+    }
   }
 
   private getSqlOrThrow(): Sql {
@@ -426,6 +463,15 @@ export class CloudinaryService {
     }> = [];
 
     const safeInsert = async (r: CloudinaryResource) => {
+      // Reserved files include unfinished uploads and every carousel attachment.
+      // They must never be imported again as independent posts.
+      const reserved = await sql`
+        SELECT 1 FROM post_media WHERE cloudinary_public_id = ${r.public_id}
+        UNION ALL SELECT 1 FROM media_uploads WHERE public_id = ${r.public_id}
+        UNION ALL SELECT 1 FROM media_deletions WHERE public_id = ${r.public_id}
+        LIMIT 1
+      `;
+      if (reserved.length) return;
       const mediaUrl = this.buildMediaUrl(r);
       if (!mediaUrl) {
         errors.push({

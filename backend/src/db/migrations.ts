@@ -1,11 +1,11 @@
 import type { Sql } from 'postgres';
 
-export async function runMigrations(sql: Sql) {
+export async function runMigrations(sql: Sql, insideTransaction = false) {
   // One transaction so we don't end up half-migrated.
-  await sql.begin(async (tx) => {
+  const migrate = async (tx: unknown) => {
     // postgres' TransactionSql type is not callable in TS due to Omit<Sql,...>,
     // but at runtime it works as a tagged template. Cast for TS.
-    const q = tx as unknown as Sql;
+    const q = tx as Sql;
 
     // UUID generation
     await q`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`;
@@ -247,5 +247,7 @@ export async function runMigrations(sql: Sql) {
       )
     `;
     await q`CREATE INDEX IF NOT EXISTS likes_post_id_idx ON likes (post_id)`;
-  });
+  };
+  if (insideTransaction) await migrate(sql);
+  else await sql.begin(migrate);
 }

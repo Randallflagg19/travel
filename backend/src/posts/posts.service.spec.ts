@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { MediaService } from '../cloudinary/media.service';
 import { DbService } from '../db/db.service';
 import { PostRow, PostsService } from './posts.service';
 
@@ -51,7 +52,14 @@ function createService(results: PostRow[][]) {
 
   const db = { client: sql } as unknown as DbService;
   const cloud = {} as CloudinaryService;
-  return { service: new PostsService(db, cloud), calls, sql };
+  const deletePost = jest.fn().mockResolvedValue({ pendingMediaDeletions: 0 });
+  const media = { deletePost } as unknown as MediaService;
+  return {
+    service: new PostsService(db, cloud, media),
+    calls,
+    sql,
+    deletePost,
+  };
 }
 
 function decodeCursor(cursor: string): Record<string, unknown> {
@@ -64,11 +72,11 @@ describe('PostsService pinning', () => {
   it('pins a post and returns its timestamp', async () => {
     const pinnedAt = '2026-09-20T07:15:00.000Z';
     const post = makePost({ pinned_at: pinnedAt });
-    const { service, calls } = createService([[post]]);
+    const { service, calls } = createService([[post], [post], []]);
 
     await expect(service.setPinned(post.id, true)).resolves.toEqual(post);
 
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(3);
     expect(calls[0]?.text).toContain(
       'SET pinned_at = CASE WHEN ?::boolean THEN now() ELSE NULL END',
     );
@@ -78,7 +86,7 @@ describe('PostsService pinning', () => {
 
   it('unpins a post', async () => {
     const post = makePost({ pinned_at: null });
-    const { service, calls } = createService([[post]]);
+    const { service, calls } = createService([[post], [post], []]);
 
     await expect(service.setPinned(post.id, false)).resolves.toEqual(post);
 
@@ -231,14 +239,14 @@ describe('PostsService author isolation', () => {
     expect(calls[0]?.values).toContain(authorId);
   });
 
-  it('refuses another author’s deletion before touching Cloudinary', async () => {
-    const { service, calls } = createService([
-      [makePost({ user_id: otherId })],
-    ]);
+  it('delegates deletion and its permission check to the durable media lifecycle', async () => {
+    const { service, calls, deletePost } = createService([]);
+    deletePost.mockRejectedValue(new ForbiddenException());
     await expect(service.delete(makePost().id, author)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(calls).toHaveLength(1);
+    expect(deletePost).toHaveBeenCalledWith(makePost().id, author);
+    expect(calls).toHaveLength(0);
   });
 
   it.each(['PHOTO', 'VIDEO'] as const)(
@@ -269,6 +277,69 @@ describe('PostsService author isolation', () => {
         cloudinaryPublicId: 'tapir/private-photo',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('Post metadata response', () => {
+  it('keeps dimension backfills of legacy single-media posts visible after migration', async () => {
+    const post = makePost({ media_width: 1600, media_height: 900 });
+    const legacyMedia = {
+      id: 'legacy-frame',
+      post_id: post.id,
+      upload_id: null,
+      position: 0,
+      media_type: 'PHOTO',
+      media_url: post.media_url,
+      cloudinary_public_id: post.cloudinary_public_id,
+      media_width: null,
+      media_height: null,
+    };
+    const { service } = createService([
+      [post],
+      [legacyMedia as unknown as PostRow],
+    ]);
+    await expect(service.getOrThrow(post.id)).resolves.toMatchObject({
+      attachments: [
+        { id: 'legacy-frame', media_width: 1600, media_height: 900 },
+      ],
+    });
+  });
+
+  it('returns real reactions and my like instead of the UPDATE row', async () => {
+    const existing = makePost();
+    const saved = makePost({
+      title: 'Updated',
+      like_count: 7,
+      comment_count: 3,
+      liked_by_me: true,
+    });
+    const { service } = createService([
+      [existing],
+      [makePost({ title: 'Updated' })],
+      [saved],
+      [],
+      [{ id: 'like' } as unknown as PostRow],
+    ]);
+    await expect(
+      service.updateMetadata(
+        saved.id,
+        { title: 'Updated' },
+        { sub: saved.user_id, role: 'ADMIN' },
+      ),
+    ).resolves.toMatchObject({
+      title: 'Updated',
+      like_count: 7,
+      comment_count: 3,
+      liked_by_me: true,
+    });
+  });
+
+  it('rejects non-object metadata bodies without making a query', async () => {
+    const { service, calls } = createService([]);
+    await expect(
+      service.updateMetadata(makePost().id, null as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(calls).toHaveLength(0);
   });
 });

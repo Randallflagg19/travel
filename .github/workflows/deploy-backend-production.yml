@@ -8,6 +8,11 @@ on:
         required: true
         default: main
         type: string
+      run_migrations:
+        description: Выполнить миграции БД (требуется отдельное подключение для миграций)
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: travel-backend-production
@@ -58,17 +63,42 @@ jobs:
       - name: Upload and activate release
         env:
           RELEASE_ID: ${{ steps.release.outputs.id }}
+          RUN_DB_MIGRATIONS: ${{ inputs.run_migrations && 'true' || 'false' }}
           VPS_HOST: ${{ secrets.TRAVEL_VPS_HOST }}
           VPS_USER: ${{ secrets.TRAVEL_VPS_USER }}
         run: |
           ssh "$VPS_USER@$VPS_HOST" 'mkdir -p ~/travel-backend/incoming ~/travel-backend/releases'
           scp "$RUNNER_TEMP/$RELEASE_ID.tar.gz" "$VPS_USER@$VPS_HOST:~/travel-backend/incoming/$RELEASE_ID.tar.gz"
-          ssh "$VPS_USER@$VPS_HOST" "RELEASE_ID=$RELEASE_ID bash -s" <<'REMOTE'
+          ssh "$VPS_USER@$VPS_HOST" "RELEASE_ID=$RELEASE_ID RUN_DB_MIGRATIONS=$RUN_DB_MIGRATIONS bash -s" <<'REMOTE'
             set -euo pipefail
             root="$HOME/travel-backend"; release="$root/releases/$RELEASE_ID"; archive="$root/incoming/$RELEASE_ID.tar.gz"
             previous=""
             if [ -L "$root/current" ]; then previous="$(readlink -f "$root/current")"; fi
-            mkdir -p "$release"; tar -xzf "$archive" -C "$release"; ln -sfn "$release" "$root/current"
+            mkdir -p "$release"; tar -xzf "$archive" -C "$release"
+            secrets_dir="$HOME/travel-secrets"
+            # systemd loads the DB file, then the backend file, over the unit environment.
+            /usr/bin/systemctl show travel-backend.service --property=Environment --value | node -e '
+              const { readFileSync } = require("node:fs");
+              const { parseEnv } = require("node:util");
+              const unitEnv = readFileSync(0, "utf8");
+              const files = process.argv.slice(1);
+              const settings = Object.assign({}, ...files.map(file => parseEnv(readFileSync(file, "utf8"))));
+              const inline = unitEnv.match(/(?:^|\s)DB_MIGRATE_ON_START=(true|false)(?=\s|$)/)?.[1];
+              if ((settings.DB_MIGRATE_ON_START ?? inline) !== "false") {
+                console.error("Set DB_MIGRATE_ON_START=false for travel-backend.service before deploying.");
+                process.exit(1);
+              }
+            ' "$secrets_dir/travel-prod-db.env" "$secrets_dir/travel-prod-backend.env"
+            if [ "${RUN_DB_MIGRATIONS:-false}" = "true" ]; then
+              migration_env="$secrets_dir/travel-prod-migrations.env"
+              if [ ! -r "$migration_env" ]; then
+                echo "Missing $migration_env. Apply migrations manually and leave run_migrations unchecked." >&2
+                exit 1
+              fi
+              echo "Applying database migrations before release activation"
+              env -u DATABASE_URL -u DB_SSL node --env-file="$migration_env" "$release/dist/db/migrate.js"
+            fi
+            ln -sfn "$release" "$root/current"
             if ! sudo /usr/bin/systemctl restart travel-backend.service; then
               if [ -n "$previous" ]; then
                 ln -sfn "$previous" "$root/current"

@@ -1,7 +1,6 @@
 /// <reference types="jest" />
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
-import { DbService } from '../db/db.service';
 import { CloudinaryService } from './cloudinary.service';
 
 jest.mock('cloudinary', () => ({
@@ -33,9 +32,7 @@ it('retrieves video duration when the ordinary Admin API response omits it', asy
     CLOUDINARY_API_KEY: 'test-key',
     CLOUDINARY_API_SECRET: 'test-secret',
   });
-  const service = new CloudinaryService(config, {
-    client: null,
-  } as unknown as DbService);
+  const service = new CloudinaryService(config);
 
   await expect(
     service.getUploadResource('travel/test/video', 'video'),

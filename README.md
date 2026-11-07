@@ -15,6 +15,7 @@ AUTHOR пока может публиковать только текстовы�
 
 `frontend`: Next.js App Router, React, TanStack Query; клиентская лента.
 `backend`: NestJS, PostgreSQL/postgres.js, JWT/Argon2, Cloudinary.
+Границы серверных модулей и проверки — в [backend/README](backend/README.md).
 `infra` и `.github/workflows`: шаблоны и ручной release deploy.
 После миграции PostgreSQL находится на новом VPS; комментарии о Neon устарели.
 

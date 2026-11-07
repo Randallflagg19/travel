@@ -6,7 +6,7 @@ import { AppService } from './app.service';
 import { DbModule } from './db/db.module';
 import { AuthModule } from './auth/auth.module';
 import { PostsModule } from './posts/posts.module';
-import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { ImportsModule } from './imports/imports.module';
 import { PlacesModule } from './places/places.module';
 
 @Module({
@@ -37,7 +37,7 @@ import { PlacesModule } from './places/places.module';
     DbModule,
     AuthModule,
     PostsModule,
-    CloudinaryModule,
+    ImportsModule,
     PlacesModule,
   ],
   controllers: [AppController],

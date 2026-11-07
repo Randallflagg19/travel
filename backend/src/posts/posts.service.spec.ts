@@ -5,10 +5,12 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
-import { MediaService } from '../cloudinary/media.service';
+import { CloudinaryService } from '../integrations/cloudinary/cloudinary.service';
+import { DeletePostService } from './delete-post.service';
+import { PostsQueryService } from './posts-query.service';
 import { DbService } from '../db/db.service';
-import { PostRow, PostsService } from './posts.service';
+import { PostsService } from './posts.service';
+import type { PostRow } from './post.types';
 
 type SqlCall = {
   text: string;
@@ -53,9 +55,9 @@ function createService(results: PostRow[][]) {
   const db = { client: sql } as unknown as DbService;
   const cloud = {} as CloudinaryService;
   const deletePost = jest.fn().mockResolvedValue({ pendingMediaDeletions: 0 });
-  const media = { deletePost } as unknown as MediaService;
+  const deletion = { deletePost } as unknown as DeletePostService;
   return {
-    service: new PostsService(db, cloud, media),
+    service: new PostsService(db, cloud, new PostsQueryService(db), deletion),
     calls,
     sql,
     deletePost,

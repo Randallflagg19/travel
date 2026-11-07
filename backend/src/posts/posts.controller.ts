@@ -16,7 +16,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthRoles } from '../auth/auth-roles.decorator';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import type { JwtUser } from '../auth/jwt-user.type';
-import { PostsService, type PostLayout } from './posts.service';
+import { PostsService } from './posts.service';
+import type { PostLayout } from './post.types';
 
 @Controller('posts')
 export class PostsController {

@@ -1,30 +1,16 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Post } from '@nestjs/common';
 import { AuthRoles } from '../auth/auth-roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtUser } from '../auth/jwt-user.type';
-import { CloudinaryService } from './cloudinary.service';
+import { CloudinaryImportService } from './cloudinary-import.service';
+import { MediaDimensionsBackfillService } from './media-dimensions-backfill.service';
 
 @Controller('admin/cloudinary')
-export class CloudinaryController {
-  constructor(private readonly cloud: CloudinaryService) {}
-
-  @Get('config')
-  @AuthRoles('ADMIN', 'SUPERADMIN')
-  config() {
-    return this.cloud.getClientConfig();
-  }
-
-  @Post('sign-upload')
-  @AuthRoles('ADMIN', 'SUPERADMIN')
-  signUpload(@Body() body: { paramsToSign?: Record<string, unknown> }) {
-    return this.cloud.signUpload(body.paramsToSign);
-  }
-
-  @Post('probe')
-  @AuthRoles('ADMIN', 'SUPERADMIN')
-  async probe(@Body() body: { prefix?: string }) {
-    return await this.cloud.probePrefix({ prefix: body.prefix ?? 'tapir/' });
-  }
+export class ImportsController {
+  constructor(
+    private readonly importer: CloudinaryImportService,
+    private readonly dimensions: MediaDimensionsBackfillService,
+  ) {}
 
   @Post('import')
   @AuthRoles('ADMIN', 'SUPERADMIN')
@@ -37,7 +23,7 @@ export class CloudinaryController {
       (user.email ? user.email.split('@')[0] : null) ??
       `user_${user.sub}`;
     const prefix = body.prefix ?? `${fallbackPrefix}/`;
-    return await this.cloud.importPrefix({
+    return await this.importer.importPrefix({
       prefix,
       userId: user.sub,
       max: body.max,
@@ -47,12 +33,12 @@ export class CloudinaryController {
   @Post('backfill-media-dimensions')
   @AuthRoles('ADMIN', 'SUPERADMIN')
   async backfillMediaDimensions(@Body() body: { max?: number }) {
-    return await this.cloud.backfillMediaDimensions({ max: body.max });
+    return await this.dimensions.backfillMediaDimensions({ max: body.max });
   }
 
   @Post('reset-media-dimensions-backfill')
   @AuthRoles('ADMIN', 'SUPERADMIN')
   async resetMediaDimensionsBackfill() {
-    return await this.cloud.resetMediaDimensionsBackfill();
+    return await this.dimensions.resetMediaDimensionsBackfill();
   }
 }

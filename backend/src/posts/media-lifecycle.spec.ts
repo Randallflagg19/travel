@@ -7,9 +7,13 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { DbService } from '../db/db.service';
-import { CloudinaryService } from './cloudinary.service';
-import { publicationBody } from './media-contract';
-import { MediaService } from './media.service';
+import { CloudinaryService } from '../integrations/cloudinary/cloudinary.service';
+import { publicationBody } from './media-publication.input';
+import { MediaSessionsService } from '../media/media-sessions.service';
+import { MediaCleanupService } from '../media/media-cleanup.service';
+import { MediaEnvironmentService } from '../media/media-environment.service';
+import { PublishMediaPostService } from './publish-media-post.service';
+import { DeletePostService } from './delete-post.service';
 
 const user = '00000000-0000-4000-8000-000000000010';
 const sessionId = '00000000-0000-4000-8000-000000000020';
@@ -37,7 +41,7 @@ const upload = {
   media_height: 80,
 };
 
-function setup(results: unknown[][]) {
+function setup(results: unknown[][], mediaEnvironment = 'test') {
   const queue = [...results];
   const calls: { text: string; values: unknown[] }[] = [];
   const sql = jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -55,14 +59,17 @@ function setup(results: unknown[][]) {
     destroy: jest.fn().mockResolvedValue(undefined),
   };
   const config = {
-    get: (key: string) => (key === 'MEDIA_ENVIRONMENT' ? 'test' : undefined),
+    get: (key: string) =>
+      key === 'MEDIA_ENVIRONMENT' ? mediaEnvironment : undefined,
   };
-  const service = new MediaService(
-    { client: sql } as unknown as DbService,
-    cloud as unknown as CloudinaryService,
-    config as ConfigService,
-  );
-  return { service, cloud, calls, begin };
+  const db = { client: sql } as unknown as DbService;
+  const storage = cloud as unknown as CloudinaryService;
+  const environment = new MediaEnvironmentService(config as ConfigService);
+  const cleanup = new MediaCleanupService(db, storage, environment);
+  const sessions = new MediaSessionsService(db, storage, environment, cleanup);
+  const publication = new PublishMediaPostService(db, sessions, cleanup);
+  const deletion = new DeletePostService(db, cleanup, environment);
+  return { publication, sessions, deletion, cleanup, cloud, calls, begin };
 }
 
 describe('Media publication contract', () => {
@@ -77,9 +84,9 @@ describe('Media publication contract', () => {
   ])(
     'rejects an invalid publication before opening a transaction: %j',
     async (body) => {
-      const { service, begin } = setup([]);
+      const { publication, begin } = setup([]);
       await expect(
-        service.publish(sessionId, user, body),
+        publication.publish(sessionId, user, body),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(begin).not.toHaveBeenCalled();
     },
@@ -87,9 +94,9 @@ describe('Media publication contract', () => {
 
   it('does not create a partial publication when any selected upload is missing', async () => {
     const other = '00000000-0000-4000-8000-000000000031';
-    const { service, calls } = setup([[session], [upload]]);
+    const { publication, calls } = setup([[session], [upload]]);
     await expect(
-      service.publish(sessionId, user, { uploadIds: [uploadId, other] }),
+      publication.publish(sessionId, user, { uploadIds: [uploadId, other] }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(calls.some((call) => call.text.includes('INSERT INTO posts'))).toBe(
       false,
@@ -103,13 +110,13 @@ describe('Media publication contract', () => {
       public_id: 'second',
       media_type: 'VIDEO',
     };
-    const { service, calls, begin } = setup([
+    const { publication, calls, begin } = setup([
       [session],
       [upload, second],
       [{ id: postId }],
     ]);
     await expect(
-      service.publish(sessionId, user, {
+      publication.publish(sessionId, user, {
         uploadIds: [second.id, uploadId],
         country: 'Thailand',
       }),
@@ -135,7 +142,7 @@ describe('Media publication contract', () => {
     const hash = createHash('sha256')
       .update(JSON.stringify(publicationBody(body)))
       .digest('hex');
-    const { service, calls } = setup([
+    const { publication, calls } = setup([
       [
         {
           ...session,
@@ -146,14 +153,14 @@ describe('Media publication contract', () => {
       ],
       [{ id: postId }],
     ]);
-    await expect(service.publish(sessionId, user, body)).resolves.toEqual({
+    await expect(publication.publish(sessionId, user, body)).resolves.toEqual({
       postId,
     });
     expect(calls.some((call) => call.text.includes('INSERT'))).toBe(false);
   });
 
   it('rejects different content under a published key', async () => {
-    const { service } = setup([
+    const { publication } = setup([
       [
         {
           ...session,
@@ -164,20 +171,20 @@ describe('Media publication contract', () => {
       ],
     ]);
     await expect(
-      service.publish(sessionId, user, { uploadIds: [uploadId] }),
+      publication.publish(sessionId, user, { uploadIds: [uploadId] }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('blocks another user before accessing Cloudinary', async () => {
-    const { service, cloud } = setup([[session]]);
+    const { sessions, cloud } = setup([[session]]);
     await expect(
-      service.complete(sessionId, uploadId, postId),
+      sessions.complete(sessionId, uploadId, postId),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(cloud.getUploadResource).not.toHaveBeenCalled();
   });
 
   it('recovers a previously uploaded file using its reserved public ID', async () => {
-    const { service, cloud } = setup([
+    const { sessions, cloud } = setup([
       [session],
       [{ ...upload, ready: false }],
       [session],
@@ -191,9 +198,11 @@ describe('Media publication contract', () => {
       width: 100,
       height: 80,
     });
-    await expect(service.complete(sessionId, uploadId, user)).resolves.toEqual({
-      ready: true,
-    });
+    await expect(sessions.complete(sessionId, uploadId, user)).resolves.toEqual(
+      {
+        ready: true,
+      },
+    );
     expect(cloud.getUploadResource).toHaveBeenCalledWith(
       upload.public_id,
       'image',
@@ -201,10 +210,10 @@ describe('Media publication contract', () => {
   });
 
   it('does not discard published files when cancelling after a lost publish response', async () => {
-    const { service, calls } = setup([
+    const { sessions, calls } = setup([
       [{ ...session, state: 'PUBLISHED', post_id: postId }],
     ]);
-    await expect(service.cancel(sessionId, user)).resolves.toEqual({ postId });
+    await expect(sessions.cancel(sessionId, user)).resolves.toEqual({ postId });
     expect(calls.some((call) => call.text.includes('media_deletions'))).toBe(
       false,
     );
@@ -212,10 +221,19 @@ describe('Media publication contract', () => {
 });
 
 describe('Durable media deletion', () => {
-  it('checks AUTHOR ownership before deleting the publication or touching Cloudinary', async () => {
-    const { service, cloud, calls } = setup([[{ user_id: postId }]]);
+  it('rejects an invalid environment before opening a deletion transaction', async () => {
+    const { deletion, calls, begin } = setup([], 'invalid');
     await expect(
-      service.deletePost(postId, { sub: user, role: 'AUTHOR' }),
+      deletion.deletePost(postId, { sub: user, role: 'ADMIN' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(begin).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('checks AUTHOR ownership before deleting the publication or touching Cloudinary', async () => {
+    const { deletion, cloud, calls } = setup([[{ user_id: postId }]]);
+    await expect(
+      deletion.deletePost(postId, { sub: user, role: 'AUTHOR' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(cloud.destroy).not.toHaveBeenCalled();
     expect(calls.some((call) => call.text.includes('DELETE FROM posts'))).toBe(
@@ -230,7 +248,7 @@ describe('Durable media deletion', () => {
       resource_type: name === 'second' ? 'video' : 'image',
       media_url: upload.media_url,
     }));
-    const { service, calls } = setup([
+    const { deletion, calls } = setup([
       [{ user_id: user, cloudinary_public_id: null }],
       resources,
       [],
@@ -241,7 +259,7 @@ describe('Durable media deletion', () => {
       [],
       [{ count: 3 }],
     ]);
-    await service.deletePost(postId, { sub: user, role: 'ADMIN' });
+    await deletion.deletePost(postId, { sub: user, role: 'ADMIN' });
     const queues = calls.filter((call) =>
       call.text.includes('INSERT INTO media_deletions'),
     );
@@ -264,9 +282,9 @@ describe('Durable media deletion', () => {
       resource_type: 'image',
       attempts: 0,
     };
-    const { service, cloud, calls } = setup([[], [job], []]);
+    const { cleanup, cloud, calls } = setup([[], [job], []]);
     cloud.destroy.mockRejectedValue(new Error('Temporary failure'));
-    await service.retryCleanup();
+    await cleanup.retryCleanup();
     const retry = calls.find((call) =>
       call.text.includes('attempts = attempts + 1'),
     )!;
@@ -285,13 +303,13 @@ describe('Durable media deletion', () => {
       resource_type: 'image',
       attempts: 0,
     };
-    const { service, cloud } = setup([[], [job], [{ exists: 1 }]]);
-    await service.retryCleanup();
+    const { cleanup, cloud } = setup([[], [job], [{ exists: 1 }]]);
+    await cleanup.retryCleanup();
     expect(cloud.destroy).not.toHaveBeenCalled();
   });
 
   it('blocks deletion of production files from a staging/test copy before queuing anything', async () => {
-    const { service, cloud, calls } = setup([
+    const { deletion, cloud, calls } = setup([
       [{ user_id: user, cloudinary_public_id: null }],
       [
         {
@@ -303,7 +321,7 @@ describe('Durable media deletion', () => {
       ],
     ]);
     await expect(
-      service.deletePost(postId, { sub: user, role: 'ADMIN' }),
+      deletion.deletePost(postId, { sub: user, role: 'ADMIN' }),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(cloud.destroy).not.toHaveBeenCalled();
     expect(
@@ -315,8 +333,8 @@ describe('Durable media deletion', () => {
   });
 
   it('cleans all reservations of an abandoned session, including uploads whose response was lost', async () => {
-    const { service, calls } = setup([[{ id: sessionId }], [], []]);
-    await service.retryCleanup();
+    const { cleanup, calls } = setup([[{ id: sessionId }], [], []]);
+    await cleanup.retryCleanup();
     const cancellation = calls.find((call) =>
       call.text.includes("SET state = 'CANCELLED'"),
     )!;

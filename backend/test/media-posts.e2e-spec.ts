@@ -5,8 +5,13 @@ import postgres, { type Sql } from 'postgres';
 import { DbService } from '../src/db/db.service';
 import { runMigrations } from '../src/db/migrations';
 import { runVersionedMigrations } from '../src/db/versioned-migrations';
-import { CloudinaryService } from '../src/cloudinary/cloudinary.service';
-import { MediaService } from '../src/cloudinary/media.service';
+import { CloudinaryService } from '../src/integrations/cloudinary/cloudinary.service';
+import { MediaSessionsService } from '../src/media/media-sessions.service';
+import { MediaCleanupService } from '../src/media/media-cleanup.service';
+import { MediaEnvironmentService } from '../src/media/media-environment.service';
+import { PublishMediaPostService } from '../src/posts/publish-media-post.service';
+import { DeletePostService } from '../src/posts/delete-post.service';
+import { PostsQueryService } from '../src/posts/posts-query.service';
 import { PostsService } from '../src/posts/posts.service';
 import { PlacesService } from '../src/places/places.service';
 
@@ -92,15 +97,17 @@ databaseTest(
       };
       const db = { client: sql } as unknown as DbService;
       const config = { get: () => 'test' } as unknown as ConfigService;
-      const media = new MediaService(
-        db,
-        cloud as unknown as CloudinaryService,
-        config,
-      );
+      const environment = new MediaEnvironmentService(config);
+      const storage = cloud as unknown as CloudinaryService;
+      const cleanup = new MediaCleanupService(db, storage, environment);
+      const media = new MediaSessionsService(db, storage, environment, cleanup);
+      const publisher = new PublishMediaPostService(db, media, cleanup);
+      const deletion = new DeletePostService(db, cleanup, environment);
       const posts = new PostsService(
         db,
-        cloud as unknown as CloudinaryService,
-        media,
+        storage,
+        new PostsQueryService(db),
+        deletion,
       );
       const session = randomUUID();
       const photo = randomUUID();
@@ -116,7 +123,7 @@ databaseTest(
       });
       await media.complete(session, photo, userId);
       await expect(
-        media.publish(session, userId, { uploadIds: [photo, video] }),
+        publisher.publish(session, userId, { uploadIds: [photo, video] }),
       ).rejects.toThrow();
       expect(await sql`SELECT id FROM posts`).toHaveLength(2);
       await media.complete(session, video, userId);
@@ -125,8 +132,26 @@ databaseTest(
         title: 'Carousel',
         country: 'Thailand',
       };
-      const first = await media.publish(session, userId, input);
-      const repeated = await media.publish(session, userId, input);
+      // Fail after the post and first attachment have already been inserted.
+      // Splitting services must not split this transaction into partial commits.
+      await sql`ALTER TABLE post_media ADD CONSTRAINT fixture_reject_second_attachment CHECK (position <> 1) NOT VALID`;
+      await expect(
+        publisher.publish(session, userId, input),
+      ).rejects.toMatchObject({ code: '23514' });
+      expect(await sql`SELECT id FROM posts`).toHaveLength(2);
+      expect(
+        await sql`SELECT id FROM post_media WHERE upload_id IN (${photo}::uuid, ${video}::uuid)`,
+      ).toHaveLength(0);
+      const [unpublished] =
+        await sql`SELECT state, post_id, publication_hash FROM media_sessions WHERE id = ${session}::uuid`;
+      expect(unpublished).toMatchObject({
+        state: 'OPEN',
+        post_id: null,
+        publication_hash: null,
+      });
+      await sql`ALTER TABLE post_media DROP CONSTRAINT fixture_reject_second_attachment`;
+      const first = await publisher.publish(session, userId, input);
+      const repeated = await publisher.publish(session, userId, input);
       expect(repeated).toEqual(first);
       expect(await sql`SELECT id FROM posts`).toHaveLength(3);
       const publication = await posts.getOrThrow(first.postId);
@@ -154,7 +179,7 @@ databaseTest(
       });
 
       cloud.destroy.mockRejectedValueOnce(new Error('Temporary cloud failure'));
-      await media.deletePost(first.postId, { sub: userId, role: 'ADMIN' });
+      await deletion.deletePost(first.postId, { sub: userId, role: 'ADMIN' });
       expect(
         await sql`SELECT id FROM posts WHERE id = ${first.postId}`,
       ).toHaveLength(0);
@@ -168,7 +193,7 @@ databaseTest(
       ).toBe(true);
       // Advance only these fixture jobs past the signature safety interval.
       await sql`UPDATE media_deletions SET next_attempt_at = now(), retain_until = now()`;
-      await media.retryCleanup();
+      await cleanup.retryCleanup();
       expect(await sql`SELECT id FROM media_deletions`).toHaveLength(0);
       expect(cloud.destroy).toHaveBeenCalledWith(
         expect.stringContaining(video),

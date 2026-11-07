@@ -1,84 +1,96 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Travel backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS, PostgreSQL/postgres.js, JWT/Argon2 и Cloudinary. Общие инструкции запуска,
+окружений и миграций — в [README проекта](../README.md).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Границы модулей
 
-## Description
+| Каталог | Ответственность |
+| --- | --- |
+| `posts` | Чтение и изменение публикаций, координация публикации медиа и удаления поста, лайки и комментарии. |
+| `media` | Сессии загрузки, проверка готовности файлов, очередь удаления, периодическая очистка и границы окружений. |
+| `imports` | Импорт существующей медиатеки и дозаполнение размеров старых публикаций. |
+| `integrations/cloudinary` | SDK, подпись загрузки, ресурсы, каталог папок и декодирование метаданных Cloudinary. |
+| `db` | Подключение к PostgreSQL и версионные миграции. |
+| `auth`, `users`, `places` | Авторизация, пользователи и сводка мест журнала. |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Зависимости Nest-модулей:
 
-## Project setup
-
-```bash
-$ yarn install
+```text
+PostsModule ────→ MediaModule ────→ CloudinaryModule
+       └────────────────────────→ CloudinaryModule
+ImportsModule ──────────────────→ CloudinaryModule
 ```
 
-## Compile and run the project
+`CloudinaryModule` не зависит от БД и модулей публикаций, загрузки или импорта.
+`MediaModule` не импортирует `PostsModule`: создание и удаление публикации
+координируются со стороны `posts`.
 
-```bash
-# development
-$ yarn run start
+В `posts` чтение с пагинацией и дополнением вложений находится в
+`PostsQueryService`; изменения текста, оформления и закрепления — в
+`PostsService`. `PublishMediaPostService` создаёт публикацию из готовых загрузок,
+`DeletePostService` удаляет публикацию с постановкой файлов в очередь очистки.
 
-# watch mode
-$ yarn run start:dev
+В `media` `MediaSessionsService` ведёт загрузки, `MediaCleanupService` хранит и
+обрабатывает задания удаления. `MediaCleanupWorker` отвечает за минутный таймер
+и останавливает его при закрытии приложения. Общий экземпляр сервиса очистки
+используется запросами API и обработчиком расписания.
 
-# production mode
-$ yarn run start:prod
+## Транзакционные гарантии
+
+- Создание поста, всех его вложений, отметка сессии о публикации и очередь
+  неиспользованных файлов выполняются в одной транзакции PostgreSQL.
+- Повтор публикации с тем же содержимым возвращает прежний `postId`.
+- Отмена после потерянного ответа публикации не удаляет уже опубликованные файлы.
+- Постановка файлов в очередь и удаление поста выполняются в одной транзакции.
+  Проверка владельца, аккаунта Cloudinary и окружения происходит до удаления.
+- Удаление из Cloudinary выполняется после фиксации удаления поста. Сбой сохраняет
+  задание для повторной попытки; используемые другими записями файлы сохраняются.
+- Импорт пропускает вложения каруселей, зарезервированные загрузки и файлы,
+  ожидающие удаления. Ошибка пакетного чтения размеров не отмечает записи как
+  окончательно недоступные.
+
+Методы `lockForUser` и `queueUnused`/`queueResource` получают транзакцию от
+координирующего сценария. Вложенные транзакции или отдельные подключения внутри
+них нарушили бы эти гарантии.
+
+## Совместимость API
+
+Адреса API сохранены. При стандартном префиксе `/api`:
+
+| Адрес | Владелец обработчика |
+| --- | --- |
+| `/api/posts` и `/api/posts/:id` | `posts` |
+| `/api/media/sessions/:id/publish` | `posts` |
+| Остальные `/api/media/sessions/*`, `/api/media/cleanup*` | `media` |
+| `/api/admin/cloudinary/import`, `backfill-media-dimensions`, `reset-media-dimensions-backfill` | `imports` |
+| `/api/admin/cloudinary/config`, `sign-upload`, `probe` | `integrations/cloudinary` |
+
+Рефакторинг модулей не требует миграции БД или изменения frontend.
+
+## Проверки
+
+Из каталога `backend`, после `yarn install --frozen-lockfile`:
+
+```sh
+yarn lint
+yarn test --runInBand
+yarn build
 ```
 
-## Run tests
+Обычные тесты не требуют Cloudinary или рабочей БД. `module-routing.spec.ts`
+поднимает локальный HTTP-сервер, проверяет сборку модулей, прежние маршруты и
+ограничения ролей. Файлы `.env` в этом наборе не загружаются.
 
-```bash
-# unit tests
-$ yarn run test
+Проверка транзакций и совместимости схемы запускается отдельно, только с явно
+переданным `MEDIA_TEST_DATABASE_URL` на выделенную тестовую БД:
 
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
+```sh
+yarn test:e2e --runInBand --runTestsByPath test/media-posts.e2e-spec.ts
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Для локальной БД без TLS дополнительно задать `MEDIA_TEST_DB_SSL=disable`.
+Тест создаёт и удаляет собственную схему, проверяет повтор миграций, публикацию,
+откат при ошибке второго вложения, отсутствие дубликатов и повторную очистку.
+`DATABASE_URL` и `.env` приложения он не использует. Старый `app.e2e-spec.ts`
+импортирует `AppModule`; общий запуск e2e требует отдельно проверенного окружения.

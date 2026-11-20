@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { useAuth } from "@/entities/session/model/auth";
+import { useAuth } from "@/entities/session";
 import { z } from "zod";
 
 const LoginSchema = z.object({

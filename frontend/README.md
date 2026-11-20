@@ -44,6 +44,17 @@ features организуют widgets и страница; общий предм
 
 ## Проверки
 
+Для обычного локального запуска владелец выбрал production API:
+`NEXT_PUBLIC_API_URL=/api-proxy`,
+`API_PROXY_TARGET=https://api.tapir.su/api` в локальном `.env.local`.
+Изменение цели прокси требует перезапуска dev-сервера. Настройка `.env.local`
+не входит в Git и не определяет API выпуска: staging workflow задаёт свой адрес.
+Тестовый автор `review_author_20261120` существует только на staging.
+
+Контрольное чтение 20 ноября: маршрут медиасессий существует на staging, а на
+production возвращает 404. Поэтому проверка новых медиапубликаций требует backend,
+поддерживающего этот API. Ручная приёмка текущего frontend выполнена со staging API.
+
 ```sh
 npm ci
 npm run lint

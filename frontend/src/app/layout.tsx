@@ -6,11 +6,10 @@ import {
   Lora,
 } from "next/font/google";
 import "./globals.css";
-import { PlacesSidebar } from "@/features/places/ui/places-sidebar";
+import { JournalSidebar } from "@/widgets/journal-sidebar";
 import { Suspense } from "react";
-import { MobileHeader } from "@/features/layout/ui/mobile-header";
+import { MobileHeader, DesktopHeader } from "@/widgets/site-header";
 import { Providers } from "./providers";
-import { DesktopHeader } from "@/features/layout/ui/desktop-header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -92,7 +91,7 @@ export default function RootLayout({
                 <Suspense
                   fallback={<div className="h-dvh border-r border-white/10" />}
                 >
-                  <PlacesSidebar />
+                  <JournalSidebar />
                 </Suspense>
               </aside>
               <main className="min-w-0 overflow-x-hidden">{children}</main>

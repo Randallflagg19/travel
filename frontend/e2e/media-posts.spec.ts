@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { ApiPost, ApiPostMedia } from "../src/shared/api/api";
-import { selectFeedMediaStats } from "../src/features/feed/model/feed-media-stats";
+import { selectFeedMediaStats } from "../src/_pages/journal/model/journal-media-stats";
 
 const browserErrors = new WeakMap<Page, string[]>();
 test.beforeEach(({ page }) => {

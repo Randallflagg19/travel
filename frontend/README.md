@@ -1,59 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Travel frontend
 
-## Getting Started
+Next.js App Router, React, TanStack Query. Общие настройки и окружения — в
+[README проекта](../README.md).
 
-First, run the development server:
+## Разделение ответственности и FSD
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Зависимости направлены сверху вниз:
+
+```text
+app → _pages → widgets → features → entities → shared
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`src/app` содержит маршруты Next.js, провайдеры и общий layout. `_pages` — слой
+страниц FSD; префикс позволяет избежать конфликта с Pages Router Next.js.
+Публичный API каждого слайса — его `index.ts` с явными экспортами. Внешние
+потребители используют этот API, внутренние файлы — относительные импорты.
 
-## E2E tests (Playwright)
+| Слайс | Ответственность |
+| --- | --- |
+| `_pages/journal` | Сборка страницы журнала: лента, навигация, просмотрщик, диалоги и координация обновлений кэша. |
+| `widgets/post-feed` | Загрузка страниц публикаций, сетка и карточки с подключением пользовательских действий. |
+| `widgets/site-header` | Мобильная и настольная шапки; передача выбранного контекста в создание публикации. |
+| `widgets/journal-sidebar` | Боковая панель с выбором автора, местами и административными действиями. |
+| `features/journal-navigation` | URL журнала, автор, страна/город, порядок, режим удаления, переходы и элементы выбора места. |
+| `features/media-viewer` | Навигация по кадрам и публикациям, предзагрузка, диалог, фото, видео и управление плеером. |
+| `features/create-post` | Создание медиапубликации и истории; контекст журнала приходит через props. |
+| `features/manage-post`, `comments`, `like-post`, `grant-author-role` | Соответствующие действия пользователя и их интерфейсы. |
+| `entities/author`, `place`, `post`, `session` | Общие запросы авторов/мест, представление автора, вложения/миниатюры, сессия. |
 
-1. Install browsers (once): `npx playwright install chromium`
-2. Start the app (e.g. `npm run dev` or `npm run build && npm run start`) and ensure the backend is reachable.
-3. Run tests: `npm run test:e2e`
+Соседние слайсы одного слоя не импортируют друг друга. Совместное использование
+features организуют widgets и страница; общий предметный код находится в entities.
+Эти ограничения, включая относительные импорты и динамический `import()`,
+проверяет правило `fsd/boundaries` в обычном `npm run lint`.
 
-Tests 1–4 run without auth. Test 5 (like persists after refresh) requires env vars: `E2E_TEST_LOGIN` and `E2E_TEST_PASSWORD` (set in `.env.local` or shell); if unset, test 5 is skipped.
+Смена автора сбрасывает предыдущее место и режим удаления. Сортировка и выбор места
+сохраняют автора. Главный журнал загружается до косметического изменения URL;
+неизвестный автор ждёт очистки старых фильтров. Управление URL само по себе не
+запрашивает список авторов: отдельный хук маршрутов используется элементами выбора.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Общий HTTP-клиент и транспортные типы пока остаются в `shared/api/api.ts`.
+Разделение предметных API, структурированные ошибки, нормализация модели поста и
+выделение процесса публикации из формы — следующие отдельные этапы.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to load its fonts.
+## Проверки
 
-## Learn More
+```sh
+npm ci
+npm run lint
+npm run test:architecture
+npx tsc --noEmit
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+Сборке нужны `NEXT_PUBLIC_API_URL` и доступ к Google Fonts. Значения
+`NEXT_PUBLIC_API_URL` и `NEXT_PUBLIC_SITE_URL` фиксируются при сборке.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Для браузерных проверок с моками собрать с `NEXT_PUBLIC_API_URL=/api-proxy` и
+`API_PROXY_TARGET=http://127.0.0.1:9/api`, затем запустить приложение локально.
+Так незамоканный запрос не попадёт в рабочий API. Для выбранного локального адреса
+задать `PLAYWRIGHT_BASE_URL`, например `http://127.0.0.1:3417`:
 
-## Deploy to VPS
+```sh
+npx playwright test e2e/author-loading.spec.ts e2e/feed-selection.spec.ts e2e/feed-responsive.spec.ts e2e/media-posts.spec.ts
+```
 
-GitHub Actions builds the standalone frontend and deploys it to the VPS:
+Наборы проверяют выбор автора и историю браузера, контекст места, мобильную и
+настольную ленту, создание, повторы загрузки, карусель, реакции, редактирование и
+удаление. `smoke.spec.ts` использует настоящий API и может входить в аккаунт и
+менять лайки; его запускают отдельно на согласованном тестовом окружении.
 
-- Production: `.github/workflows/deploy-frontend-production.yml`, site `https://www.tapir.su`.
-- Staging: `.github/workflows/deploy-frontend-staging.yml`, site `https://staging.tapir.su`.
+## Выпуск
 
-Both workflows set `NEXT_PUBLIC_SITE_URL` at build time. This is the base URL
-for Open Graph and Twitter metadata, including the image routes in `src/app`.
-Local builds default to `https://www.tapir.su`; set `NEXT_PUBLIC_SITE_URL` to
-build for another origin. Changing the variable requires rebuilding the frontend.
+Ручные сценарии GitHub Actions:
 
-The preview images are `src/app/opengraph-image.jpg` and
-`src/app/twitter-image.jpg` (1200 × 630 JPEG, 88,775 bytes each). Next.js derives image URLs,
-types and dimensions from these files; accompanying `.alt.txt` files supply
-the descriptions. Keep image metadata in these files rather than duplicating
-it in `layout.tsx`. Verify the generated HTML and the image URLs
-after deployment, then check a real link preview in Telegram.
+- Production: `.github/workflows/deploy-frontend-production.yml`.
+- Staging: `.github/workflows/deploy-frontend-staging.yml`.
 
-The previous PNG images remain in `public/opengraph-image.png` and
-`public/twitter-image.png` so previously shared image URLs still work.
-Only the JPEG files in `src/app` define the current social image metadata.
+Предпросмотр ссылок задают `src/app/opengraph-image.jpg` и `twitter-image.jpg` с
+сопровождающими `.alt.txt`. Старые PNG в `public` сохраняются для ранее
+опубликованных ссылок. Изменение модулей frontend не требует миграции БД.

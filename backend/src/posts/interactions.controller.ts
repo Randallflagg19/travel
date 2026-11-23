@@ -6,7 +6,6 @@ import {
   ParseUUIDPipe,
   Param,
   Post,
-  ForbiddenException,
 } from '@nestjs/common';
 import { AuthRoles } from '../auth/auth-roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -58,10 +57,7 @@ export class InteractionsController {
     @CurrentUser() user: JwtUser,
     @Body() body: { text?: string },
   ) {
-    const post = await this.posts.getOrThrow(id);
-    if (user.role === 'AUTHOR' && post.user_id !== user.sub) {
-      throw new ForbiddenException('You can only comment on your own post');
-    }
+    await this.posts.getOrThrow(id);
     const comment = await this.comments.create(id, user.sub, body.text ?? '');
     return { comment };
   }

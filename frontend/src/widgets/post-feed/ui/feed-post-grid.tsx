@@ -108,7 +108,7 @@ export function FeedPostGrid({
             onPhotoPreviewReady={onPhotoPreviewReady}
             showPlaceInCard={showPlaceInCard}
             canLike={canLike}
-            canComment={canComment && (user?.role !== "AUTHOR" || user.id === post.user_id)}
+            canComment={canComment}
             isCommentsOpen={commentsPostId === post.id}
             currentUserId={user?.id ?? null}
             accessToken={accessToken}

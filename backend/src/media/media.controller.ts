@@ -29,7 +29,7 @@ export class MediaController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
   ) {
-    return this.media.open(id, user.sub);
+    return this.media.open(id, user);
   }
 
   @Put('sessions/:id/uploads/:uploadId')

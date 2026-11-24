@@ -14,6 +14,7 @@ import { DeletePostService } from '../src/posts/delete-post.service';
 import { PostsQueryService } from '../src/posts/posts-query.service';
 import { PostsService } from '../src/posts/posts.service';
 import { PlacesService } from '../src/places/places.service';
+import { AuthorCloudinaryService } from '../src/users/author-cloudinary.service';
 
 // Opt-in only. Never uses DATABASE_URL or the application's .env file.
 const url = process.env.MEDIA_TEST_DATABASE_URL;
@@ -68,6 +69,8 @@ databaseTest(
         '001_legacy',
         '002_media_posts',
         '003_author_cloudinary_connections',
+        '004_author_cloudinary_sessions',
+        '005_author_media',
       ]);
       expect(
         await sql`SELECT * FROM post_media WHERE post_id = ${oldId}`,
@@ -105,8 +108,20 @@ databaseTest(
       const config = { get: () => 'test' } as unknown as ConfigService;
       const environment = new MediaEnvironmentService(config);
       const storage = cloud as unknown as CloudinaryService;
-      const cleanup = new MediaCleanupService(db, storage, environment);
-      const media = new MediaSessionsService(db, storage, environment, cleanup);
+      const authorCloud = new AuthorCloudinaryService(db, config);
+      const cleanup = new MediaCleanupService(
+        db,
+        storage,
+        environment,
+        authorCloud,
+      );
+      const media = new MediaSessionsService(
+        db,
+        storage,
+        environment,
+        cleanup,
+        authorCloud,
+      );
       const publisher = new PublishMediaPostService(db, media, cleanup);
       const deletion = new DeletePostService(db, cleanup, environment);
       const posts = new PostsService(
@@ -118,7 +133,7 @@ databaseTest(
       const session = randomUUID();
       const photo = randomUUID();
       const video = randomUUID();
-      await media.open(session, userId);
+      await media.open(session, { sub: userId, role: 'ADMIN' });
       await media.reserve(session, photo, userId, {
         mediaType: 'PHOTO',
         bytes: 1024,
@@ -204,10 +219,12 @@ databaseTest(
       expect(cloud.destroy).toHaveBeenCalledWith(
         expect.stringContaining(video),
         'video',
+        undefined,
       );
       expect(cloud.destroy).toHaveBeenCalledWith(
         expect.stringContaining(photo),
         'image',
+        undefined,
       );
     }, 30000);
   },

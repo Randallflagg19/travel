@@ -51,10 +51,12 @@ export class DeletePostService {
           public_id: string;
           resource_type: MediaDeletion['resource_type'];
           media_url: string;
+          author_user_id: string | null;
         }[]
       >`
-        SELECT cloud_name, cloudinary_public_id AS public_id, resource_type, media_url FROM post_media
-        WHERE post_id = ${id}::uuid AND cloudinary_public_id IS NOT NULL
+        SELECT m.cloud_name, m.cloudinary_public_id AS public_id, m.resource_type, m.media_url, u.author_user_id
+        FROM post_media m LEFT JOIN media_uploads u ON u.id = m.upload_id
+        WHERE m.post_id = ${id}::uuid AND m.cloudinary_public_id IS NOT NULL
       `;
       if (
         post.cloudinary_public_id &&
@@ -67,6 +69,7 @@ export class DeletePostService {
           public_id: post.cloudinary_public_id,
           resource_type: post.media_type === 'PHOTO' ? 'image' : 'video',
           media_url: post.media_url,
+          author_user_id: null,
         });
       }
       for (const resource of resources) {

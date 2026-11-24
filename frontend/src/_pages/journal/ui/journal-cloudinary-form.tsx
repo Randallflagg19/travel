@@ -57,20 +57,23 @@ export function JournalCloudinaryForm({
       <details className="rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-sm">
         <summary className="cursor-pointer font-medium">Где найти ключи?</summary>
         <p className="mt-2 text-amber-50/80">
-          На Dashboard нажми <strong>Go to API Keys</strong>, затем <strong>Generate New API Key</strong>.
+          Войди в свой аккаунт Cloudinary или зарегистрируйся. На странице <strong>API Keys</strong> скопируй <strong>Cloud name</strong> вверху.
+        </p>
+        <p className="mt-2 text-amber-50/80">
+          Если у тебя уже есть ключ для Travel, скопируй <strong>API key</strong> и <strong>API secret</strong> из одной строки. Иначе нажми <strong>Generate New API Key</strong> и создай ключ для Travel.
         </p>
         <div className="mt-3 rounded-md border border-white/15 bg-black/20 p-3 text-amber-50/80">
-          <p className="font-medium">Product Environment</p>
-          <p className="mt-1">Cloud name <code className="ml-1 text-amber-100">example-travel</code></p>
+          <p className="font-medium">API Keys</p>
+          <p className="mt-1">Cloud name <code className="ml-1 text-sky-300">example-travel</code></p>
         </div>
       </details>
       <a
-        href="https://console.cloudinary.com/"
+        href="https://console.cloudinary.com/app/settings/api-keys"
         target="_blank"
         rel="noopener noreferrer"
         className="inline-block text-sm font-medium text-amber-200 underline underline-offset-4 hover:text-amber-100"
       >
-        Открыть консоль Cloudinary
+        Открыть API Keys в Cloudinary
       </a>
       <label className="block text-sm text-amber-50/80">
         Cloud name

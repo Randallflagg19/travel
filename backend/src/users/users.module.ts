@@ -7,6 +7,6 @@ import { AuthorCloudinaryService } from './author-cloudinary.service';
 @Module({
   providers: [UsersService, AuthorCloudinaryService],
   controllers: [UsersController, AuthorsController],
-  exports: [UsersService],
+  exports: [UsersService, AuthorCloudinaryService],
 })
 export class UsersModule {}

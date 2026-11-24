@@ -5,7 +5,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
-import { createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
+import { v2 as cloudinary } from 'cloudinary';
+import {
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  randomUUID,
+} from 'node:crypto';
 import type { Server } from 'node:http';
 import postgres, { type Sql } from 'postgres';
 import request from 'supertest';
@@ -13,6 +19,7 @@ import { AuthModule } from '../src/auth/auth.module';
 import { DbModule } from '../src/db/db.module';
 import { DbService } from '../src/db/db.service';
 import { runVersionedMigrations } from '../src/db/versioned-migrations';
+import { PostsModule } from '../src/posts/posts.module';
 
 const databaseUrl = process.env.AUTHOR_CLOUDINARY_TEST_DATABASE_URL;
 const databaseTest = databaseUrl ? describe : describe.skip;
@@ -45,6 +52,7 @@ databaseTest('Author Cloudinary connections', () => {
         ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
         DbModule,
         AuthModule,
+        PostsModule,
       ],
     })
       .overrideProvider(ConfigService)
@@ -273,5 +281,272 @@ databaseTest('Author Cloudinary connections', () => {
       SELECT user_id FROM author_cloudinary_connections WHERE user_id = ${userId}
     `;
     expect(connections).toHaveLength(0);
+  });
+
+  it('binds each media session to the cloud active on its first open', async () => {
+    const authorId = randomUUID();
+    const originalSession = randomUUID();
+    const nextSession = randomUUID();
+    await sql`
+      INSERT INTO users (id, username, password_hash, role)
+      VALUES (${authorId}, 'media-author', 'unused', 'AUTHOR')
+    `;
+    const token = await jwt.signAsync({ sub: authorId });
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() =>
+        Promise.resolve(Response.json({ status: 'ok' })),
+      );
+    const open = (id: string) =>
+      request(app.getHttpServer())
+        .put(`/api/media/sessions/${id}`)
+        .auth(token, { type: 'bearer' });
+    const save = (cloudName: string, apiKey: string) =>
+      request(app.getHttpServer())
+        .put(endpoint)
+        .auth(token, { type: 'bearer' })
+        .send({ cloudName, apiKey, apiSecret: 'fixture-api-secret' })
+        .expect(200, { connected: true, cloudName });
+
+    await open(originalSession).expect(403);
+    await save('fixture-cloud-a', 'old-key');
+    await open(originalSession).expect(200);
+    await save('fixture-cloud-a', 'replacement-key');
+    await save('fixture-cloud-b', 'new-cloud-key');
+    await open(originalSession).expect(200);
+    await open(nextSession).expect(200);
+
+    const sessions = await sql`
+      SELECT s.id, s.author_cloud_name, c.is_active, c.api_key
+      FROM media_sessions s
+      JOIN author_cloudinary_connections c
+        ON (s.user_id, s.author_cloud_name) = (c.user_id, c.cloud_name)
+      WHERE s.user_id = ${authorId}::uuid
+      ORDER BY s.author_cloud_name
+    `;
+    expect([...sessions]).toEqual([
+      {
+        id: originalSession,
+        author_cloud_name: 'fixture-cloud-a',
+        is_active: false,
+        api_key: 'replacement-key',
+      },
+      {
+        id: nextSession,
+        author_cloud_name: 'fixture-cloud-b',
+        is_active: true,
+        api_key: 'new-cloud-key',
+      },
+    ]);
+  });
+
+  it('publishes and retries deletion in the original cloud after the active cloud changes', async () => {
+    const authorId = randomUUID();
+    const adminId = randomUUID();
+    const sessionId = randomUUID();
+    const uploadId = randomUUID();
+    const nextSession = randomUUID();
+    await sql`
+      INSERT INTO users (id, username, password_hash, role) VALUES
+        (${authorId}, 'cloud-switch-author', 'unused', 'AUTHOR'),
+        (${adminId}, 'cloud-switch-admin', 'unused', 'ADMIN')
+    `;
+    const token = await jwt.signAsync({ sub: authorId });
+    const adminToken = await jwt.signAsync({ sub: adminId });
+    const secret = 'fixture-a-secret';
+    const pngBytes = 1200;
+    const photoLimit = 5000;
+    const api = request(app.getHttpServer());
+    const provider = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((url) => {
+        const pathname = new URL(url instanceof Request ? url.url : url)
+          .pathname;
+        if (pathname.endsWith('/ping'))
+          return Promise.resolve(Response.json({ status: 'ok' }));
+        if (pathname.endsWith('/usage')) {
+          return Promise.resolve(
+            Response.json({
+              media_limits: { image_max_size_bytes: photoLimit },
+            }),
+          );
+        }
+        return Promise.reject(new Error('Unexpected Cloudinary request'));
+      });
+    const save = (cloudName: string, apiKey: string, apiSecret: string) =>
+      api
+        .put(endpoint)
+        .auth(token, { type: 'bearer' })
+        .send({ cloudName, apiKey, apiSecret })
+        .expect(200);
+    const open = (id: string) =>
+      api
+        .put(`/api/media/sessions/${id}`)
+        .auth(token, { type: 'bearer' })
+        .expect(200);
+    const reserve = (id: string, fileId: string, bytes: number) =>
+      api
+        .put(`/api/media/sessions/${id}/uploads/${fileId}`)
+        .auth(token, { type: 'bearer' })
+        .send({ mediaType: 'PHOTO', bytes });
+
+    await save('fixture-run-a', 'key-a', secret);
+    await open(sessionId);
+    await save('fixture-run-b', 'key-b', 'fixture-b-secret');
+    await reserve(sessionId, randomUUID(), photoLimit + 1).expect(400);
+    const { body: signed } = (await reserve(
+      sessionId,
+      uploadId,
+      pngBytes,
+    ).expect(200)) as {
+      body: {
+        cloudName: string;
+        apiKey: string;
+        signature: string;
+        timestamp: number;
+        params: { public_id: string };
+      };
+    };
+    const publicId = signed.params.public_id;
+    const signature = createHash('sha1')
+      .update(
+        `overwrite=false&public_id=${publicId}&timestamp=${signed.timestamp}${secret}`,
+      )
+      .digest('hex');
+    expect(signed).toMatchObject({
+      cloudName: 'fixture-run-a',
+      apiKey: 'key-a',
+      signature,
+    });
+    expect(JSON.stringify(signed)).not.toContain(secret);
+    expect(provider).toHaveBeenCalledWith(
+      'https://api.cloudinary.com/v1_1/fixture-run-a/usage',
+      expect.objectContaining({
+        headers: {
+          Authorization: `Basic ${Buffer.from(`key-a:${secret}`).toString('base64')}`,
+        },
+      }),
+    );
+
+    const mediaUrl = `https://res.cloudinary.com/fixture-run-a/image/upload/${publicId}.png`;
+    const resource = {
+      public_id: publicId,
+      resource_type: 'image',
+      secure_url: mediaUrl,
+      format: 'png',
+      bytes: pngBytes,
+      width: 80,
+      height: 60,
+    };
+    const metadata = jest
+      .spyOn(cloudinary.api, 'resource')
+      .mockResolvedValueOnce({ ...resource, bytes: photoLimit + 1 })
+      .mockResolvedValue(resource);
+    const complete = () =>
+      api
+        .post(`/api/media/sessions/${sessionId}/uploads/${uploadId}/complete`)
+        .auth(token, { type: 'bearer' });
+    await complete().expect(400);
+    await complete().expect(201, { ready: true });
+    expect(metadata).toHaveBeenLastCalledWith(publicId, {
+      cloud_name: 'fixture-run-a',
+      api_key: 'key-a',
+      api_secret: secret,
+      resource_type: 'image',
+    });
+    const {
+      body: { postId },
+    } = (await api
+      .post(`/api/media/sessions/${sessionId}/publish`)
+      .auth(token, { type: 'bearer' })
+      .send({ uploadIds: [uploadId] })
+      .expect(201)) as { body: { postId: string } };
+    await api
+      .get(`/api/posts/${postId}`)
+      .expect(200)
+      .expect(({ body }: { body: unknown }) => {
+        expect(body).toMatchObject({
+          post: { media_url: mediaUrl, media_width: 80, media_height: 60 },
+        });
+      });
+
+    await open(nextSession);
+    const { body: nextUpload } = (await reserve(
+      nextSession,
+      randomUUID(),
+      pngBytes,
+    ).expect(200)) as { body: { params: { public_id: string } } };
+    expect(nextUpload).toMatchObject({
+      cloudName: 'fixture-run-b',
+      apiKey: 'key-b',
+    });
+
+    const destroy = jest
+      .spyOn(cloudinary.uploader, 'destroy')
+      .mockRejectedValueOnce({ http_code: 401, message: secret })
+      .mockResolvedValue({ result: 'ok' });
+    await api
+      .delete(`/api/posts/${postId}`)
+      .auth(token, { type: 'bearer' })
+      .expect(200, { ok: true, pendingMediaDeletions: 1 });
+    expect(destroy).toHaveBeenCalledWith(
+      publicId,
+      expect.objectContaining({
+        cloud_name: 'fixture-run-a',
+        api_key: 'key-a',
+      }),
+    );
+    const [job] =
+      await sql`SELECT cloud_name, author_user_id, attempts, last_error FROM media_deletions WHERE public_id = ${publicId}`;
+    expect(job).toMatchObject({
+      cloud_name: 'fixture-run-a',
+      author_user_id: authorId,
+      attempts: 1,
+    });
+    expect(JSON.stringify(job)).not.toContain(secret);
+
+    await save('fixture-run-a', 'replacement-a-key', 'replacement-a-secret');
+    await save('fixture-run-b', 'key-b', 'fixture-b-secret');
+    await sql`UPDATE media_deletions SET retain_until = now() WHERE public_id = ${publicId}`;
+    await api
+      .post('/api/media/cleanup/retry')
+      .auth(adminToken, { type: 'bearer' })
+      .expect(201, { jobs: [] });
+    expect(destroy).toHaveBeenLastCalledWith(
+      publicId,
+      expect.objectContaining({
+        cloud_name: 'fixture-run-a',
+        api_key: 'replacement-a-key',
+        api_secret: 'replacement-a-secret',
+      }),
+    );
+    await api.get(`/api/posts/${postId}`).expect(404);
+
+    const cancelledId = nextUpload.params.public_id;
+    await api
+      .delete(`/api/media/sessions/${nextSession}`)
+      .auth(token, { type: 'bearer' })
+      .expect(200, { postId: null });
+    const [cancelled] = await sql`
+      SELECT cloud_name, author_user_id, next_attempt_at > now() AS delayed
+      FROM media_deletions WHERE public_id = ${cancelledId}
+    `;
+    expect(cancelled).toEqual({
+      cloud_name: 'fixture-run-b',
+      author_user_id: authorId,
+      delayed: true,
+    });
+    await sql`UPDATE media_deletions SET next_attempt_at = now(), retain_until = now() WHERE public_id = ${cancelledId}`;
+    await api
+      .post('/api/media/cleanup/retry')
+      .auth(adminToken, { type: 'bearer' })
+      .expect(201, { jobs: [] });
+    expect(destroy).toHaveBeenLastCalledWith(
+      cancelledId,
+      expect.objectContaining({
+        cloud_name: 'fixture-run-b',
+        api_key: 'key-b',
+      }),
+    );
   });
 });

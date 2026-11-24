@@ -1,7 +1,11 @@
 import type { Sql } from 'postgres';
 import { runMigrations } from './migrations';
 import { migrateMedia } from './media-migration';
-import { migrateAuthorCloudinaryConnections } from './author-cloudinary-migration';
+import {
+  migrateAuthorCloudinaryConnections,
+  migrateAuthorCloudinarySessionBindings,
+} from './author-cloudinary-migration';
+import { migrateAuthorMedia } from './author-media-migration';
 
 export async function runVersionedMigrations(sql: Sql) {
   await sql.begin(async (transaction) => {
@@ -29,6 +33,16 @@ export async function runVersionedMigrations(sql: Sql) {
     ) {
       await migrateAuthorCloudinaryConnections(tx);
       await tx`INSERT INTO schema_migrations (version) VALUES ('003_author_cloudinary_connections')`;
+    }
+    if (
+      !versions.some((row) => row.version === '004_author_cloudinary_sessions')
+    ) {
+      await migrateAuthorCloudinarySessionBindings(tx);
+      await tx`INSERT INTO schema_migrations (version) VALUES ('004_author_cloudinary_sessions')`;
+    }
+    if (!versions.some((row) => row.version === '005_author_media')) {
+      await migrateAuthorMedia(tx);
+      await tx`INSERT INTO schema_migrations (version) VALUES ('005_author_media')`;
     }
   });
 }

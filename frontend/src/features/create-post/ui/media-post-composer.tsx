@@ -6,7 +6,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, LoaderCircle, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/shared/ui/button";
-import { LOCAL_MEDIA_LIMITS, MediaPublishingUnavailableError, cancelMediaSession, completeMedia, localMediaType, openMediaSession,
+import { LOCAL_MEDIA_LIMITS, MediaCloudinaryConnectionRequiredError, MediaPublishingUnavailableError, cancelMediaSession, completeMedia, localMediaType, openMediaSession,
   publishMedia, reserveMedia, uploadToCloudinary, type PublicationInput } from "../model/media-upload";
 
 type LocalMedia = { id: string; file: File; url: string; type: "PHOTO" | "VIDEO";
@@ -23,13 +23,34 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
   const [busy, setBusy] = useState(false);
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<"opening" | "ready" | { error: string }>("opening");
   const busyRef = useRef(false);
   const sessionAttempted = useRef(false);
+  const sessionOpening = useRef<ReturnType<typeof openMediaSession> | null>(null);
   const prepared = useRef<PublicationInput | null>(null);
   const readyFiles = useRef(new Set<string>());
   const urls = useRef(new Set<string>());
   const controller = useRef<AbortController | null>(null);
   const input = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (sessionOpening.current) return;
+    sessionAttempted.current = true;
+    const request = openMediaSession(accessToken, sessionId);
+    sessionOpening.current = request;
+    void request.then(
+      () => setSessionStatus("ready"),
+      (error: unknown) => {
+        sessionOpening.current = null;
+        if (error instanceof MediaCloudinaryConnectionRequiredError || error instanceof MediaPublishingUnavailableError) {
+          sessionAttempted.current = false;
+          setSessionStatus({ error: error.message });
+        } else {
+          setSessionStatus({ error: "Не удалось открыть публикацию. Закройте форму и попробуйте ещё раз." });
+        }
+      },
+    );
+  }, [accessToken, sessionId]);
 
   useEffect(() => {
     const previews = urls.current;
@@ -44,7 +65,7 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
   }
 
   function selectFiles(selected: FileList | null) {
-    if (!selected || busyRef.current || locked) return;
+    if (!selected || sessionStatus !== "ready" || busyRef.current || locked) return;
     const incoming = Array.from(selected);
     if (files.length + incoming.length > LOCAL_MEDIA_LIMITS.count) {
       setError("В публикации может быть не больше 10 файлов. Выберите меньше файлов.");
@@ -93,7 +114,7 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (busyRef.current || !files.length) return;
+    if (sessionStatus !== "ready" || busyRef.current || !files.length) return;
     busyRef.current = true;
     setBusy(true);
     setError(null);
@@ -101,8 +122,6 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
     controller.current = abort;
     try {
       if (!prepared.current) {
-        sessionAttempted.current = true;
-        await openMediaSession(accessToken, sessionId, abort.signal);
         let failed = false;
         for (const item of files) {
           if (readyFiles.current.has(item.id)) continue;
@@ -137,11 +156,7 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
       await publishMedia(accessToken, sessionId, prepared.current, abort.signal);
       published();
     } catch (submitError) {
-      if (submitError instanceof MediaPublishingUnavailableError) {
-        // The server has no session endpoint, so nothing was created to cancel.
-        sessionAttempted.current = false;
-        setError(submitError.message);
-      } else if (!abort.signal.aborted) setError(prepared.current
+      if (!abort.signal.aborted) setError(prepared.current
         ? "Не удалось получить подтверждение публикации. Нажмите «Повторить публикацию»: повтор не создаст второй пост."
         : submitError instanceof Error ? `Не удалось начать публикацию: ${submitError.message}` : "Не удалось начать публикацию. Попробуйте ещё раз.");
     } finally {
@@ -156,6 +171,8 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
     busyRef.current = true;
     setBusy(true);
     try {
+      await sessionOpening.current?.catch(() => undefined);
+      if (!sessionAttempted.current) { onClose(); return; }
       const result = await cancelMediaSession(accessToken, sessionId);
       if (result.postId) published(); else onClose();
     } catch {
@@ -166,7 +183,7 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
     }
   }
 
-  const disabled = busy || locked;
+  const disabled = sessionStatus !== "ready" || busy || locked;
   const hasErrors = files.some((file) => file.status === "error");
   return <Dialog.Root open onOpenChange={(open) => { if (!open) void close(); }}>
     <Dialog.Portal>
@@ -183,6 +200,8 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
           <Dialog.Description id="media-composer-description" className="mb-4 text-sm leading-relaxed text-amber-50/65">
             До 10 фото и видео в одном посте. Первый файл — обложка. Файлы отправятся только после нажатия «Опубликовать».
           </Dialog.Description>
+          {sessionStatus === "opening" ? <p role="status" className="mb-4 text-sm text-amber-50/65">Открываем форму…</p> : null}
+          {typeof sessionStatus === "object" ? <p role="alert" className="mb-4 rounded-lg border border-red-200/20 bg-red-950/25 p-3 text-sm text-red-100">{sessionStatus.error}</p> : null}
           <input ref={input} type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,image/gif,video/*,.heic,.heif,.mkv"
             className="sr-only" aria-label="Выбрать фото и видео" disabled={disabled}
             onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} />
@@ -227,7 +246,7 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
           {error ? <p role="alert" className="mt-4 rounded-lg border border-red-200/20 bg-red-950/25 p-3 text-sm text-red-100">{error}</p> : null}
           <footer className="sticky -bottom-4 mt-5 flex flex-wrap justify-end gap-3 border-t border-white/10 bg-[#0b1517] py-4">
             <Button type="button" variant="ghost" disabled={busy} onClick={() => void close()}>Отмена</Button>
-            <Button type="submit" disabled={busy || !files.length}>{busy ? <><LoaderCircle className="size-4 animate-spin" />Публикуем…</>
+            <Button type="submit" disabled={sessionStatus !== "ready" || busy || !files.length}>{busy ? <><LoaderCircle className="size-4 animate-spin" />Публикуем…</>
               : locked ? "Повторить публикацию" : hasErrors ? "Повторить загрузку и опубликовать" : "Опубликовать"}</Button>
           </footer>
         </form>

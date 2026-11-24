@@ -25,6 +25,7 @@ function post(id = "old", title = "Старая запись"): ApiPost {
 
 async function mockMedia(page: Page, options: {
   failUpload?: number; losePublish?: boolean; loseUpload?: boolean; posts?: ApiPost[]; cities?: string[];
+  needsCloudinary?: boolean;
 } = {}) {
   const state = {
     posts: options.posts ?? [post()], uploads: new Map<string, { type: "PHOTO" | "VIDEO"; ready: boolean }>(),
@@ -55,7 +56,10 @@ async function mockMedia(page: Page, options: {
     const path = url.pathname.replace("/api-proxy/", "");
     if (path.startsWith("media/")) state.mediaRequests.push(path);
     if (path === "auth/me") {
-      await route.fulfill({ json: { user: { id: authorId, username: "traveller", name: "Автор", role: "ADMIN" } } }); return;
+      await route.fulfill({ json: { user: { id: authorId, username: "traveller", name: "Автор", role: options.needsCloudinary ? "AUTHOR" : "ADMIN" } } }); return;
+    }
+    if (path === "users/me/cloudinary") {
+      await route.fulfill({ json: { connected: false, cloudName: null } }); return;
     }
     if (path === "authors") {
       await route.fulfill({ json: { items: [{ id: authorId, username: "traveller", name: "Автор" }] } }); return;
@@ -84,6 +88,10 @@ async function mockMedia(page: Page, options: {
     }
     const session = path.match(/^media\/sessions\/([^/]+)$/);
     if (session) {
+      if (options.needsCloudinary && request.method() === "PUT") {
+        await route.fulfill({ status: 403, json: { message: "Connect Cloudinary before opening an upload form" } });
+        return;
+      }
       state.session = session[1];
       await route.fulfill({ json: request.method() === "DELETE" ? { postId: state.created ? "new-post" : null } : { id: session[1] } }); return;
     }
@@ -141,16 +149,37 @@ async function mockMedia(page: Page, options: {
   return state;
 }
 
-async function openComposer(page: Page, selection = "all=true") {
+async function showComposer(page: Page, selection = "all=true") {
   await page.goto(`/?author=${authorId}&${selection}`);
   await page.locator('button[aria-label="Новая публикация"]:visible').click();
   return page.getByRole("dialog", { name: "Новая публикация", exact: true });
 }
 
+async function openComposer(page: Page, selection?: string) {
+  const dialog = await showComposer(page, selection);
+  await expect(dialog.getByRole("button", { name: "Добавить файлы" })).toBeEnabled();
+  return dialog;
+}
+
+test("author without Cloudinary sees the connection error before choosing files", async ({ page }) => {
+  const state = await mockMedia(page, { needsCloudinary: true });
+  const dialog = await showComposer(page);
+
+  await expect(dialog.getByRole("alert")).toContainText("Подключите Cloudinary, чтобы публиковать фото и видео.");
+  await expect(dialog.getByRole("button", { name: "Добавить файлы" })).toBeDisabled();
+  await expect(dialog.getByLabel(/^Название/)).toBeDisabled();
+  await dialog.getByRole("button", { name: "Отмена" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Подключить Cloudinary", exact: true })).toBeVisible();
+  expect(state.mediaRequests).toEqual([expect.stringMatching(/^media\/sessions\/[^/]+$/)]);
+  expect(state.cloudRequests).toHaveLength(0);
+});
+
 test("files stay local until Publish; order, cover and removal are preserved", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = await mockMedia(page);
   const dialog = await openComposer(page);
+  await expect.poll(() => state.mediaRequests).toEqual([expect.stringMatching(/^media\/sessions\/[^/]+$/)]);
   await dialog.getByLabel("Выбрать фото и видео").setInputFiles([image("first.png"),
     { name: "clip.mp4", mimeType: "video/mp4", buffer: Buffer.from("test video") }, image("remove.png")]);
   await dialog.getByRole("button", { name: "Переместить clip.mp4 раньше" }).click();
@@ -158,7 +187,7 @@ test("files stay local until Publish; order, cover and removal are preserved", a
   await dialog.getByLabel("Название").fill("День со слонами");
   await dialog.getByLabel("Описание").fill("Общий рассказ о поездке");
   expect(state.cloudRequests).toHaveLength(0);
-  expect(state.mediaRequests).toHaveLength(0);
+  expect(state.mediaRequests).toEqual([`media/sessions/${state.session}`]);
   await expect(dialog.getByRole("listitem").first()).toContainText("clip.mp4");
   await expect(dialog.getByRole("listitem").first()).toContainText("Обложка");
   await dialog.getByRole("heading", { name: "Новая публикация", exact: true }).evaluate((heading) => {
@@ -220,13 +249,11 @@ test("an unavailable publication endpoint shows a clear error and allows cancell
     expect(route.request().method()).toBe("PUT");
     await route.fulfill({ status: 404, json: { message: `Cannot PUT /api/media/sessions/${route.request().url().split("/").at(-1)}` } });
   });
-  const dialog = await openComposer(page);
-  await dialog.getByLabel("Выбрать фото и видео").setInputFiles([image("trip.png")]);
-  await dialog.getByLabel("Название").fill("Поездка");
-  await dialog.getByRole("button", { name: "Опубликовать", exact: true }).click();
+  const dialog = await showComposer(page);
   await expect(dialog.getByRole("alert")).toHaveText("Публикация с фото и видео пока недоступна на сервере. Попробуйте позже.");
-  await expect(dialog.getByLabel("Название")).toHaveValue("Поездка");
-  await expect(dialog.getByRole("listitem")).toHaveCount(1);
+  await expect(dialog.getByRole("button", { name: "Добавить файлы" })).toBeDisabled();
+  await expect(dialog.getByLabel(/^Название/)).toBeDisabled();
+  await expect(dialog.getByRole("listitem")).toHaveCount(0);
   expect(state.cloudRequests).toHaveLength(0);
   expect(state.created).toBe(0);
   await dialog.getByRole("button", { name: "Отмена", exact: true }).click();
@@ -284,7 +311,7 @@ test("eleven files are rejected locally and ten files can be published", async (
   await dialog.getByLabel("Выбрать фото и видео").setInputFiles(Array.from({ length: 11 }, (_, index) => image(`${index}.png`)));
   await expect(dialog.getByRole("alert")).toContainText("не больше 10");
   await expect(dialog.getByRole("listitem")).toHaveCount(0);
-  expect(state.mediaRequests).toHaveLength(0);
+  await expect.poll(() => state.mediaRequests).toEqual([expect.stringMatching(/^media\/sessions\/[^/]+$/)]);
   await dialog.getByLabel("Выбрать фото и видео").setInputFiles(Array.from({ length: 10 }, (_, index) => image(`${index}.png`)));
   await dialog.getByRole("button", { name: "Опубликовать", exact: true }).click();
   await expect(dialog).toHaveCount(0);

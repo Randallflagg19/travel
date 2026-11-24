@@ -19,6 +19,21 @@ import {
   toResourceType,
 } from './cloudinary.types';
 
+function cloudinaryStatus(error: unknown) {
+  const response = error as
+    | { http_code?: number; error?: { http_code?: number } }
+    | undefined;
+  return response?.http_code ?? response?.error?.http_code;
+}
+
+function cloudinaryFailure(status: number | undefined, message: string) {
+  return new ServiceUnavailableException(
+    status === 401 || status === 403
+      ? 'Cloudinary denied access; check the credentials for the original cloud'
+      : message,
+  );
+}
+
 @Injectable()
 export class CloudinaryService {
   private readonly appCredentials: CloudinaryCredentials | null;
@@ -98,17 +113,66 @@ export class CloudinaryService {
     return { signature, timestamp: Number(timestamp) };
   }
 
+  async getUploadSizeLimit(
+    resourceType: 'image' | 'video',
+    { cloudName, apiKey, apiSecret }: CloudinaryCredentials,
+  ): Promise<number> {
+    const message = 'Could not read the Cloudinary upload limits; retry';
+    let response: Response;
+    try {
+      const authorization = Buffer.from(`${apiKey}:${apiSecret}`).toString(
+        'base64',
+      );
+      response = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/usage`,
+        {
+          headers: { Authorization: `Basic ${authorization}` },
+          redirect: 'error',
+          signal: AbortSignal.timeout(5_000),
+        },
+      );
+    } catch {
+      throw cloudinaryFailure(undefined, message);
+    }
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      throw cloudinaryFailure(response.status, message);
+    }
+    const result = (await response.json().catch(() => null)) as {
+      media_limits?: Partial<
+        Record<'image_max_size_bytes' | 'video_max_size_bytes', unknown>
+      >;
+    } | null;
+    const limit = result?.media_limits?.[`${resourceType}_max_size_bytes`];
+    if (
+      typeof limit !== 'number' ||
+      !Number.isSafeInteger(limit) ||
+      limit < 1
+    ) {
+      throw cloudinaryFailure(undefined, message);
+    }
+    return limit;
+  }
+
   /** Delete asset from Cloudinary by public_id. resourceType: 'image' | 'video' | 'raw'. */
   async destroy(
     publicId: string,
     resourceType: 'image' | 'video' | 'raw',
     credentials?: CloudinaryCredentials,
   ): Promise<void> {
-    const result: unknown = await cloudinary.uploader.destroy(publicId, {
+    const options = {
       ...this.sdkOptions(credentials),
       resource_type: resourceType,
       invalidate: true,
-    });
+    };
+    const result: unknown = await cloudinary.uploader
+      .destroy(publicId, options)
+      .catch((error: unknown) => {
+        throw cloudinaryFailure(
+          cloudinaryStatus(error),
+          'Cloudinary deletion failed; retry',
+        );
+      });
     const status = (result as { result?: string })?.result;
     if (status !== 'ok' && status !== 'not found') {
       throw new ServiceUnavailableException(
@@ -140,13 +204,10 @@ export class CloudinaryService {
         duration: number;
       };
     } catch (error) {
-      if (
-        (error as { error?: { http_code?: number }; http_code?: number })?.error
-          ?.http_code === 404 ||
-        (error as { http_code?: number })?.http_code === 404
-      )
-        return null;
-      throw new ServiceUnavailableException(
+      const status = cloudinaryStatus(error);
+      if (status === 404) return null;
+      throw cloudinaryFailure(
+        status,
         'Could not verify the uploaded file; retry',
       );
     }

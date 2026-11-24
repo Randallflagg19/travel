@@ -6,6 +6,7 @@ import {
 import type { Sql } from 'postgres';
 import { DbService } from '../db/db.service';
 import { CloudinaryService } from '../integrations/cloudinary/cloudinary.service';
+import { AuthorCloudinaryService } from '../users/author-cloudinary.service';
 import { MediaEnvironmentService } from './media-environment.service';
 import type { MediaDeletion } from './media-session.types';
 
@@ -24,6 +25,7 @@ export class MediaCleanupService {
     private readonly db: DbService,
     private readonly cloud: CloudinaryService,
     private readonly environment: MediaEnvironmentService,
+    private readonly authorCloud: AuthorCloudinaryService,
   ) {}
 
   private sql(): Sql {
@@ -34,9 +36,9 @@ export class MediaCleanupService {
 
   async queueUnused(sql: Sql, sessionId: string) {
     await sql`
-      INSERT INTO media_deletions (environment, cloud_name, public_id, resource_type, next_attempt_at, retain_until)
+      INSERT INTO media_deletions (environment, cloud_name, public_id, resource_type, next_attempt_at, retain_until, author_user_id)
       SELECT s.environment, u.cloud_name, u.public_id, u.resource_type,
-        GREATEST(now(), u.signature_expires_at), u.signature_expires_at
+        GREATEST(now(), u.signature_expires_at), u.signature_expires_at, u.author_user_id
       FROM media_uploads u JOIN media_sessions s ON s.id = u.session_id
       WHERE u.session_id = ${sessionId}::uuid AND NOT EXISTS (SELECT 1 FROM post_media m WHERE m.upload_id = u.id)
       ON CONFLICT (cloud_name, resource_type, public_id) DO NOTHING
@@ -50,10 +52,11 @@ export class MediaCleanupService {
       public_id: string;
       resource_type: MediaDeletion['resource_type'];
       media_url: string;
+      author_user_id: string | null;
     },
   ) {
     const environment = this.environment.current();
-    const cloudName = this.cloud.getClientConfig().cloudName;
+    const authorUserId = resource.author_user_id;
     const storedCloud =
       resource.cloud_name ||
       resource.media_url.match(
@@ -62,21 +65,30 @@ export class MediaCleanupService {
     const namespaced = /^travel\/(production|staging|development|test)\//.test(
       resource.public_id,
     );
-    const ownedEnvironment = resource.public_id.startsWith(
-      `travel/${environment}/`,
-    );
-    const legacyProduction = !namespaced && environment === 'production';
-    if (storedCloud !== cloudName || (!ownedEnvironment && !legacyProduction)) {
+    const prefix = `travel/${environment}/${authorUserId ? `${authorUserId}/` : ''}`;
+    const ownedEnvironment = resource.public_id.startsWith(prefix);
+    const legacyProduction =
+      !authorUserId && !namespaced && environment === 'production';
+    if (
+      !storedCloud ||
+      (!authorUserId &&
+        storedCloud !== this.cloud.getClientConfig().cloudName) ||
+      (!ownedEnvironment && !legacyProduction)
+    ) {
       throw new ConflictException(
         'Media belongs to another Cloudinary account or environment; deletion is blocked',
       );
     }
     await tx`
-          INSERT INTO media_deletions (environment, cloud_name, public_id, resource_type, retain_until)
-          VALUES (${environment}, ${storedCloud}, ${resource.public_id}, ${resource.resource_type},
-            COALESCE((SELECT MAX(signature_expires_at) FROM media_uploads WHERE cloud_name = ${storedCloud} AND public_id = ${resource.public_id}), now()))
-          ON CONFLICT (cloud_name, resource_type, public_id) DO UPDATE SET next_attempt_at = now()
-        `;
+      INSERT INTO media_deletions (environment, cloud_name, public_id, resource_type, retain_until, author_user_id)
+      VALUES (${environment}, ${storedCloud}, ${resource.public_id}, ${resource.resource_type},
+        COALESCE((SELECT signature_expires_at FROM media_uploads
+          WHERE cloud_name = ${storedCloud} AND resource_type = ${resource.resource_type} AND public_id = ${resource.public_id}), now()),
+        ${authorUserId})
+      ON CONFLICT (cloud_name, resource_type, public_id) DO UPDATE SET next_attempt_at = now(),
+        retain_until = GREATEST(media_deletions.retain_until, EXCLUDED.retain_until),
+        author_user_id = COALESCE(media_deletions.author_user_id, EXCLUDED.author_user_id)
+    `;
   }
 
   async pendingCount() {
@@ -123,7 +135,7 @@ export class MediaCleanupService {
         UPDATE media_deletions SET next_attempt_at = now() + interval '5 minutes'
         WHERE id IN (SELECT id FROM media_deletions WHERE environment = ${environment} AND next_attempt_at <= now()
           ORDER BY next_attempt_at LIMIT 10 FOR UPDATE SKIP LOCKED)
-        RETURNING id, cloud_name, public_id, resource_type, attempts
+        RETURNING id, cloud_name, public_id, resource_type, attempts, author_user_id
       `;
       for (const job of jobs) {
         try {
@@ -135,9 +147,22 @@ export class MediaCleanupService {
           `;
           if (referenced.length)
             throw new Error('Resource is still referenced; deletion postponed');
-          if (this.cloud.getClientConfig().cloudName !== job.cloud_name)
+          const credentials = job.author_user_id
+            ? await this.authorCloud.credentialsFor(
+                sql,
+                job.author_user_id,
+                job.cloud_name,
+              )
+            : undefined;
+          if (
+            this.cloud.getClientConfig(credentials).cloudName !== job.cloud_name
+          )
             throw new Error('Cloudinary account does not match deletion job');
-          await this.cloud.destroy(job.public_id, job.resource_type);
+          await this.cloud.destroy(
+            job.public_id,
+            job.resource_type,
+            credentials,
+          );
           await sql`DELETE FROM media_deletions WHERE id = ${job.id}::uuid AND retain_until <= now()`;
           await sql`UPDATE media_deletions SET next_attempt_at = retain_until, last_error = NULL WHERE id = ${job.id}::uuid`;
         } catch (error) {

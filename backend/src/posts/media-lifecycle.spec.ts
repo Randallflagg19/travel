@@ -14,6 +14,7 @@ import { MediaCleanupService } from '../media/media-cleanup.service';
 import { MediaEnvironmentService } from '../media/media-environment.service';
 import { PublishMediaPostService } from './publish-media-post.service';
 import { DeletePostService } from './delete-post.service';
+import { AuthorCloudinaryService } from '../users/author-cloudinary.service';
 
 const user = '00000000-0000-4000-8000-000000000010';
 const sessionId = '00000000-0000-4000-8000-000000000020';
@@ -23,6 +24,7 @@ const session = {
   id: sessionId,
   user_id: user,
   environment: 'test',
+  author_cloud_name: null,
   state: 'OPEN',
   expired: false,
   post_id: null,
@@ -36,6 +38,8 @@ const upload = {
   public_id: `travel/test/${user}/${sessionId}/${uploadId}`,
   resource_type: 'image',
   cloud_name: 'demo',
+  author_user_id: null,
+  size_limit_bytes: null,
   media_url: 'https://res.cloudinary.com/demo/image/upload/photo.jpg',
   media_width: 100,
   media_height: 80,
@@ -65,8 +69,20 @@ function setup(results: unknown[][], mediaEnvironment = 'test') {
   const db = { client: sql } as unknown as DbService;
   const storage = cloud as unknown as CloudinaryService;
   const environment = new MediaEnvironmentService(config as ConfigService);
-  const cleanup = new MediaCleanupService(db, storage, environment);
-  const sessions = new MediaSessionsService(db, storage, environment, cleanup);
+  const authorCloud = new AuthorCloudinaryService(db, config as ConfigService);
+  const cleanup = new MediaCleanupService(
+    db,
+    storage,
+    environment,
+    authorCloud,
+  );
+  const sessions = new MediaSessionsService(
+    db,
+    storage,
+    environment,
+    cleanup,
+    authorCloud,
+  );
   const publication = new PublishMediaPostService(db, sessions, cleanup);
   const deletion = new DeletePostService(db, cleanup, environment);
   return { publication, sessions, deletion, cleanup, cloud, calls, begin };
@@ -214,6 +230,7 @@ describe('Media publication contract', () => {
     expect(cloud.getUploadResource).toHaveBeenCalledWith(
       upload.public_id,
       'image',
+      undefined,
     );
   });
 
@@ -252,6 +269,7 @@ describe('Durable media deletion', () => {
   it('queues every attachment before removing the post', async () => {
     const resources = ['first', 'second', 'third'].map((name) => ({
       cloud_name: 'demo',
+      author_user_id: null,
       public_id: `travel/test/${name}`,
       resource_type: name === 'second' ? 'video' : 'image',
       media_url: upload.media_url,
@@ -286,6 +304,7 @@ describe('Durable media deletion', () => {
     const job = {
       id: postId,
       cloud_name: 'demo',
+      author_user_id: null,
       public_id: 'travel/test/file',
       resource_type: 'image',
       attempts: 0,
@@ -307,6 +326,7 @@ describe('Durable media deletion', () => {
     const job = {
       id: postId,
       cloud_name: 'demo',
+      author_user_id: null,
       public_id: 'travel/test/file',
       resource_type: 'image',
       attempts: 0,

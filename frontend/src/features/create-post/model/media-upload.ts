@@ -14,6 +14,13 @@ export class MediaPublishingUnavailableError extends Error {
   }
 }
 
+export class MediaCloudinaryConnectionRequiredError extends Error {
+  constructor() {
+    super("Подключите Cloudinary, чтобы публиковать фото и видео. Закройте форму и нажмите «Подключить Cloudinary» в журнале.");
+    this.name = "MediaCloudinaryConnectionRequiredError";
+  }
+}
+
 async function mediaRequest<T>(token: string, path: string, method: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const request = new AbortController();
   const cancel = () => request.abort();
@@ -28,10 +35,15 @@ async function mediaRequest<T>(token: string, path: string, method: string, body
       signal: request.signal,
     });
     if (!response.ok) {
-      if (response.status === 404 && method === "PUT" && /^sessions\/[^/]+$/.test(path)) {
+      const openingSession = method === "PUT" && /^sessions\/[^/]+$/.test(path);
+      if (openingSession && response.status === 404) {
         throw new MediaPublishingUnavailableError();
       }
-      throw new Error(await readApiError(response));
+      const message = await readApiError(response);
+      if (openingSession && response.status === 403 && message === "Connect Cloudinary before opening an upload form") {
+        throw new MediaCloudinaryConnectionRequiredError();
+      }
+      throw new Error(message);
     }
     return await response.json() as T;
   } catch (error) {

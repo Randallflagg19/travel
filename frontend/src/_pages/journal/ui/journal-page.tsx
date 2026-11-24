@@ -21,6 +21,7 @@ import { Button } from "@/shared/ui/button";
 import { useJournalPostActions } from "../model/use-journal-post-actions";
 import { selectHeroPhoto } from "../model/hero-photo-selection";
 import { selectFeedMediaStats } from "../model/journal-media-stats";
+import { JournalCloudinaryConnection } from "./journal-cloudinary-connection";
 import { FeedHero } from "./journal-hero";
 import { FeedServerLoadingNotice } from "./journal-loading-notice";
 
@@ -41,6 +42,8 @@ export function JournalPage() {
     selectAuthor,
     isAuthorReady,
   } = useJournalNavigation({ canonicalizeAuthor: true });
+  const isOwnAuthorJournal =
+    isAuthorReady && auth.user?.role === "AUTHOR" && auth.user.id === author?.id;
   const placesQuery = usePlaces(author?.id, isAuthorReady);
 
   const { isCitySelection, isCountryFeed, canLoadPosts } =
@@ -154,6 +157,12 @@ export function JournalPage() {
         >
           Не удалось загрузить авторов. Обнови страницу и попробуй снова.
         </p>
+      ) : null}
+      {isOwnAuthorJournal && auth.accessToken ? (
+        <JournalCloudinaryConnection
+          key={auth.accessToken}
+          accessToken={auth.accessToken}
+        />
       ) : null}
       <FeedHero
         title={heroTitle}

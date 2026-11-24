@@ -13,6 +13,7 @@ import {
   type ResourceMetadata,
 } from './cloudinary-metadata';
 import {
+  type CloudinaryCredentials,
   type CloudinaryResource,
   type ResourceType,
   toResourceType,
@@ -20,47 +21,50 @@ import {
 
 @Injectable()
 export class CloudinaryService {
-  private readonly isConfigured: boolean;
-  private readonly cloudName: string | null;
-  private readonly apiKey: string | null;
-  private readonly apiSecret: string | null;
+  private readonly appCredentials: CloudinaryCredentials | null;
 
-  constructor(private readonly config: ConfigService) {
-    const cloudName = this.config.get<string>('CLOUDINARY_CLOUD_NAME') ?? null;
-    const apiKey = this.config.get<string>('CLOUDINARY_API_KEY') ?? null;
-    const apiSecret = this.config.get<string>('CLOUDINARY_API_SECRET') ?? null;
+  constructor(config: ConfigService) {
+    const cloudName = config.get<string>('CLOUDINARY_CLOUD_NAME');
+    const apiKey = config.get<string>('CLOUDINARY_API_KEY');
+    const apiSecret = config.get<string>('CLOUDINARY_API_SECRET');
+    this.appCredentials =
+      cloudName && apiKey && apiSecret
+        ? { cloudName, apiKey, apiSecret }
+        : null;
 
-    this.cloudName = cloudName;
-    this.apiKey = apiKey;
-    this.apiSecret = apiSecret;
-
-    this.isConfigured = Boolean(cloudName && apiKey && apiSecret);
-    if (cloudName && apiKey && apiSecret) {
+    if (this.appCredentials) {
       cloudinary.config({
-        cloud_name: cloudName,
-        api_key: apiKey,
-        api_secret: apiSecret,
+        ...this.sdkOptions(this.appCredentials),
         secure: true,
       });
     }
   }
 
-  getClientConfig() {
-    if (!this.isConfigured || !this.cloudName || !this.apiKey) {
+  private requireCredentials(credentials = this.appCredentials) {
+    if (!credentials) {
       throw new BadRequestException(
         'Cloudinary is not configured on the server',
       );
     }
-    return { cloudName: this.cloudName, apiKey: this.apiKey };
+    return credentials;
   }
 
-  signUpload(paramsToSign: Record<string, unknown> | null | undefined) {
-    if (!this.isConfigured || !this.apiSecret) {
-      throw new BadRequestException(
-        'Cloudinary is not configured on the server',
-      );
-    }
+  private sdkOptions(credentials?: CloudinaryCredentials) {
+    const { cloudName, apiKey, apiSecret } =
+      this.requireCredentials(credentials);
+    return { cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret };
+  }
 
+  getClientConfig(credentials?: CloudinaryCredentials) {
+    const { cloudName, apiKey } = this.requireCredentials(credentials);
+    return { cloudName, apiKey };
+  }
+
+  signUpload(
+    paramsToSign: Record<string, unknown> | null | undefined,
+    credentials?: CloudinaryCredentials,
+  ) {
+    const { apiSecret } = this.requireCredentials(credentials);
     const input = paramsToSign ?? {};
     const inputTimestamp = input.timestamp;
     const timestamp =
@@ -88,7 +92,7 @@ export class CloudinaryService {
 
     const toSign = entries.map(([k, v]) => `${k}=${v}`).join('&');
     const signature = createHash('sha1')
-      .update(`${toSign}${this.apiSecret}`, 'utf8')
+      .update(`${toSign}${apiSecret}`, 'utf8')
       .digest('hex');
 
     return { signature, timestamp: Number(timestamp) };
@@ -98,13 +102,10 @@ export class CloudinaryService {
   async destroy(
     publicId: string,
     resourceType: 'image' | 'video' | 'raw',
+    credentials?: CloudinaryCredentials,
   ): Promise<void> {
-    if (!this.isConfigured) {
-      throw new BadRequestException(
-        'Cloudinary is not configured on the server',
-      );
-    }
     const result: unknown = await cloudinary.uploader.destroy(publicId, {
+      ...this.sdkOptions(credentials),
       resource_type: resourceType,
       invalidate: true,
     });
@@ -116,10 +117,15 @@ export class CloudinaryService {
     }
   }
 
-  async getUploadResource(publicId: string, resourceType: 'image' | 'video') {
-    this.getClientConfig();
+  async getUploadResource(
+    publicId: string,
+    resourceType: 'image' | 'video',
+    credentials?: CloudinaryCredentials,
+  ) {
+    const options = this.sdkOptions(credentials);
     try {
       const result: unknown = await cloudinary.api.resource(publicId, {
+        ...options,
         resource_type: resourceType,
         ...(resourceType === 'video' ? { media_metadata: true } : {}),
       });
@@ -177,7 +183,7 @@ export class CloudinaryService {
       width: null,
       height: null,
     };
-    if (!this.isConfigured) return out;
+    if (!this.appCredentials) return out;
     let raw: unknown;
     try {
       raw = await cloudinary.api.resource(publicId, {

@@ -304,6 +304,59 @@ export async function authMe(accessToken: string): Promise<{ user: AuthUser }> {
   return (await res.json()) as { user: AuthUser };
 }
 
+export type AuthorCloudinaryStatus = {
+  connected: boolean;
+  cloudName: string | null;
+};
+
+export async function fetchAuthorCloudinaryStatus(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<AuthorCloudinaryStatus> {
+  const res = await fetch(`${getApiBaseUrl()}/users/me/cloudinary`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+    signal,
+  });
+
+  if (!res.ok) {
+    const message = await readApiError(res);
+    throw new Error(`Cloudinary status failed (${res.status}): ${message}`);
+  }
+
+  return (await res.json()) as AuthorCloudinaryStatus;
+}
+
+export type AuthorCloudinaryCredentials = {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+};
+
+export class AuthorCloudinarySaveError extends Error {
+  constructor(readonly status: number) {
+    super(`Cloudinary save failed (${status})`);
+  }
+}
+
+export async function saveAuthorCloudinaryConnection(
+  accessToken: string,
+  credentials: AuthorCloudinaryCredentials,
+): Promise<AuthorCloudinaryStatus> {
+  const res = await fetch(`${getApiBaseUrl()}/users/me/cloudinary`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!res.ok) throw new AuthorCloudinarySaveError(res.status);
+
+  return (await res.json()) as AuthorCloudinaryStatus;
+}
+
 export async function adminCloudinaryConfig(accessToken: string): Promise<{
   cloudName: string;
   apiKey: string;

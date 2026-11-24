@@ -7,12 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { createCipheriv, randomBytes } from 'node:crypto';
 import * as Joi from 'joi';
 import { DbService } from '../db/db.service';
-
-type CloudinaryCredentials = {
-  cloudName: string;
-  apiKey: string;
-  apiSecret: string;
-};
+import type { CloudinaryCredentials } from '../integrations/cloudinary/cloudinary.types';
 
 const credentialsSchema = Joi.object<CloudinaryCredentials>({
   cloudName: Joi.string()

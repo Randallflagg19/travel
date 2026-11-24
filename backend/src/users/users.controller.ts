@@ -1,6 +1,16 @@
-import { BadRequestException, Body, Controller, Patch } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Header,
+  Patch,
+  Put,
+} from '@nestjs/common';
+import { AuthRoles } from '../auth/auth-roles.decorator';
 import { Auth, CurrentUser } from '../auth/current-user.decorator';
 import type { JwtUser } from '../auth/jwt-user.type';
+import { AuthorCloudinaryService } from './author-cloudinary.service';
 import { UsersService } from './users.service';
 
 function isValidEmail(email: string) {
@@ -9,7 +19,23 @@ function isValidEmail(email: string) {
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly authorCloudinary: AuthorCloudinaryService,
+  ) {}
+
+  @Put('me/cloudinary')
+  @AuthRoles('AUTHOR')
+  saveCloudinary(@CurrentUser() user: JwtUser, @Body() body: unknown) {
+    return this.authorCloudinary.save(user.sub, body);
+  }
+
+  @Get('me/cloudinary')
+  @AuthRoles('AUTHOR')
+  @Header('Cache-Control', 'no-store')
+  getCloudinaryStatus(@CurrentUser() user: JwtUser) {
+    return this.authorCloudinary.getStatus(user.sub);
+  }
 
   // Attach / update email for the currently authenticated user.
   @Patch('me')

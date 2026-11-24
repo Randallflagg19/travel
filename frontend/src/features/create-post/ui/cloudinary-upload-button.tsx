@@ -24,7 +24,9 @@ export function CloudinaryUploadButton(props: {
     auth.accessToken &&
     props.journal.ready &&
     props.journal.authorId === auth.user.id &&
-    (auth.user.role === "ADMIN" || auth.user.role === "SUPERADMIN");
+    (auth.user.role === "AUTHOR" ||
+      auth.user.role === "ADMIN" ||
+      auth.user.role === "SUPERADMIN");
   if (!canUpload || !auth.user || !auth.accessToken) return null;
 
   return (

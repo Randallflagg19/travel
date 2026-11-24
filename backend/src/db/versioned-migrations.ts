@@ -1,6 +1,7 @@
 import type { Sql } from 'postgres';
 import { runMigrations } from './migrations';
 import { migrateMedia } from './media-migration';
+import { migrateAuthorCloudinaryConnections } from './author-cloudinary-migration';
 
 export async function runVersionedMigrations(sql: Sql) {
   await sql.begin(async (transaction) => {
@@ -20,6 +21,14 @@ export async function runVersionedMigrations(sql: Sql) {
     if (!versions.some((row) => row.version === '002_media_posts')) {
       await migrateMedia(tx);
       await tx`INSERT INTO schema_migrations (version) VALUES ('002_media_posts')`;
+    }
+    if (
+      !versions.some(
+        (row) => row.version === '003_author_cloudinary_connections',
+      )
+    ) {
+      await migrateAuthorCloudinaryConnections(tx);
+      await tx`INSERT INTO schema_migrations (version) VALUES ('003_author_cloudinary_connections')`;
     }
   });
 }

@@ -61,8 +61,14 @@ databaseTest(
       await sql`INSERT INTO comments (post_id, user_id, text) VALUES (${oldId}, ${userId}, 'Comment')`;
       await runVersionedMigrations(sql);
       await runVersionedMigrations(sql);
-      const versions = await sql`SELECT version FROM schema_migrations`;
-      expect(versions).toHaveLength(2);
+      const versions = await sql<{ version: string }[]>`
+        SELECT version FROM schema_migrations ORDER BY version
+      `;
+      expect(versions.map(({ version }) => version)).toEqual([
+        '001_legacy',
+        '002_media_posts',
+        '003_author_cloudinary_connections',
+      ]);
       expect(
         await sql`SELECT * FROM post_media WHERE post_id = ${oldId}`,
       ).toHaveLength(1);

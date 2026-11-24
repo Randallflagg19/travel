@@ -262,6 +262,12 @@ export async function authRegister(params: {
   return (await res.json()) as AuthResponse;
 }
 
+export class AuthLoginError extends Error {
+  constructor(readonly status: number) {
+    super(`Login failed (${status})`);
+  }
+}
+
 export async function authLogin(params: {
   login: string;
   password: string;
@@ -277,8 +283,7 @@ export async function authLogin(params: {
   });
 
   if (!res.ok) {
-    const text = await readApiError(res);
-    throw new Error(`Login failed (${res.status}): ${text}`);
+    throw new AuthLoginError(res.status);
   }
 
   return (await res.json()) as AuthResponse;

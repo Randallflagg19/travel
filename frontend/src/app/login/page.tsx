@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useAuth } from "@/entities/session";
+import { AuthLoginError } from "@/shared/api/api";
 import { z } from "zod";
 
 const LoginSchema = z.object({
@@ -35,7 +36,11 @@ export default function LoginPage() {
       await auth.login({ login: parsed.data.login, password: parsed.data.password });
       router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось войти");
+      setError(
+        err instanceof AuthLoginError && err.status === 401
+          ? "Неверный логин или пароль."
+          : "Не удалось войти. Попробуй ещё раз.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -74,7 +79,9 @@ export default function LoginPage() {
               />
             </div>
 
-            {error ? <div className="text-sm text-red-600">{error}</div> : null}
+            {error ? (
+              <div role="alert" className="text-sm text-red-600">{error}</div>
+            ) : null}
 
             <Button className="w-full" type="submit" disabled={submitting || auth.isLoading}>
               {submitting ? "Входим…" : "Войти"}

@@ -183,6 +183,14 @@ describe('Media publication contract', () => {
     expect(cloud.getUploadResource).not.toHaveBeenCalled();
   });
 
+  it('rejects publishing a session owned by another user', async () => {
+    const { publication, calls } = setup([[session]]);
+    await expect(
+      publication.publish(sessionId, postId, { uploadIds: [uploadId] }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(calls).toHaveLength(1);
+  });
+
   it('recovers a previously uploaded file using its reserved public ID', async () => {
     const { sessions, cloud } = setup([
       [session],

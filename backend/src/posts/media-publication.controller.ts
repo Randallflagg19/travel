@@ -5,7 +5,7 @@ import type { JwtUser } from '../auth/jwt-user.type';
 import { PublishMediaPostService } from './publish-media-post.service';
 
 @Controller('media')
-@AuthRoles('ADMIN', 'SUPERADMIN')
+@AuthRoles('AUTHOR', 'ADMIN', 'SUPERADMIN')
 export class MediaPublicationController {
   constructor(private readonly publication: PublishMediaPostService) {}
 

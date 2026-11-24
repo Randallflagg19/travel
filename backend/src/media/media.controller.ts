@@ -13,6 +13,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtUser } from '../auth/jwt-user.type';
 import { MediaSessionsService } from './media-sessions.service';
 import { MediaCleanupService } from './media-cleanup.service';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('media')
 @AuthRoles('ADMIN', 'SUPERADMIN')
@@ -23,6 +24,7 @@ export class MediaController {
   ) {}
 
   @Put('sessions/:id')
+  @Roles('AUTHOR', 'ADMIN', 'SUPERADMIN')
   open(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
@@ -31,6 +33,7 @@ export class MediaController {
   }
 
   @Put('sessions/:id/uploads/:uploadId')
+  @Roles('AUTHOR', 'ADMIN', 'SUPERADMIN')
   reserve(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('uploadId', new ParseUUIDPipe()) uploadId: string,
@@ -41,6 +44,7 @@ export class MediaController {
   }
 
   @Post('sessions/:id/uploads/:uploadId/complete')
+  @Roles('AUTHOR', 'ADMIN', 'SUPERADMIN')
   complete(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('uploadId', new ParseUUIDPipe()) uploadId: string,
@@ -50,6 +54,7 @@ export class MediaController {
   }
 
   @Delete('sessions/:id')
+  @Roles('AUTHOR', 'ADMIN', 'SUPERADMIN')
   cancel(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,

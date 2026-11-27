@@ -71,6 +71,7 @@ databaseTest(
         '003_author_cloudinary_connections',
         '004_author_cloudinary_sessions',
         '005_author_media',
+        '006_albums',
       ]);
       expect(
         await sql`SELECT * FROM post_media WHERE post_id = ${oldId}`,

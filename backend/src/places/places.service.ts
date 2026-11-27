@@ -1,5 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { DbService } from '../db/db.service';
+
+type Album = { id: string; country: string; title: string };
 
 type PlaceRow = {
   country: string | null;
@@ -34,6 +40,41 @@ export type PlacesResponse = {
 @Injectable()
 export class PlacesService {
   constructor(private readonly db: DbService) {}
+
+  async createAlbum(userId: string, country: string, title: string) {
+    const sql = this.db.client;
+    if (!sql) {
+      throw new ServiceUnavailableException('Database is not configured');
+    }
+
+    const [album] = await sql<Album[]>`
+      INSERT INTO albums (user_id, country, title)
+      SELECT p.user_id, btrim(p.country), ${title}
+      FROM posts p
+      WHERE p.user_id = ${userId}::uuid AND btrim(p.country) = ${country}
+      LIMIT 1
+      RETURNING id, country, title
+    `;
+
+    if (!album) {
+      throw new NotFoundException('Страна не найдена в вашем журнале');
+    }
+    return album;
+  }
+
+  async listAlbums(authorId: string, country: string) {
+    const sql = this.db.client;
+    if (!sql) {
+      throw new ServiceUnavailableException('Database is not configured');
+    }
+
+    return sql<Album[]>`
+      SELECT id, country, title
+      FROM albums
+      WHERE user_id = ${authorId}::uuid AND country = ${country}
+      ORDER BY title, id
+    `;
+  }
 
   async listPlaces(authorId?: string): Promise<PlacesResponse> {
     if (!this.db.client) return { countries: [] };

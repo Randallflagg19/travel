@@ -158,6 +158,10 @@ async function mockFeed(page: Page) {
       return;
     }
     if (pathname.endsWith("/posts")) {
+      if (requestUrl.searchParams.has("albumId")) {
+        await route.fulfill({ json: { items: [], nextCursor: null, hasMore: false } });
+        return;
+      }
       if (requestUrl.searchParams.get("authorId") === "friend") {
         await route.fulfill({ json: { items: [], nextCursor: null, hasMore: false } });
         return;
@@ -256,6 +260,80 @@ test("hero counters follow country and city selection", async ({ page }) => {
   await page.goto("/?country=Indonesia&city=Bali");
   await expect(page.locator("span:visible", { hasText: "2 фото" })).toBeVisible();
   await expect(page.locator("span:visible", { hasText: "0 видео" })).toBeVisible();
+});
+
+test("city navigation keeps the filters in place while the feed loads", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 850 });
+  await mockFeed(page);
+  await page.route("**/api-proxy/places/albums?*", (route) =>
+    route.fulfill({ json: { albums: [] } }),
+  );
+  await page.goto("/?author=admin&country=Indonesia");
+  await expect(page.getByRole("heading", { name: "Тестовая история" })).toBeVisible();
+
+  const navigation = page.getByRole("navigation", { name: "Навигация по стране" });
+  await expect(navigation.getByRole("button", { name: "Создать альбом" })).toBeVisible();
+  await navigation.evaluate((element) =>
+    window.scrollTo(0, window.scrollY + element.getBoundingClientRect().top - 120),
+  );
+  const measure = () => navigation.evaluate((element) => ({
+    scroll: window.scrollY,
+    top: element.getBoundingClientRect().top,
+  }));
+  const before = await measure();
+  expect(before.scroll).toBeGreaterThan(100);
+
+  let resumeFeed!: () => void;
+  const paused = new Promise<void>((resolve) => { resumeFeed = resolve; });
+  await page.route((url) => url.pathname.endsWith("/posts") && url.searchParams.get("city") === "Bali", async (route) => {
+    await paused;
+    await route.fallback();
+  });
+  try {
+    await navigation.getByRole("button", { name: "Bali", exact: true }).click();
+    await expect(page.getByText("Загружаем первые кадры", { exact: true })).toBeVisible();
+    const during = await measure();
+    expect(Math.abs(during.scroll - before.scroll)).toBeLessThanOrEqual(2);
+    expect(Math.abs(during.top - before.top)).toBeLessThanOrEqual(2);
+  } finally {
+    resumeFeed();
+  }
+  await expect(page.getByRole("heading", { name: "Тестовая история" })).toBeVisible();
+});
+
+test("opening an empty album hides the place feed and survives reload", async ({ page }) => {
+  await mockFeed(page);
+  const winter = {
+    id: "8b7a00d9-3000-487e-968b-e6a262dabd6a",
+    country: "Indonesia",
+    title: "Зимовка",
+  };
+  await page.route("**/api-proxy/places/albums?*", (route) =>
+    route.fulfill({ json: { albums: [winter] } }),
+  );
+  await page.goto("/?author=admin&country=Indonesia&city=Bali");
+  const story = page.getByRole("heading", { name: "Тестовая история" });
+  const navigation = page.getByRole("navigation", { name: "Навигация по стране" });
+  const album = navigation.getByRole("button", { name: winter.title, exact: true });
+  const country = navigation.getByRole("button", { name: "Вся страна", exact: true });
+  const empty = page.getByRole("region", { name: "Лента альбома" }).getByText("Пока нет записей");
+  await expect(story).toBeVisible();
+
+  await album.click();
+  await expect(empty).toBeVisible();
+  const params = new URL(page.url()).searchParams;
+  expect(params.get("album")).toBe(winter.id);
+  expect(params.has("city")).toBe(false);
+  await expect(album).toHaveAttribute("aria-pressed", "true");
+  await expect(country).toHaveAttribute("aria-pressed", "false");
+  await expect(story).toHaveCount(0);
+
+  await page.reload();
+  await expect(empty).toBeVisible();
+  await expect(album).toHaveAttribute("aria-pressed", "true");
+  await country.click();
+  await expect(story).toBeVisible();
+  expect(new URL(page.url()).searchParams.has("album")).toBe(false);
 });
 
 test("desktop preserves standard, featured, and story column spans", async ({

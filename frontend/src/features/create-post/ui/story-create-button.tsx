@@ -26,6 +26,7 @@ export function StoryCreateButton({
   const canCreate = Boolean(
     auth.accessToken &&
     journal.ready &&
+    !journal.albumId &&
     journal.authorId === auth.user?.id &&
     (auth.user?.role === "AUTHOR" ||
       auth.user?.role === "ADMIN" ||

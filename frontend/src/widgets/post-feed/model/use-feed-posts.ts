@@ -18,12 +18,13 @@ type FeedPostsOptions = {
   all: boolean;
   isCountryFeed: boolean;
   authorId?: string;
+  albumId?: string;
   accessToken: string | null;
   enabled: boolean;
 };
 
 export function useFeedPosts({
-  order, selectedCountry, selectedCity, all, isCountryFeed, authorId, accessToken, enabled,
+  order, selectedCountry, selectedCity, all, isCountryFeed, authorId, albumId, accessToken, enabled,
 }: FeedPostsOptions) {
   const queryClient = useQueryClient();
   const postsQueryKey = useMemo(
@@ -36,10 +37,11 @@ export function useFeedPosts({
         city: selectedCity,
         all,
         authorId,
+        albumId,
         accessToken,
       },
     ],
-    [order, selectedCountry, selectedCity, all, authorId, accessToken],
+    [order, selectedCountry, selectedCity, all, authorId, albumId, accessToken],
   );
 
   const postsQuery = useInfiniteQuery({
@@ -51,6 +53,7 @@ export function useFeedPosts({
           cursor: typeof pageParam === "string" ? pageParam : undefined,
           order,
           authorId,
+          albumId,
           ...buildPostsCountryCityFilter({
             all,
             selectedCountry,

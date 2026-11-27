@@ -2,9 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useJournalNavigation } from "@/features/journal-navigation";
-import { usePlaces, displayCountryImage,
-  displayCountryName,
-  shouldOpenCountryDirectly, } from "@/entities/place";
+import { displayCountryImage, displayCountryName, usePlaces } from "@/entities/place";
 import Image from "next/image";
 import { MapPin, Palmtree, Trash2 } from "lucide-react";
 import { useAuth } from "@/entities/session";
@@ -141,13 +139,7 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
             {placesQuery.data?.countries.map((c) => {
               const isOpen = openCountry === c.country;
               const isActiveCountry = selectedCountry === c.country;
-              const opensDirectly = shouldOpenCountryDirectly(c.cities);
               const displayCountry = displayCountryName(c.country);
-              const directCity = c.cities[0];
-              const isActiveDirect =
-                opensDirectly &&
-                selectedCountry === c.country &&
-                selectedCity === directCity?.city;
               const countryImage = displayCountryImage(displayCountry);
 
               return (
@@ -155,15 +147,11 @@ export function PlacesSidebar({ onNavigate }: { onNavigate?: () => void }) {
                   <button
                     type="button"
                     className={`group relative h-28 w-full overflow-hidden rounded-[1.35rem] border text-left shadow-lg shadow-black/20 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/70 ${
-                      isActiveCountry || isActiveDirect
+                      isActiveCountry
                         ? "border-emerald-300/70 ring-2 ring-emerald-300/25"
                         : "border-amber-100/10 hover:border-amber-100/25"
                     }`}
-                    onClick={() => {
-                      if (opensDirectly && directCity)
-                        selectCity(c.country, directCity.city);
-                      else selectCountry(c.country);
-                    }}
+                    onClick={() => selectCountry(c.country)}
                   >
                     {countryImage ? (
                       <Image

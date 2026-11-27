@@ -18,6 +18,7 @@ export function CloudinaryUploadButton(props: {
   const [context, setContext] = useState<{
     country: string;
     city: string;
+    albumId?: string;
   } | null>(null);
   const canUpload =
     auth.user &&
@@ -39,6 +40,7 @@ export function CloudinaryUploadButton(props: {
           setContext({
             country: props.journal.country,
             city: props.journal.city,
+            albumId: props.journal.albumId,
           });
         }}
         aria-label="Новая публикация"
@@ -52,6 +54,7 @@ export function CloudinaryUploadButton(props: {
           accessToken={auth.accessToken}
           initialCountry={context.country}
           initialCity={context.city}
+          albumId={context.albumId}
           onClose={() => setContext(null)}
         />
       ) : null}

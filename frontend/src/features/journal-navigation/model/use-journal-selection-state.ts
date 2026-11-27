@@ -21,12 +21,6 @@ export function useJournalSelectionState({
     selectedCountry && !selectedCity && !all,
   );
 
-  const isCitySelection = Boolean(
-    hasCountryOnlySelection &&
-    selectedCountryPlace &&
-    selectedCountryPlace.cities.length > 1,
-  );
-
   const isCountryFeed = Boolean(
     hasCountryOnlySelection && selectedCountryPlace,
   );
@@ -35,8 +29,6 @@ export function useJournalSelectionState({
 
   return {
     selectedCountryPlace,
-    hasCountryOnlySelection,
-    isCitySelection,
     isCountryFeed,
     canLoadPosts,
   };

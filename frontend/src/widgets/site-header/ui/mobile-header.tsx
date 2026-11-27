@@ -20,6 +20,7 @@ export function MobileHeader() {
     isAuthorReady,
     selectedCountry,
     selectedCity,
+    selectedAlbumId,
     deleteMode,
     toggleDeleteMode,
     homeHref,
@@ -29,6 +30,7 @@ export function MobileHeader() {
     ready: isAuthorReady,
     country: selectedCountry,
     city: selectedCity,
+    albumId: selectedAlbumId || undefined,
   };
   const pathname = usePathname();
   const canDelete = Boolean(

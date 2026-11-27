@@ -33,11 +33,12 @@ export function useSelectedAuthor({
     if (requestedId) {
       next.delete("country");
       next.delete("city");
+      next.delete("album");
       next.set("all", "true");
     } else if (!next.has("all") && !next.has("country")) {
       next.set("all", "true");
     }
-    router.replace(`/?${next.toString()}`);
+    router.replace(`/?${next.toString()}`, { scroll: false });
   }, [author, canonicalize, requestedId, router, searchParams]);
 
   function selectAuthor(authorId: string) {
@@ -48,6 +49,7 @@ export function useSelectedAuthor({
       return;
     router.push(
       buildJournalUrl(searchParams.toString(), { type: "author", authorId }),
+      { scroll: false },
     );
   }
 

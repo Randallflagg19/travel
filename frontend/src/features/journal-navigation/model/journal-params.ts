@@ -14,6 +14,7 @@ export type JournalParams = {
   deleteMode: boolean;
   selectedCountry: string;
   selectedCity: string;
+  selectedAlbumId: string;
   all: boolean;
   headerTitle: string;
   isSelectionReady: boolean;
@@ -26,8 +27,10 @@ export function useJournalParams(): JournalParams {
   const order: JournalOrder =
     searchParams.get("order") === "asc" ? "asc" : "desc";
   const deleteMode = searchParams.get("delete") === "1";
-  const { selectedCountry, selectedCity, all } =
+  const { selectedCountry, selectedCity: city, all } =
     readPlaceSelection(searchParams);
+  const selectedAlbumId = selectedCountry ? (searchParams.get("album") ?? "") : "";
+  const selectedCity = selectedAlbumId ? "" : city;
 
   const headerTitle = all
     ? "Все посты"
@@ -46,6 +49,7 @@ export function useJournalParams(): JournalParams {
           type: "order",
           order: next,
         }),
+        { scroll: false },
       );
     },
     [router, searchParams],
@@ -57,6 +61,7 @@ export function useJournalParams(): JournalParams {
     deleteMode,
     selectedCountry,
     selectedCity,
+    selectedAlbumId,
     all,
     headerTitle,
     isSelectionReady,

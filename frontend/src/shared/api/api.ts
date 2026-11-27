@@ -48,6 +48,8 @@ export type PlacesResponse = {
   }>;
 };
 
+export type ApiAlbum = { id: string; country: string; title: string };
+
 export type ApiAuthor = {
   id: string;
   username: string;
@@ -123,6 +125,7 @@ export async function fetchPostsPage(
     country?: string;
     city?: string;
     authorId?: string;
+    albumId?: string;
   },
   accessToken?: string | null,
 ): Promise<PostsPage> {
@@ -134,6 +137,7 @@ export async function fetchPostsPage(
   if (params.country) search.set("country", params.country);
   if (params.city) search.set("city", params.city);
   if (params.authorId) search.set("authorId", params.authorId);
+  if (params.albumId) search.set("albumId", params.albumId);
 
   const headers: HeadersInit = { "Content-Type": "application/json" };
   if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
@@ -191,6 +195,42 @@ export async function fetchPlaces(authorId?: string): Promise<PlacesResponse> {
     throw new Error(`Failed to load places (${res.status}): ${text}`);
   }
   return (await res.json()) as PlacesResponse;
+}
+
+export async function fetchAlbums(
+  authorId: string,
+  country: string,
+  signal?: AbortSignal,
+): Promise<{ albums: ApiAlbum[] }> {
+  const api = getApiBaseUrl();
+  const search = new URLSearchParams({ authorId, country });
+  const res = await fetch(`${api}/places/albums?${search}`, {
+    cache: "no-store",
+    signal,
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res));
+  }
+  return (await res.json()) as { albums: ApiAlbum[] };
+}
+
+export async function createAlbum(
+  accessToken: string,
+  body: { country: string; title: string },
+): Promise<{ album: ApiAlbum }> {
+  const api = getApiBaseUrl();
+  const res = await fetch(`${api}/places/albums`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res));
+  }
+  return (await res.json()) as { album: ApiAlbum };
 }
 
 export async function fetchAuthors(): Promise<AuthorsResponse> {

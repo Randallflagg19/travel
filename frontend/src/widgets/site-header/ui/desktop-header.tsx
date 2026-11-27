@@ -11,13 +11,14 @@ import {
 
 export function DesktopHeader() {
   const auth = useAuth();
-  const { author, isAuthorReady, selectedCountry, selectedCity } =
+  const { author, isAuthorReady, selectedCountry, selectedCity, selectedAlbumId } =
     useJournalNavigation();
   const publicationContext = {
     authorId: author?.id ?? null,
     ready: isAuthorReady,
     country: selectedCountry,
     city: selectedCity,
+    albumId: selectedAlbumId || undefined,
   };
   const displayName = auth.user?.name?.trim()
     ? auth.user.name.trim()

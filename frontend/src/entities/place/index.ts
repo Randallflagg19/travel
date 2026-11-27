@@ -3,5 +3,4 @@ export {
   displayCountryName,
   displayCountryImage,
   displayPlaceTitle,
-  shouldOpenCountryDirectly,
 } from "./lib/place-labels";

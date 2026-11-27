@@ -4,4 +4,5 @@ export type CreatePostContext = {
   ready: boolean;
   country: string;
   city: string;
+  albumId?: string;
 };

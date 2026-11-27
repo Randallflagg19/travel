@@ -13,6 +13,14 @@ test.afterEach(({ page }) => {
 });
 
 const authorId = "00000000-0000-4000-8000-000000000010";
+const winterAlbum = {
+  id: "00000000-0000-4000-8000-000000000020",
+  title: "Зимовка 26–27",
+  country: "Thailand",
+  countryLabel: "Таиланд",
+  cities: ["Bangkok", "Pattaya"],
+};
+const winterFolder = `travel/traveller/TH/${winterAlbum.title}`;
 const pixel = (color = "315755") => `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'%3E%3Crect width='1200' height='800' fill='%23${color}'/%3E%3C/svg%3E`;
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lXcAAAAASUVORK5CYII=", "base64");
 function image(name: string) { return { name, mimeType: "image/png", buffer: png }; }
@@ -25,11 +33,12 @@ function post(id = "old", title = "Старая запись"): ApiPost {
 
 async function mockMedia(page: Page, options: {
   failUpload?: number; losePublish?: boolean; loseUpload?: boolean; posts?: ApiPost[]; cities?: string[];
-  needsCloudinary?: boolean;
+  needsCloudinary?: boolean; album?: typeof winterAlbum;
 } = {}) {
   const state = {
     posts: options.posts ?? [post()], uploads: new Map<string, { type: "PHOTO" | "VIDEO"; ready: boolean }>(),
     reserveOrder: [] as string[], cloudRequests: [] as string[], mediaRequests: [] as string[],
+    assetFolders: [] as string[], sessionAlbums: [] as string[], sessionCountry: "",
     publications: [] as { uploadIds: string[]; title: string; text: string; country: string; city: string }[],
     stories: [] as { mediaType: string; title: string; text: string; country?: string; city?: string }[],
     created: 0, failed: false, lost: false, session: "", deleted: [] as string[],
@@ -41,6 +50,8 @@ async function mockMedia(page: Page, options: {
     if (!publicId) throw new Error("Missing reserved public ID");
     const id = publicId.split("/").at(-1)!;
     state.cloudRequests.push(id);
+    const folder = route.request().postData()?.match(/name="asset_folder"\r\n\r\n([^\r\n]+)/)?.[1];
+    if (folder) state.assetFolders.push(folder);
     if (options.failUpload === state.cloudRequests.length && !state.failed) {
       state.failed = true;
       await route.fulfill({ status: 503, headers: { "Access-Control-Allow-Origin": "*" }, json: { error: "Upload failed" } });
@@ -71,6 +82,9 @@ async function mockMedia(page: Page, options: {
           city, count: state.posts.length, stats: { posts: state.posts.length, photos: 2, videos: 1, stories: 0 },
         })) }] } }); return;
     }
+    if (path === "places/albums") {
+      await route.fulfill({ json: { albums: options.album ? [options.album] : [] } }); return;
+    }
     if (path === "posts" && request.method() === "POST") {
       const body = request.postDataJSON();
       state.stories.push(body);
@@ -83,7 +97,9 @@ async function mockMedia(page: Page, options: {
       state.postQueries.push(url.search);
       const country = url.searchParams.get("country");
       const city = url.searchParams.get("city");
-      const items = state.posts.filter((item) => (!country || item.country === country) && (!city || item.city === city));
+      const albumId = url.searchParams.get("albumId");
+      const items = state.posts.filter((item) => (!country || item.country === country) && (!city || item.city === city)
+        && (!albumId || (albumId === options.album?.id && item.id === "new-post")));
       await route.fulfill({ json: { items, nextCursor: null, hasMore: false } }); return;
     }
     const session = path.match(/^media\/sessions\/([^/]+)$/);
@@ -93,7 +109,12 @@ async function mockMedia(page: Page, options: {
         return;
       }
       state.session = session[1];
-      await route.fulfill({ json: request.method() === "DELETE" ? { postId: state.created ? "new-post" : null } : { id: session[1] } }); return;
+      const albumId = request.postDataJSON()?.albumId;
+      if (albumId) state.sessionAlbums.push(albumId);
+      if (request.method() === "PUT") state.sessionCountry = request.postDataJSON()?.country ?? "";
+      await route.fulfill({ json: request.method() === "DELETE" ? { postId: state.created ? "new-post" : null } : {
+        id: session[1], album: albumId === options.album?.id ? options.album : undefined,
+      } }); return;
     }
     const reserve = path.match(/^media\/sessions\/[^/]+\/uploads\/([^/]+)$/);
     if (reserve) {
@@ -101,7 +122,9 @@ async function mockMedia(page: Page, options: {
       const body = request.postDataJSON();
       if (!state.uploads.has(id)) { state.uploads.set(id, { type: body.mediaType, ready: false }); state.reserveOrder.push(id); }
       await route.fulfill({ json: { cloudName: "test", apiKey: "key", signature: "signed", timestamp: 1,
-        params: { public_id: `travel/test/${id}`, overwrite: false },
+        params: { public_id: `travel/test/${id}`, overwrite: false,
+          asset_folder: state.sessionAlbums.includes(winterAlbum.id) ? winterFolder
+            : state.sessionCountry === "Thailand" ? "travel/traveller/TH" : "travel/traveller" },
         resourceType: body.mediaType === "PHOTO" ? "image" : "video", ready: state.uploads.get(id)!.ready } }); return;
     }
     const complete = path.match(/^media\/sessions\/[^/]+\/uploads\/([^/]+)\/complete$/);
@@ -175,6 +198,35 @@ test("author without Cloudinary sees the connection error before choosing files"
   expect(state.cloudRequests).toHaveLength(0);
 });
 
+test("a photo from the album form uses the album folder and appears in all matching feeds", async ({ page }) => {
+  const state = await mockMedia(page, { album: winterAlbum, cities: winterAlbum.cities });
+  const dialog = await openComposer(page, `country=Thailand&album=${winterAlbum.id}`);
+  await expect(dialog.getByText("Таиланд → Зимовка 26–27", { exact: true })).toBeVisible();
+  const city = dialog.getByRole("combobox", { name: /Город/ });
+  await expect(city).toHaveValue("");
+  await expect(city.locator("option")).toHaveText(["Без города", "Bangkok", "Pattaya"]);
+  await city.selectOption("Bangkok");
+  await dialog.getByLabel("Выбрать фото и видео").setInputFiles(image("winter.png"));
+  await dialog.getByLabel("Название").fill("Фото зимовки");
+  await dialog.getByRole("button", { name: "Опубликовать", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.sessionAlbums).toEqual([winterAlbum.id]);
+  expect(state.assetFolders).toEqual([winterFolder]);
+  expect(state.cloudRequests).toHaveLength(1);
+  expect(state.publications[0]).toMatchObject({ country: "Thailand", city: "Bangkok" });
+  await expect(page.getByText("Фото зимовки", { exact: true })).toBeVisible();
+  await expect(page.getByText("Старая запись", { exact: true })).toHaveCount(0);
+  expect(state.postQueries.some((query) => new URLSearchParams(query).get("albumId") === winterAlbum.id)).toBe(true);
+
+  const cities = page.getByRole("group", { name: "Города", exact: true });
+  await cities.getByRole("button", { name: "Вся страна", exact: true }).click();
+  await expect(page.getByText("Фото зимовки", { exact: true })).toBeVisible();
+  await expect(page.getByText("Старая запись", { exact: true })).toBeVisible();
+  await cities.getByRole("button", { name: "Bangkok", exact: true }).click();
+  await expect(page.getByText("Фото зимовки", { exact: true })).toBeVisible();
+  await expect(page.getByText("Старая запись", { exact: true })).toHaveCount(0);
+});
+
 test("files stay local until Publish; order, cover and removal are preserved", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = await mockMedia(page);
@@ -224,6 +276,8 @@ for (const context of [
     await dialog.getByLabel("Выбрать фото и видео").setInputFiles([image("trip.png")]);
     await dialog.getByRole("button", { name: "Опубликовать", exact: true }).click();
     await expect(dialog).toHaveCount(0);
+    expect(state.sessionCountry).toBe(context.country);
+    expect(state.assetFolders).toEqual([context.country ? "travel/traveller/TH" : "travel/traveller"]);
     expect(state.publications[0]).toMatchObject({ country: context.country, city: context.city });
   });
 
@@ -680,7 +734,8 @@ test("a country with multiple cities shows new country posts and still filters b
   await expect(bangkokPost).toBeVisible();
   await expect(chiangMaiPost).toBeVisible();
 
-  await page.getByRole("button", { name: /город Bangkok/i }).click();
+  await page.getByRole("group", { name: "Города", exact: true })
+    .getByRole("button", { name: "Bangkok", exact: true }).click();
   await expect(page).toHaveURL(/city=Bangkok/);
   await expect(bangkokPost).toBeVisible();
   await expect(countryPost).toHaveCount(0);

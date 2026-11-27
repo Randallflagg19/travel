@@ -6,20 +6,22 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, LoaderCircle, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/shared/ui/button";
-import { LOCAL_MEDIA_LIMITS, MediaCloudinaryConnectionRequiredError, MediaPublishingUnavailableError, cancelMediaSession, completeMedia, localMediaType, openMediaSession,
-  publishMedia, reserveMedia, uploadToCloudinary, type PublicationInput } from "../model/media-upload";
+import { LOCAL_MEDIA_LIMITS, MediaCloudinaryConnectionRequiredError, MediaPublishingUnavailableError, MediaRequestError, cancelMediaSession, completeMedia, localMediaType, openMediaSession,
+  publishMedia, reserveMedia, uploadToCloudinary, type PublicationAlbum, type PublicationInput } from "../model/media-upload";
 
 type LocalMedia = { id: string; file: File; url: string; type: "PHOTO" | "VIDEO";
   status: "local" | "uploading" | "ready" | "error"; progress: number; error?: string };
 
-export function MediaPostComposer({ accessToken, initialCountry, initialCity, onClose }: {
-  accessToken: string; initialCountry: string; initialCity: string; onClose: () => void;
+export function MediaPostComposer({ accessToken, initialCountry, initialCity, albumId, onClose }: {
+  accessToken: string; initialCountry: string; initialCity: string; albumId?: string; onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const [sessionId] = useState(() => crypto.randomUUID());
   const [files, setFiles] = useState<LocalMedia[]>([]);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
+  const [album, setAlbum] = useState<PublicationAlbum>();
+  const [city, setCity] = useState(initialCity);
   const [busy, setBusy] = useState(false);
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +38,25 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
   useEffect(() => {
     if (sessionOpening.current) return;
     sessionAttempted.current = true;
-    const request = openMediaSession(accessToken, sessionId);
+    const country = initialCountry.trim();
+    const place = albumId ? { albumId } : country ? { country } : undefined;
+    const request = openMediaSession(accessToken, sessionId, place);
     sessionOpening.current = request;
     void request.then(
-      () => setSessionStatus("ready"),
+      ({ album: sessionAlbum }) => {
+        if (albumId && sessionAlbum?.id !== albumId) {
+          setSessionStatus({ error: "Публикация в альбом пока недоступна на сервере." });
+          return;
+        }
+        setAlbum(sessionAlbum);
+        setSessionStatus("ready");
+      },
       (error: unknown) => {
         sessionOpening.current = null;
         if (error instanceof MediaCloudinaryConnectionRequiredError || error instanceof MediaPublishingUnavailableError) {
+          sessionAttempted.current = false;
+          setSessionStatus({ error: error.message });
+        } else if (albumId && error instanceof MediaRequestError && error.status === 400) {
           sessionAttempted.current = false;
           setSessionStatus({ error: error.message });
         } else {
@@ -50,7 +64,7 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
         }
       },
     );
-  }, [accessToken, sessionId]);
+  }, [accessToken, albumId, initialCountry, sessionId]);
 
   useEffect(() => {
     const previews = urls.current;
@@ -150,12 +164,24 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
           }
         }
         if (failed) { setError("Публикация пока не создана. Повторите загрузку или уберите файлы с ошибкой — готовые файлы сохранятся."); return; }
-        prepared.current = { uploadIds: files.map((file) => file.id), title: title.trim(), text: text.trim(), country: initialCountry.trim(), city: initialCity.trim() };
+        prepared.current = {
+          uploadIds: files.map((file) => file.id),
+          title: title.trim(),
+          text: text.trim(),
+          country: (album?.country ?? initialCountry).trim(),
+          city: city.trim(),
+        };
         setLocked(true);
       }
       await publishMedia(accessToken, sessionId, prepared.current, abort.signal);
       published();
     } catch (submitError) {
+      if (!abort.signal.aborted && album && prepared.current && submitError instanceof MediaRequestError && submitError.status === 400) {
+        prepared.current = null;
+        setLocked(false);
+        setError(submitError.message);
+        return;
+      }
       if (!abort.signal.aborted) setError(prepared.current
         ? "Не удалось получить подтверждение публикации. Нажмите «Повторить публикацию»: повтор не создаст второй пост."
         : submitError instanceof Error ? `Не удалось начать публикацию: ${submitError.message}` : "Не удалось начать публикацию. Попробуйте ещё раз.");
@@ -202,6 +228,23 @@ export function MediaPostComposer({ accessToken, initialCountry, initialCity, on
           </Dialog.Description>
           {sessionStatus === "opening" ? <p role="status" className="mb-4 text-sm text-amber-50/65">Открываем форму…</p> : null}
           {typeof sessionStatus === "object" ? <p role="alert" className="mb-4 rounded-lg border border-red-200/20 bg-red-950/25 p-3 text-sm text-red-100">{sessionStatus.error}</p> : null}
+          {album ? (
+            <div className="mb-4 space-y-2">
+              <p className="text-sm font-medium">{album.countryLabel} → {album.title}</p>
+              <label className="block text-sm">
+                Город <span className="text-white/45">необязательно</span>
+                <select
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                  disabled={disabled}
+                  className="mt-1.5 block w-full rounded-lg border border-white/15 bg-[#101d20] px-3 py-2"
+                >
+                  <option value="">Без города</option>
+                  {album.cities.map((city) => <option key={city} value={city}>{city}</option>)}
+                </select>
+              </label>
+            </div>
+          ) : null}
           <input ref={input} type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,image/gif,video/*,.heic,.heif,.mkv"
             className="sr-only" aria-label="Выбрать фото и видео" disabled={disabled}
             onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} />

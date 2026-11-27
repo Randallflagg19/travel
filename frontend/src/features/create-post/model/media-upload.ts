@@ -2,10 +2,17 @@ import { getApiBaseUrl, readApiError } from "@/shared/api/api";
 
 export const LOCAL_MEDIA_LIMITS = { count: 10, photoBytes: 20 * 1024 * 1024, videoBytes: 90 * 1024 * 1024, videoSeconds: 600 };
 export type PublicationInput = { uploadIds: string[]; title: string; text: string; country: string; city: string };
+export type PublicationAlbum = { id: string; title: string; country: string; countryLabel: string; cities: string[] };
 type Reservation = {
   cloudName: string; apiKey: string; signature: string; timestamp: number;
-  resourceType: "image" | "video"; params: { public_id: string; overwrite: boolean }; ready: boolean;
+  resourceType: "image" | "video"; params: { public_id: string; overwrite: boolean; asset_folder?: string }; ready: boolean;
 };
+
+export class MediaRequestError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
 
 export class MediaPublishingUnavailableError extends Error {
   constructor() {
@@ -43,7 +50,7 @@ async function mediaRequest<T>(token: string, path: string, method: string, body
       if (openingSession && response.status === 403 && message === "Connect Cloudinary before opening an upload form") {
         throw new MediaCloudinaryConnectionRequiredError();
       }
-      throw new Error(message);
+      throw new MediaRequestError(response.status, message);
     }
     return await response.json() as T;
   } catch (error) {
@@ -55,8 +62,10 @@ async function mediaRequest<T>(token: string, path: string, method: string, body
   }
 }
 
-export function openMediaSession(token: string, id: string, signal?: AbortSignal) {
-  return mediaRequest<{ id: string; limits: typeof LOCAL_MEDIA_LIMITS }>(token, `sessions/${id}`, "PUT", undefined, signal);
+export function openMediaSession(token: string, id: string, place?: { albumId: string } | { country: string }) {
+  return mediaRequest<{ id: string; limits: typeof LOCAL_MEDIA_LIMITS; album?: PublicationAlbum }>(
+    token, `sessions/${id}`, "PUT", place,
+  );
 }
 export function reserveMedia(token: string, session: string, id: string, type: "PHOTO" | "VIDEO", bytes: number, signal?: AbortSignal) {
   return mediaRequest<Reservation>(token, `sessions/${session}/uploads/${id}`, "PUT", { mediaType: type, bytes }, signal);

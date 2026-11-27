@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { usePlaces } from "@/entities/place";
+import { displayCountryName, usePlaces } from "@/entities/place";
 import { AuthorSelector } from "@/entities/author";
 import { useAuth } from "@/entities/session";
 import {
@@ -15,24 +16,31 @@ import {
 import { PostMetadataDialog, PostDeleteDialog } from "@/features/manage-post";
 import { MediaViewer, useMediaViewer } from "@/features/media-viewer";
 import { FeedPostGrid, useFeedPosts } from "@/widgets/post-feed";
+import { fetchAlbums, type ApiPost } from "@/shared/api/api";
 import { useInView } from "@/shared/lib/hooks/use-in-view";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { useJournalPostActions } from "../model/use-journal-post-actions";
 import { selectHeroPhoto } from "../model/hero-photo-selection";
 import { selectFeedMediaStats } from "../model/journal-media-stats";
+import { JournalAlbums } from "./journal-albums";
 import { JournalCloudinaryConnection } from "./journal-cloudinary-connection";
 import { FeedHero } from "./journal-hero";
 import { FeedServerLoadingNotice } from "./journal-loading-notice";
 
+const EMPTY_POSTS: ApiPost[] = [];
+
 export function JournalPage() {
   const auth = useAuth();
+  const queryClient = useQueryClient();
   const {
     order,
     setOrder,
     deleteMode,
     selectedCountry,
     selectedCity,
+    selectedAlbumId,
+    selectAlbum,
     all,
     headerTitle,
     isSelectionReady,
@@ -46,24 +54,57 @@ export function JournalPage() {
     isAuthorReady && auth.user?.role === "AUTHOR" && auth.user.id === author?.id;
   const placesQuery = usePlaces(author?.id, isAuthorReady);
 
-  const { isCitySelection, isCountryFeed, canLoadPosts } =
+  const { selectedCountryPlace, isCountryFeed, canLoadPosts: canLoadPlacePosts } =
     useJournalSelectionState({
       places: placesQuery.data,
       selectedCountry,
       selectedCity,
       all,
     });
+  const isAlbumView = Boolean(selectedAlbumId);
+  const albumAuthorId =
+    isAuthorReady && selectedCountry && (selectedCountryPlace || isAlbumView)
+      ? author?.id
+      : undefined;
+  const albumsKey = ["albums", albumAuthorId, selectedCountry];
+  const albumsQuery = useQuery({
+    queryKey: albumsKey,
+    queryFn: albumAuthorId
+      ? ({ signal }) => fetchAlbums(albumAuthorId, selectedCountry, signal)
+      : skipToken,
+  });
+  const albums = albumsQuery.data?.albums ?? [];
+  const selectedAlbum = albums.find((album) => album.id === selectedAlbumId);
+  const canLoadPosts = isAlbumView ? Boolean(selectedAlbum) : canLoadPlacePosts;
+  const albumTitle = selectedAlbum
+    ? `${displayCountryName(selectedCountry)} → ${selectedAlbum.title}`
+    : null;
+  const albumFeedMessage = selectedAlbum
+    ? "Пока нет записей"
+    : albumsQuery.isError
+      ? "Не удалось загрузить альбомы."
+      : albumsQuery.isSuccess
+        ? "Альбом не найден"
+        : "Загружаем альбом…";
+  const showCountryNavigation = Boolean(selectedCountryPlace || selectedAlbum);
+  const canCreateAlbum =
+    auth.user?.id === author?.id &&
+    (auth.user?.role === "AUTHOR" ||
+      auth.user?.role === "ADMIN" ||
+      auth.user?.role === "SUPERADMIN");
 
-  const { postsQueryKey, postsQuery, items, loadMorePosts } = useFeedPosts({
+  const { postsQueryKey, postsQuery, items: placePosts, loadMorePosts } = useFeedPosts({
     order,
     selectedCountry,
     selectedCity,
     all,
     isCountryFeed,
     authorId: author?.id,
+    albumId: selectedAlbum?.id,
     accessToken: auth.accessToken,
     enabled: Boolean(canLoadPosts && auth.hydrated && isAuthorReady),
   });
+  const items = isAlbumView && !selectedAlbum ? EMPTY_POSTS : placePosts;
   const {
     editingPost,
     setEditingPost,
@@ -92,7 +133,7 @@ export function JournalPage() {
   } = postsQuery;
 
   const viewer = useMediaViewer(items, {
-    hasMore: Boolean(hasNextPage),
+    hasMore: canLoadPosts && Boolean(hasNextPage),
     loadMore: loadMorePosts,
     loadMoreFailed: isFetchNextPageError && !isFetchingNextPage,
   });
@@ -101,6 +142,7 @@ export function JournalPage() {
   const { ref: sentinelRef, inView } = useInView<HTMLDivElement>(inViewOptions);
 
   useEffect(() => {
+    if (!canLoadPosts) return;
     if (viewer.expandedPost) return;
     if (!inView) return;
     if (!hasNextPage) return;
@@ -108,6 +150,7 @@ export function JournalPage() {
     if (isFetchNextPageError) return;
     void fetchNextPage();
   }, [
+    canLoadPosts,
     viewer.expandedPost,
     inView,
     hasNextPage,
@@ -119,12 +162,16 @@ export function JournalPage() {
   const showPlaceInCard = Boolean(!all && !(selectedCountry && selectedCity));
   const showPosts = canLoadPosts && items.length > 0;
   const isInitialPostsLoading = Boolean(canLoadPosts && postsQuery.isLoading);
+  const showAlbumStatus =
+    isAlbumView && isAuthorReady &&
+    (!selectedAlbum || (postsQuery.isSuccess && items.length === 0));
   const heroTitle =
-    isSelectionReady && !all
+    albumTitle ??
+    (isSelectionReady && !all
       ? headerTitle.replace(" / ", ": ")
       : author?.username.toLowerCase() === "tapir"
         ? "Tapir Travel"
-        : author?.name?.trim() || author?.username || "Travel";
+        : author?.name?.trim() || author?.username || "Travel");
   const heroPhoto =
     author?.username.toLowerCase() === "tapir"
       ? selectHeroPhoto({
@@ -133,12 +180,14 @@ export function JournalPage() {
           city: selectedCity,
         })
       : null;
-  const heroMediaStats = selectFeedMediaStats({
-    places: placesQuery.data,
-    all,
-    selectedCountry,
-    selectedCity,
-  });
+  const heroMediaStats = isAlbumView
+    ? null
+    : selectFeedMediaStats({
+        places: placesQuery.data,
+        all,
+        selectedCountry,
+        selectedCity,
+      });
 
   return (
     <main className="mx-auto flex w-full max-w-[1720px] flex-col gap-4 overflow-x-hidden px-4 py-3 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
@@ -174,32 +223,56 @@ export function JournalPage() {
         photoUnoptimized={heroPhoto?.unoptimized}
       />
 
+      <MobileChapters
+        selectedCountry={selectedCountry}
+        places={placesQuery.data}
+        isLoading={placesQuery.isLoading}
+      />
+
+      {isAuthorReady && author && showCountryNavigation ? (
+        <nav aria-label="Навигация по стране" className="grid gap-2.5">
+          <CitySelection
+            country={selectedCountry}
+            cities={selectedCountryPlace?.cities ?? []}
+            selectedCity={isAlbumView ? null : selectedCity}
+          />
+          <JournalAlbums
+            key={`${author.id}:${selectedCountry}`}
+            country={selectedCountry}
+            accessToken={canCreateAlbum ? auth.accessToken : null}
+            albums={albums}
+            selectedAlbumId={selectedAlbumId}
+            isPending={albumsQuery.isPending}
+            isError={albumsQuery.isError}
+            onSelect={(albumId) => selectAlbum(selectedCountry, albumId)}
+            onCreated={() => {
+              void queryClient.invalidateQueries({ queryKey: albumsKey, exact: true });
+            }}
+          />
+        </nav>
+      ) : null}
+
+      <JournalFilters
+        headerTitle={albumTitle ?? headerTitle}
+        isSelectionReady={Boolean(isSelectionReady)}
+        showCountryFilters={isAuthorReady && showCountryNavigation}
+        order={order}
+        onOrderChange={setOrder}
+      />
+
       <FeedServerLoadingNotice
         isPlacesLoading={authorsQuery.isLoading || placesQuery.isLoading}
         isPostsLoading={isInitialPostsLoading}
       />
 
-      <MobileChapters
-        selectedCountry={selectedCountry}
-        selectedCity={selectedCity}
-        places={placesQuery.data}
-        isLoading={placesQuery.isLoading}
-        order={order}
-        onOrderChange={setOrder}
-      />
-
-      <JournalFilters
-        headerTitle={headerTitle}
-        isSelectionReady={Boolean(isSelectionReady)}
-        order={order}
-        onOrderChange={setOrder}
-      />
-
-      {isCitySelection ? (
-        <CitySelection
-          selectedCountry={selectedCountry}
-          places={placesQuery.data}
-        />
+      {showAlbumStatus ? (
+        <section aria-label="Лента альбома" className="min-h-dvh">
+          <Card className="travel-glass border-white/10 bg-white/[0.055]">
+            <CardHeader>
+              <CardTitle aria-live="polite">{albumFeedMessage}</CardTitle>
+            </CardHeader>
+          </Card>
+        </section>
       ) : null}
 
       {!canLoadPosts ? null : postsQuery.isLoading ? null : postsQuery.isError &&
@@ -214,7 +287,7 @@ export function JournalPage() {
             </CardDescription>
           </CardHeader>
         </Card>
-      ) : items.length === 0 ? (
+      ) : !isAlbumView && items.length === 0 ? (
         <Card className="travel-glass border-white/10 bg-white/[0.055]">
           <CardHeader>
             <CardTitle className="text-white">Пока пусто</CardTitle>

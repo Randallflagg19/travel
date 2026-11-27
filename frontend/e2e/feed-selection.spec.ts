@@ -47,3 +47,26 @@ test("country navigation clears the previous city without losing journal or orde
   const url = buildJournalUrl("author=friend&country=Thailand&city=Bangkok&order=asc", { type: "country", country: "Egypt" });
   expect(Object.fromEntries(new URL(url, "http://localhost").searchParams)).toEqual({ author: "friend", country: "Egypt", order: "asc" });
 });
+
+test("album navigation replaces the city and keeps journal and ordering", () => {
+  const selected = buildJournalUrl("author=friend&country=Thailand&city=Bangkok&order=asc", {
+    type: "album",
+    country: "Thailand",
+    albumId: "winter",
+  });
+  const albumParams = new URL(selected, "http://localhost").searchParams;
+  expect(Object.fromEntries(albumParams)).toEqual({
+    author: "friend",
+    country: "Thailand",
+    order: "asc",
+    album: "winter",
+  });
+
+  const sorted = buildJournalUrl(albumParams.toString(), { type: "order", order: "desc" });
+  expect(new URL(sorted, "http://localhost").searchParams.get("album")).toBe("winter");
+
+  const country = buildJournalUrl(albumParams.toString(), { type: "country", country: "Thailand" });
+  expect(new URL(country, "http://localhost").searchParams.has("album")).toBe(false);
+  const city = buildJournalUrl(albumParams.toString(), { type: "city", country: "Thailand", city: "Pattaya" });
+  expect(new URL(city, "http://localhost").searchParams.has("album")).toBe(false);
+});

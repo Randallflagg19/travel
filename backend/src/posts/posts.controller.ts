@@ -34,6 +34,7 @@ export class PostsController {
     @Query('unknown') unknown?: string,
     @Query('order') order?: 'asc' | 'desc',
     @Query('authorId', new ParseUUIDPipe({ optional: true })) authorId?: string,
+    @Query('albumId', new ParseUUIDPipe({ optional: true })) albumId?: string,
   ) {
     return await this.posts.listPage({
       limit,
@@ -44,6 +45,7 @@ export class PostsController {
       order,
       userId: user?.sub,
       authorId,
+      albumId,
     });
   }
 

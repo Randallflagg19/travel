@@ -72,6 +72,9 @@ databaseTest(
         '004_author_cloudinary_sessions',
         '005_author_media',
         '006_albums',
+        '007_album_media',
+        '008_album_folder_paths',
+        '009_media_session_country',
       ]);
       expect(
         await sql`SELECT * FROM post_media WHERE post_id = ${oldId}`,
@@ -90,6 +93,7 @@ databaseTest(
 
       const cloud = {
         getClientConfig: () => ({ cloudName: 'demo', apiKey: 'unused' }),
+        getFolderMode: () => Promise.resolve('fixed'),
         signUpload: () => ({ signature: 'unused', timestamp: 1 }),
         getUploadResource: jest.fn((id: string, type: string) =>
           Promise.resolve({
@@ -228,5 +232,236 @@ databaseTest(
         undefined,
       );
     }, 30000);
+
+    it('publishes one attachment into an author album and the matching place feeds', async () => {
+      const userId = randomUUID();
+      const otherId = randomUUID();
+      const albumId = randomUUID();
+      await sql`
+        INSERT INTO users (id, username, password_hash, role)
+        VALUES (${userId}, 'album-author', 'unused', 'AUTHOR'),
+               (${otherId}, 'other-album-author', 'unused', 'ADMIN')
+      `;
+      await sql`
+        INSERT INTO posts (user_id, media_type, media_url, title, text, country, city)
+        VALUES (${userId}, 'STORY', '', 'Existing story', 'Body', 'Thailand', 'Bangkok')
+      `;
+      await sql`
+        INSERT INTO albums (id, user_id, country, title)
+        VALUES (${albumId}, ${userId}, 'Thailand', 'Зимовка 26–27')
+      `;
+      const credentials = {
+        cloudName: 'author-album',
+        apiKey: 'key',
+        apiSecret: 'secret',
+      };
+      await sql`
+        INSERT INTO author_cloudinary_connections (user_id, cloud_name, api_key, api_secret_encrypted)
+        VALUES (${userId}, ${credentials.cloudName}, ${credentials.apiKey}, 'stubbed')
+      `;
+      const cloud = {
+        getClientConfig: jest.fn(() => ({
+          cloudName: credentials.cloudName,
+          apiKey: credentials.apiKey,
+        })),
+        getUploadSizeLimit: jest.fn().mockResolvedValue(20_000),
+        getFolderMode: jest
+          .fn()
+          .mockResolvedValueOnce('dynamic')
+          .mockResolvedValueOnce('fixed')
+          .mockResolvedValue('dynamic'),
+        signUpload: jest.fn(() => ({ signature: 'unused', timestamp: 1 })),
+        getUploadResource: jest.fn((publicId: string) =>
+          Promise.resolve({
+            public_id: publicId,
+            resource_type: 'image',
+            format: 'jpg',
+            bytes: 1024,
+            width: 1200,
+            height: 800,
+            secure_url: `https://res.cloudinary.com/author-album/image/upload/${publicId}.jpg`,
+          }),
+        ),
+      };
+      const db = { client: sql } as unknown as DbService;
+      const config = { get: () => 'development' } as unknown as ConfigService;
+      const storage = cloud as unknown as CloudinaryService;
+      const authorCloud = {
+        credentialsFor: jest.fn().mockResolvedValue(credentials),
+      } as unknown as AuthorCloudinaryService;
+      const cleanup = new MediaCleanupService(
+        db,
+        storage,
+        new MediaEnvironmentService(config),
+        authorCloud,
+      );
+      const environment = new MediaEnvironmentService(config);
+      const media = new MediaSessionsService(
+        db,
+        storage,
+        environment,
+        cleanup,
+        authorCloud,
+      );
+      const publisher = new PublishMediaPostService(db, media, cleanup);
+      const queries = new PostsQueryService(db);
+      const actor = { sub: userId, role: 'AUTHOR' } as const;
+      const session = randomUUID();
+      const photo = randomUUID();
+      const folder = 'TH/Зимовка 26–27';
+      await expect(
+        media.open(session, { sub: otherId, role: 'ADMIN' }, albumId),
+      ).rejects.toThrow('Альбом недоступен');
+      await expect(media.open(session, actor, albumId)).resolves.toMatchObject({
+        album: {
+          id: albumId,
+          country: 'Thailand',
+          countryLabel: 'Таиланд',
+          cities: ['Bangkok'],
+        },
+      });
+      await expect(media.open(session, actor)).rejects.toThrow('другой ленты');
+      const upload = { mediaType: 'PHOTO', bytes: 1024 };
+      const reservation = await media.reserve(session, photo, userId, upload);
+      expect(reservation.params).toEqual({
+        public_id: `travel/development/${userId}/${session}/${photo}`,
+        asset_folder: `travel/album-author/${folder}`,
+        overwrite: false,
+      });
+      expect(
+        (await media.reserve(session, photo, userId, upload)).params,
+      ).toEqual(reservation.params);
+      expect(cloud.getFolderMode).toHaveBeenCalledTimes(1);
+      expect(cloud.getFolderMode).toHaveBeenCalledWith(credentials);
+      await media.complete(session, photo, userId);
+      await expect(
+        publisher.publish(session, userId, {
+          uploadIds: [photo],
+          country: 'Thailand',
+          city: 'Paris',
+        }),
+      ).rejects.toThrow('Город не найден');
+      const input = {
+        uploadIds: [photo],
+        country: 'Thailand',
+        city: 'Bangkok',
+      };
+      const { postId } = await publisher.publish(session, userId, input);
+      await expect(publisher.publish(session, userId, input)).resolves.toEqual({
+        postId,
+      });
+
+      const fixedSession = randomUUID();
+      const fixedPhoto = randomUUID();
+      await sql`UPDATE albums SET title = 'Новое название' WHERE id = ${albumId}`;
+      await media.open(fixedSession, actor, albumId);
+      expect(
+        (await media.reserve(fixedSession, fixedPhoto, userId, upload)).params,
+      ).toEqual({
+        public_id: `travel/development/${userId}/${folder}/${fixedPhoto}`,
+        overwrite: false,
+      });
+      await media.complete(fixedSession, fixedPhoto, userId);
+      const { postId: noCityPost } = await publisher.publish(
+        fixedSession,
+        userId,
+        { uploadIds: [fixedPhoto] },
+      );
+      for (const order of ['asc', 'desc'] as const) {
+        const album = await queries.listPage({
+          authorId: userId,
+          albumId,
+          order,
+        });
+        expect(album.items.map((post) => post.id).sort()).toEqual(
+          [postId, noCityPost].sort(),
+        );
+        expect(album.items.map((post) => post.attachments?.length)).toEqual([
+          1, 1,
+        ]);
+      }
+      const country = await queries.listPage({
+        authorId: userId,
+        country: 'Thailand',
+      });
+      expect(country.items.map((post) => post.id)).toEqual(
+        expect.arrayContaining([postId, noCityPost]),
+      );
+      const city = await queries.listPage({
+        authorId: userId,
+        country: 'Thailand',
+        city: 'Bangkok',
+      });
+      expect(city.items.map((post) => post.id)).toContain(postId);
+      expect(city.items.map((post) => post.id)).not.toContain(noCityPost);
+      await expect(
+        queries.listPage({ authorId: otherId, albumId }),
+      ).resolves.toMatchObject({ items: [] });
+
+      const duplicateAlbum = randomUUID();
+      await sql`
+        INSERT INTO albums (id, user_id, country, title)
+        VALUES (${duplicateAlbum}, ${userId}, 'Thailand', 'Зимовка 26–27')
+      `;
+      const duplicateSession = randomUUID();
+      await media.open(duplicateSession, actor, duplicateAlbum);
+      const duplicate = await media.reserve(
+        duplicateSession,
+        randomUUID(),
+        userId,
+        upload,
+      );
+      expect(duplicate.params.asset_folder).toBe(
+        `travel/album-author/${folder} (2)`,
+      );
+    }, 30000);
+
+    it('keeps a country with albums in the journal after its last post is deleted', async () => {
+      await runVersionedMigrations(sql);
+      const userId = randomUUID();
+      const otherId = randomUUID();
+      const postId = randomUUID();
+      await sql`
+        INSERT INTO users (id, username, password_hash, role)
+        VALUES (${userId}, 'empty-album-owner', 'unused', 'AUTHOR'),
+               (${otherId}, 'empty-album-other', 'unused', 'AUTHOR')
+      `;
+      await sql`
+        INSERT INTO posts (id, user_id, media_type, media_url, country, city)
+        VALUES (${postId}, ${userId}, 'STORY', '', 'Thailand', 'Pattaya')
+      `;
+      const places = new PlacesService({ client: sql } as unknown as DbService);
+      const album = await places.createAlbum(userId, 'Thailand', 'Зимовка');
+      await expect(places.listPlaces(userId)).resolves.toMatchObject({
+        countries: [{ country: 'Thailand', count: 1 }],
+        totals: { posts: 1, stories: 1 },
+      });
+
+      await sql`DELETE FROM posts WHERE id = ${postId}`;
+
+      const zeroStats = { posts: 0, photos: 0, videos: 0, stories: 0 };
+      await expect(places.listPlaces(userId)).resolves.toEqual({
+        countries: [
+          { country: 'Thailand', count: 0, cities: [], stats: zeroStats },
+        ],
+        totals: zeroStats,
+      });
+      await expect(places.listAlbums(userId, 'Thailand')).resolves.toEqual([
+        album,
+      ]);
+      await expect(
+        places.createAlbum(userId, 'Thailand', 'Второй альбом'),
+      ).resolves.toMatchObject({
+        country: 'Thailand',
+        title: 'Второй альбом',
+      });
+      await expect(places.listPlaces(otherId)).resolves.toEqual({
+        countries: [],
+        totals: zeroStats,
+      });
+      await expect(
+        places.createAlbum(otherId, 'Thailand', 'Чужой альбом'),
+      ).rejects.toThrow('Страна не найдена');
+    });
   },
 );

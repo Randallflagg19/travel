@@ -60,6 +60,7 @@ export class PostsQueryService {
     order?: 'asc' | 'desc';
     userId?: string;
     authorId?: string;
+    albumId?: string;
   }): Promise<{
     items: PostRow[];
     nextCursor: string | null;
@@ -87,6 +88,7 @@ export class PostsQueryService {
               FROM posts p
               WHERE
                 (${params?.authorId ?? null}::uuid IS NULL OR p.user_id = ${params?.authorId ?? null}::uuid)
+                AND (${params?.albumId ?? null}::uuid IS NULL OR p.album_id = ${params?.albumId ?? null}::uuid)
                 AND
                 (
                   ${wantUnknown}::boolean = false
@@ -169,6 +171,7 @@ export class PostsQueryService {
               FROM posts p
               WHERE
                 (${params?.authorId ?? null}::uuid IS NULL OR p.user_id = ${params?.authorId ?? null}::uuid)
+                AND (${params?.albumId ?? null}::uuid IS NULL OR p.album_id = ${params?.albumId ?? null}::uuid)
                 AND
                 (
                   ${wantUnknown}::boolean = false

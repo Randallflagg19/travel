@@ -113,6 +113,22 @@ export class CloudinaryService {
     return { signature, timestamp: Number(timestamp) };
   }
 
+  async getFolderMode(
+    credentials?: CloudinaryCredentials,
+  ): Promise<'dynamic' | 'fixed'> {
+    const message = 'Не удалось определить режим папок в Cloudinary';
+    const options = this.sdkOptions(credentials);
+    const result = await cloudinary.api
+      .config({ ...options, settings: true, timeout: 5_000 })
+      .catch((error: unknown) => {
+        throw cloudinaryFailure(cloudinaryStatus(error), message);
+      });
+    const mode = (result as { settings?: { folder_mode?: unknown } }).settings
+      ?.folder_mode;
+    if (mode === 'dynamic' || mode === 'fixed') return mode;
+    throw cloudinaryFailure(undefined, message);
+  }
+
   async getUploadSizeLimit(
     resourceType: 'image' | 'video',
     { cloudName, apiKey, apiSecret }: CloudinaryCredentials,

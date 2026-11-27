@@ -46,6 +46,25 @@ export class PublishMediaPostService {
         return { postId: session.post_id! };
       }
       this.sessions.assertOpen(session);
+      const sessionCountry = session.album_country ?? session.country;
+      const country = sessionCountry ?? body.country;
+      if (sessionCountry && body.country && body.country !== sessionCountry) {
+        throw new BadRequestException(
+          session.album_id
+            ? 'Страна публикации должна совпадать со страной альбома'
+            : 'Страна публикации должна совпадать со страной формы',
+        );
+      }
+      if (session.album_id && body.city) {
+        const [city] = await sql`
+          SELECT 1 FROM posts
+          WHERE user_id = ${userId}::uuid AND btrim(country) = ${country}
+            AND btrim(city) = ${body.city}
+          LIMIT 1
+        `;
+        if (!city)
+          throw new BadRequestException('Город не найден в этой стране');
+      }
       const uploads = await sql<
         MediaUpload[]
       >`SELECT * FROM media_uploads WHERE session_id = ${id}::uuid AND id = ANY(${sql.array(body.uploadIds)}::uuid[])`;
@@ -63,10 +82,10 @@ export class PublishMediaPostService {
       const cover = ordered[0];
       const [post] = await sql<{ id: string }[]>`
         INSERT INTO posts (user_id, media_type, media_url, cloudinary_public_id, folder,
-          media_width, media_height, title, text, country, city)
+          media_width, media_height, title, text, country, city, album_id)
         VALUES (${userId}::uuid, ${cover.media_type}, ${cover.media_url}, ${cover.public_id},
-          ${cover.public_id.slice(0, cover.public_id.lastIndexOf('/'))}, ${cover.media_width}, ${cover.media_height},
-          ${body.title}, ${body.text}, ${body.country}, ${body.city}) RETURNING id
+          ${cover.asset_folder ?? cover.public_id.slice(0, cover.public_id.lastIndexOf('/'))}, ${cover.media_width}, ${cover.media_height},
+          ${body.title}, ${body.text}, ${country}, ${body.city}, ${session.album_id ?? null}::uuid) RETURNING id
       `;
       for (const [position, upload] of ordered.entries()) {
         await sql`

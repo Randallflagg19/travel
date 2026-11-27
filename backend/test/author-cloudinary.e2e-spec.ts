@@ -379,19 +379,23 @@ databaseTest('Author Cloudinary connections', () => {
         .auth(token, { type: 'bearer' })
         .send({ cloudName, apiKey, apiSecret })
         .expect(200);
-    const open = (id: string) =>
+    const open = (id: string, country?: string) =>
       api
         .put(`/api/media/sessions/${id}`)
         .auth(token, { type: 'bearer' })
-        .expect(200);
+        .send(country ? { country } : {});
     const reserve = (id: string, fileId: string, bytes: number) =>
       api
         .put(`/api/media/sessions/${id}/uploads/${fileId}`)
         .auth(token, { type: 'bearer' })
         .send({ mediaType: 'PHOTO', bytes });
+    const folderMode = jest.spyOn(cloudinary.api, 'config').mockResolvedValue({
+      settings: { folder_mode: 'dynamic' },
+    });
+    const assetFolder = 'travel/cloud-switch-author';
 
     await save('fixture-run-a', 'key-a', secret);
-    await open(sessionId);
+    await open(sessionId).expect(200);
     await save('fixture-run-b', 'key-b', 'fixture-b-secret');
     await reserve(sessionId, randomUUID(), photoLimit + 1).expect(400);
     const { body: signed } = (await reserve(
@@ -404,19 +408,33 @@ databaseTest('Author Cloudinary connections', () => {
         apiKey: string;
         signature: string;
         timestamp: number;
-        params: { public_id: string };
+        params: { public_id: string; asset_folder: string };
       };
     };
     const publicId = signed.params.public_id;
     const signature = createHash('sha1')
       .update(
-        `overwrite=false&public_id=${publicId}&timestamp=${signed.timestamp}${secret}`,
+        `asset_folder=${assetFolder}&overwrite=false&public_id=${publicId}&timestamp=${signed.timestamp}${secret}`,
       )
       .digest('hex');
     expect(signed).toMatchObject({
       cloudName: 'fixture-run-a',
       apiKey: 'key-a',
       signature,
+      params: { asset_folder: assetFolder },
+    });
+    await reserve(sessionId, uploadId, pngBytes)
+      .expect(200)
+      .expect(({ body }: { body: unknown }) => {
+        expect(body).toMatchObject({ params: signed.params });
+      });
+    expect(folderMode).toHaveBeenCalledTimes(1);
+    expect(folderMode).toHaveBeenCalledWith({
+      cloud_name: 'fixture-run-a',
+      api_key: 'key-a',
+      api_secret: secret,
+      settings: true,
+      timeout: 5_000,
     });
     expect(JSON.stringify(signed)).not.toContain(secret);
     expect(provider).toHaveBeenCalledWith(
@@ -466,20 +484,38 @@ databaseTest('Author Cloudinary connections', () => {
       .expect(200)
       .expect(({ body }: { body: unknown }) => {
         expect(body).toMatchObject({
-          post: { media_url: mediaUrl, media_width: 80, media_height: 60 },
+          post: {
+            media_url: mediaUrl,
+            folder: assetFolder,
+            media_width: 80,
+            media_height: 60,
+          },
         });
       });
 
-    await open(nextSession);
+    await open(nextSession, 'Thailand').expect(200);
+    await open(nextSession, 'Japan').expect(409);
+    const countryUploadId = randomUUID();
     const { body: nextUpload } = (await reserve(
       nextSession,
-      randomUUID(),
+      countryUploadId,
       pngBytes,
     ).expect(200)) as { body: { params: { public_id: string } } };
     expect(nextUpload).toMatchObject({
       cloudName: 'fixture-run-b',
       apiKey: 'key-b',
+      params: { asset_folder: `${assetFolder}/TH` },
     });
+    await api
+      .post(`/api/media/sessions/${nextSession}/publish`)
+      .auth(token, { type: 'bearer' })
+      .send({ uploadIds: [countryUploadId], country: 'Japan' })
+      .expect(400)
+      .expect(({ body }: { body: unknown }) => {
+        expect(body).toMatchObject({
+          message: 'Страна публикации должна совпадать со страной формы',
+        });
+      });
 
     const destroy = jest
       .spyOn(cloudinary.uploader, 'destroy')

@@ -7,6 +7,11 @@ import {
 } from './author-cloudinary-migration';
 import { migrateAuthorMedia } from './author-media-migration';
 import { migrateAlbums } from './albums-migration';
+import {
+  migrateAlbumFolderPaths,
+  migrateAlbumMedia,
+  migrateMediaSessionCountry,
+} from './album-media-migration';
 
 export async function runVersionedMigrations(sql: Sql) {
   await sql.begin(async (transaction) => {
@@ -48,6 +53,18 @@ export async function runVersionedMigrations(sql: Sql) {
     if (!versions.some((row) => row.version === '006_albums')) {
       await migrateAlbums(tx);
       await tx`INSERT INTO schema_migrations (version) VALUES ('006_albums')`;
+    }
+    if (!versions.some((row) => row.version === '007_album_media')) {
+      await migrateAlbumMedia(tx);
+      await tx`INSERT INTO schema_migrations (version) VALUES ('007_album_media')`;
+    }
+    if (!versions.some((row) => row.version === '008_album_folder_paths')) {
+      await migrateAlbumFolderPaths(tx);
+      await tx`INSERT INTO schema_migrations (version) VALUES ('008_album_folder_paths')`;
+    }
+    if (!versions.some((row) => row.version === '009_media_session_country')) {
+      await migrateMediaSessionCountry(tx);
+      await tx`INSERT INTO schema_migrations (version) VALUES ('009_media_session_country')`;
     }
   });
 }

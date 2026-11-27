@@ -174,7 +174,12 @@ describe('Backend modules and existing HTTP routes', () => {
         .expect({ postId: id });
       await api.delete(sessionPath).expect(200).expect({ postId: id });
 
-      expect(open).toHaveBeenCalledWith(id, { sub: userId, role });
+      expect(open).toHaveBeenCalledWith(
+        id,
+        { sub: userId, role },
+        undefined,
+        undefined,
+      );
       expect(reserve).toHaveBeenCalledWith(id, uploadId, userId, photo);
       expect(complete).toHaveBeenCalledWith(id, uploadId, userId);
       expect(publish).toHaveBeenCalledWith(id, userId, publication);

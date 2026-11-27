@@ -49,10 +49,14 @@ export class PlacesService {
 
     const [album] = await sql<Album[]>`
       INSERT INTO albums (user_id, country, title)
-      SELECT p.user_id, btrim(p.country), ${title}
-      FROM posts p
-      WHERE p.user_id = ${userId}::uuid AND btrim(p.country) = ${country}
-      LIMIT 1
+      SELECT ${userId}::uuid, ${country}, ${title}
+      WHERE EXISTS (
+        SELECT 1 FROM posts p
+        WHERE p.user_id = ${userId}::uuid AND btrim(p.country) = ${country}
+      ) OR EXISTS (
+        SELECT 1 FROM albums a
+        WHERE a.user_id = ${userId}::uuid AND a.country = ${country}
+      )
       RETURNING id, country, title
     `;
 
@@ -95,6 +99,12 @@ export class PlacesService {
       ) m ON true
       WHERE (${authorId ?? null}::uuid IS NULL OR p.user_id = ${authorId ?? null}::uuid)
       GROUP BY 1, 2
+
+      UNION ALL
+
+      SELECT DISTINCT a.country, NULL::text, 0, 0, 0, 0
+      FROM albums a
+      WHERE (${authorId ?? null}::uuid IS NULL OR a.user_id = ${authorId ?? null}::uuid)
       ORDER BY 1 NULLS LAST, 2 NULLS LAST
     `;
 

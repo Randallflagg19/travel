@@ -3,6 +3,9 @@ export type MediaSession = {
   user_id: string;
   environment: string;
   author_cloud_name: string | null;
+  country: string | null;
+  album_id: string | null;
+  album_country: string | null;
   state: string;
   post_id: string | null;
   publication_hash: string | null;
@@ -16,6 +19,7 @@ export type MediaUpload = {
   author_user_id: string | null;
   size_limit_bytes: number | null;
   public_id: string;
+  asset_folder: string | null;
   resource_type: 'image' | 'video';
   declared_bytes: number;
   ready: boolean;

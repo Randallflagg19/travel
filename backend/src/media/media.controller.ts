@@ -28,8 +28,9 @@ export class MediaController {
   open(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: JwtUser,
+    @Body() body?: { albumId?: unknown; country?: unknown },
   ) {
-    return this.media.open(id, user);
+    return this.media.open(id, user, body?.albumId, body?.country);
   }
 
   @Put('sessions/:id/uploads/:uploadId')

@@ -10,7 +10,14 @@ import type { JwtUser } from '../auth/jwt-user.type';
 import { DbService } from '../db/db.service';
 import { CloudinaryService } from '../integrations/cloudinary/cloudinary.service';
 import { AuthorCloudinaryService } from '../users/author-cloudinary.service';
-import { MEDIA_LIMITS, objectBody } from './media-contract';
+import { MEDIA_LIMITS, objectBody, optionalText, uuid } from './media-contract';
+import {
+  albumCountryLabel,
+  albumFolderParts,
+  mediaCountryFolder,
+  mediaOwnerFolder,
+  type MediaAlbum,
+} from './media-album';
 import { MediaEnvironmentService } from './media-environment.service';
 import { MediaCleanupService } from './media-cleanup.service';
 import type { MediaSession, MediaUpload } from './media-session.types';
@@ -37,7 +44,10 @@ export class MediaSessionsService {
     userId: string,
   ): Promise<MediaSession> {
     const [session] = await sql<MediaSession[]>`
-      SELECT *, expires_at <= now() AS expired FROM media_sessions WHERE id = ${id}::uuid FOR UPDATE
+      SELECT s.*, s.expires_at <= now() AS expired, a.country AS album_country
+      FROM media_sessions s
+      LEFT JOIN albums a ON a.id = s.album_id
+      WHERE s.id = ${id}::uuid FOR UPDATE OF s
     `;
     if (!session) throw new NotFoundException('Upload form was not found');
     if (
@@ -57,14 +67,84 @@ export class MediaSessionsService {
     }
   }
 
-  async open(id: string, { sub: userId, role }: JwtUser) {
+  private async reserveAlbumFolder(
+    sql: Sql,
+    albumId: string,
+    userId: string,
+    environment: string,
+  ) {
+    const [album] = await sql<
+      {
+        folder_path: string | null;
+        username: string;
+        country: string;
+        title: string;
+      }[]
+    >`
+      SELECT a.folder_path, u.username, a.country, a.title
+      FROM albums a JOIN users u ON u.id = a.user_id
+      WHERE a.id = ${albumId}::uuid AND a.user_id = ${userId}::uuid
+      FOR UPDATE OF a
+    `;
+    if (!album)
+      throw new BadRequestException('Альбом недоступен в вашем журнале');
+    if (album.folder_path) return album.folder_path;
+
+    const { ownerFolder, countryCode, titleFolder } = albumFolderParts(
+      album.username,
+      userId,
+      album.country,
+      album.title,
+      environment,
+    );
+    const parent = `${ownerFolder}/${countryCode}`;
+    // Serialize allocations in the same directory, including simultaneous first uploads.
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended(lower(${parent}), 0))`;
+    const [available] = await sql<{ path: string }[]>`
+      WITH RECURSIVE candidates(path, suffix) AS (
+        SELECT ${`${parent}/${titleFolder}`}::text, 1
+        UNION ALL
+        SELECT ${`${parent}/${titleFolder}`}::text || ' (' || (c.suffix + 1) || ')', c.suffix + 1
+        FROM candidates c
+        WHERE EXISTS (SELECT 1 FROM albums WHERE lower(folder_path) = lower(c.path))
+      )
+      SELECT path FROM candidates ORDER BY suffix DESC LIMIT 1
+    `;
+    await sql`UPDATE albums SET folder_path = ${available.path} WHERE id = ${albumId}::uuid`;
+    return available.path;
+  }
+
+  async open(
+    id: string,
+    { sub: userId, role }: JwtUser,
+    requestedAlbum?: unknown,
+    requestedCountry?: unknown,
+  ) {
     const environment = this.environment.current();
     const needsAuthorCloud = role === 'AUTHOR';
+    const albumId = requestedAlbum == null ? null : uuid(requestedAlbum);
+    const country = albumId ? null : optionalText(requestedCountry, 200);
     return this.sql().begin(async (transaction) => {
       const sql = transaction as unknown as Sql;
+      let album: MediaAlbum | undefined;
+      if (albumId) {
+        [album] = await sql<MediaAlbum[]>`
+          SELECT a.id, a.title, a.country, ARRAY(
+            SELECT DISTINCT btrim(p.city)
+            FROM posts p
+            WHERE p.user_id = a.user_id AND btrim(p.country) = a.country
+              AND NULLIF(btrim(p.city), '') IS NOT NULL
+            ORDER BY 1
+          ) AS cities
+          FROM albums a
+          WHERE a.id = ${albumId}::uuid AND a.user_id = ${userId}::uuid
+        `;
+        if (!album)
+          throw new BadRequestException('Альбом недоступен в вашем журнале');
+      }
       const [created] = await sql<Pick<MediaSession, 'author_cloud_name'>[]>`
-        INSERT INTO media_sessions (id, user_id, environment, author_cloud_name)
-        VALUES (${id}::uuid, ${userId}::uuid, ${environment}, (
+        INSERT INTO media_sessions (id, user_id, environment, album_id, country, author_cloud_name)
+        VALUES (${id}::uuid, ${userId}::uuid, ${environment}, ${albumId}::uuid, ${country}, (
           SELECT cloud_name FROM author_cloudinary_connections
           WHERE ${needsAuthorCloud}::boolean AND user_id = ${userId}::uuid AND is_active
         ))
@@ -78,7 +158,19 @@ export class MediaSessionsService {
       }
       const session = await this.lockForUser(sql, id, userId);
       this.assertOpen(session);
-      return { id, limits: MEDIA_LIMITS };
+      if (
+        (session.album_id ?? null) !== albumId ||
+        (session.country ?? null) !== country
+      ) {
+        throw new ConflictException('Эта форма уже открыта для другой ленты');
+      }
+      return {
+        id,
+        limits: MEDIA_LIMITS,
+        ...(album && {
+          album: { ...album, countryLabel: albumCountryLabel(album.country) },
+        }),
+      };
     });
   }
 
@@ -102,8 +194,8 @@ export class MediaSessionsService {
     const resourceType = mediaType === 'PHOTO' ? 'image' : 'video';
     const environment = this.environment.current();
     const db = this.sql();
-    const { authorUserId, credentials, reservedLimit } = await db.begin(
-      async (transaction) => {
+    const { authorUserId, credentials, existing, albumId, country } =
+      await db.begin(async (transaction) => {
         const sql = transaction as unknown as Sql;
         const session = await this.lockForUser(sql, sessionId, userId);
         this.assertOpen(session);
@@ -136,14 +228,15 @@ export class MediaSessionsService {
         return {
           authorUserId,
           credentials,
-          reservedLimit: existing?.size_limit_bytes,
+          existing,
+          albumId: session.album_id,
+          country: session.country,
         };
-      },
-    );
+      });
     const client = this.cloud.getClientConfig(credentials);
     // Keep the provider request outside the transaction and enforce the same limit on completion.
     const sizeLimit =
-      reservedLimit ??
+      existing?.size_limit_bytes ??
       (credentials
         ? Math.min(
             max,
@@ -153,10 +246,11 @@ export class MediaSessionsService {
     if (bytes > sizeLimit)
       throw new BadRequestException(`File exceeds the ${sizeLimit} byte limit`);
 
+    const mode = existing ? null : await this.cloud.getFolderMode(credentials);
+
     return db.begin(async (transaction) => {
       const sql = transaction as unknown as Sql;
       this.assertOpen(await this.lockForUser(sql, sessionId, userId));
-      const publicId = `travel/${environment}/${userId}/${sessionId}/${id}`;
       const [count] = await sql<
         { count: number }[]
       >`SELECT COUNT(*)::int AS count FROM media_uploads WHERE session_id = ${sessionId}::uuid`;
@@ -168,9 +262,32 @@ export class MediaSessionsService {
             'Too many replacements; open a new upload form',
           );
       }
+      const albumFolder =
+        mode && albumId
+          ? await this.reserveAlbumFolder(sql, albumId, userId, environment)
+          : null;
+      const countryFolder = country ? mediaCountryFolder(country) : null;
+      const fixedFolder = albumFolder
+        ? albumFolder.slice(albumFolder.indexOf('/') + 1)
+        : countryFolder;
+      const publicId =
+        existing?.public_id ??
+        `travel/${environment}/${userId}/${mode === 'fixed' ? (fixedFolder ?? sessionId) : sessionId}/${id}`;
+      let assetFolder = existing?.asset_folder ?? null;
+      if (mode === 'dynamic') {
+        if (albumFolder) {
+          assetFolder = `travel/${albumFolder}`;
+        } else {
+          const [owner] = await sql<{ username: string }[]>`
+            SELECT username FROM users WHERE id = ${userId}::uuid
+          `;
+          assetFolder = `travel/${mediaOwnerFolder(owner.username, userId, environment)}`;
+          if (countryFolder) assetFolder += `/${countryFolder}`;
+        }
+      }
       await sql`
-        INSERT INTO media_uploads (id, session_id, media_type, cloud_name, public_id, resource_type, declared_bytes, author_user_id, size_limit_bytes)
-        VALUES (${id}::uuid, ${sessionId}::uuid, ${mediaType}, ${client.cloudName}, ${publicId}, ${resourceType}, ${bytes}, ${authorUserId}, ${sizeLimit})
+        INSERT INTO media_uploads (id, session_id, media_type, cloud_name, public_id, resource_type, declared_bytes, author_user_id, size_limit_bytes, asset_folder)
+        VALUES (${id}::uuid, ${sessionId}::uuid, ${mediaType}, ${client.cloudName}, ${publicId}, ${resourceType}, ${bytes}, ${authorUserId}, ${sizeLimit}, ${assetFolder})
         ON CONFLICT (id) DO NOTHING
       `;
       const [upload] = await sql<
@@ -192,7 +309,11 @@ export class MediaSessionsService {
       }
       // Cloudinary signatures live for an hour; keep a safety margin for late requests.
       await sql`UPDATE media_uploads SET signature_expires_at = now() + interval '2 hours' WHERE id = ${id}::uuid`;
-      const params = { public_id: publicId, overwrite: false };
+      const params = {
+        public_id: upload.public_id,
+        overwrite: false,
+        ...(upload.asset_folder && { asset_folder: upload.asset_folder }),
+      };
       const signed = this.cloud.signUpload(params, credentials);
       return {
         ...client,
